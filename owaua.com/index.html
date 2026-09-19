@@ -98,7 +98,7 @@ owaua
 <ul class="list">
 <li><strong>it waits until you ask</strong><span>Ping it in a server and it replies. A lonely <code>@owaua</code> with nothing else gets a tiny local “yeah?” — no model call. Other bots are ignored. DMs only work if the operator turns on <code>BOT_ALLOW_DMS=1</code>.</span></li>
 <li><strong>it remembers your thread, not the room</strong><span>Your history with it is just you, in that channel. It keeps up to 20 turns, they fade after a week, and the whole file tops out at 10,000 records. The person next to you has a separate memory.</span></li>
-<li><strong>a few voices, and a few brains</strong><span>Pick <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code>, or <code>chaotic</code> for yourself. You can also choose a host default, DeepSeek, Mistral, or GPT alias when that option is available. Full mode is a separate opt-in for approved users.</span></li>
+<li><strong>a few voices, and a few brains</strong><span>Pick <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code>, or <code>chaotic</code> for yourself. Full mode is a separate opt-in for approved users.</span></li>
 <li><strong>it can answer in your language</strong><span>Admins set a full language name, like <code>!language hungarian</code>. When matching art exists, owaua can change that server’s bot avatar and banner too, so it looks like it belongs there.</span></li>
 <li><strong>a song in voice, if you ask</strong><span><code>!music</code> plays a single YouTube video or Twitter/X post with video, or a supported audio attachment. Pause, resume, restart, skip, stop, now, and leave. No name searches or playlists.</span></li>
 <li><strong>short answers, on purpose</strong><span>Normal hangout mode stays text-only, with a small 80-token cap, and it does not look at images. Approved people can open <code>!full mode on</code> in the designated channels. Full mode still uses the same per-user request budget.</span></li>
@@ -110,7 +110,7 @@ owaua
 <p>Each command has its own 25-second per-user cooldown. Changing server settings needs Manage Server. Music controls only work if you are in the same voice channel as the bot.</p>
 <div class="commands">
 <div class="command"><code>!help</code><p>The list, when you forget.</p></div>
-<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic</code><p>Hear or change your general-audience voice. <code>!persona host default gpt|deepseek|mistral</code> selects a host-model alias for you.</p></div>
+<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic</code><p>Hear or change your general-audience voice.</p></div>
 <div class="command"><code>!language &lt;full name&gt;|reset</code><p>Set or clear the server’s reply language, and the matching profile art when it exists.</p></div>
 <div class="command"><code>!music &lt;YouTube/X URL or attachment&gt;</code><p>Put one supported track on. Or <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code>, and <code>leave</code>.</p></div>
 <div class="command"><code>!memory erase</code> / <code>!memory erase mine</code><p>Admins can wipe the server’s stored chats. Anyone can wipe their own, including DMs when those are on.</p></div>
