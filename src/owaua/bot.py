@@ -74,6 +74,7 @@ COMMANDS = frozenset(
     {
         "!help",
         "!persona",
+        "!human",
         "!language",
         "!music",
         "!memory",
@@ -123,6 +124,7 @@ HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
 `!persona rudeish|nerdish|flirty|chaotic` — view or switch your persona
+`!human on|off` — talk like a person, or use the usual hangout-bot voice
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
@@ -135,6 +137,7 @@ OWNER_HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
 `!persona rudeish|nerdish|flirty|chaotic` — view or switch your persona
+`!human on|off` — talk like a person, or use the usual hangout-bot voice
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
@@ -294,6 +297,7 @@ PERSONA_USAGE = (
     "usage: !persona rudeish, !persona nerdish, !persona flirty, "
     "or !persona chaotic"
 )
+HUMAN_USAGE = "usage: !human on or !human off"
 
 
 def parse_persona_argument(argument: str) -> tuple[str | None, str | None]:
@@ -304,6 +308,16 @@ def parse_persona_argument(argument: str) -> tuple[str | None, str | None]:
     if text in PERSONAS:
         return text, None
     return None, PERSONA_USAGE
+
+
+def parse_human_argument(argument: str) -> tuple[str | None, str | None]:
+    """Return ``(on|off, error)`` for ``!human`` arguments."""
+    text = " ".join(argument.casefold().split())
+    if not text:
+        return None, None
+    if text in {"on", "off"}:
+        return text, None
+    return None, HUMAN_USAGE
 
 
 def parse_language_name(value: str) -> tuple[str | None, str | None]:
@@ -491,6 +505,11 @@ def persona_setting_key(message: object) -> str:
     return f"persona:user:{getattr(getattr(message, 'author', None), 'id', '')}"
 
 
+def human_setting_key(message: object) -> str:
+    """Return the persistent human-voice key for the user issuing a message."""
+    return f"human:user:{getattr(getattr(message, 'author', None), 'id', '')}"
+
+
 def split_reply(text: str, limit: int = DISCORD_MESSAGE_LIMIT) -> list[str]:
     remaining = text.strip()
     if not remaining:
@@ -649,6 +668,10 @@ class PersonaBot(discord.Client):
             if not valid_persona(selected):
                 selected = "rudeish"
         return selected
+
+    def human_mode_for(self, message: object) -> bool:
+        """True unless this user has explicitly turned human voice off."""
+        return self.memory.get_setting(human_setting_key(message), "1") != "0"
 
     @staticmethod
     def can_manage_settings(message: object) -> bool:
@@ -922,6 +945,9 @@ class PersonaBot(discord.Client):
         if name == "!persona":
             await self._reply(message, self._persona_command(message, argument))
             return
+        if name == "!human":
+            await self._reply(message, self._human_command(message, argument))
+            return
         if name == "!language":
             await self._reply(
                 message, await self._language_command(message, argument)
@@ -1043,6 +1069,7 @@ class PersonaBot(discord.Client):
                         ),
                         use_history=use_history,
                         relaxed_guardrails=relaxed_guardrails,
+                        human=not full_mode and self.human_mode_for(message),
                     )
                 answer = await asyncio.wait_for(request, timeout=ASK_TIMEOUT)
             if not answer:
@@ -1148,6 +1175,16 @@ class PersonaBot(discord.Client):
         # current persona, so the previous character cannot bleed through.
         self.memory.erase_user_memory(str(message.author.id))
         return f"persona: {persona_label(persona)}"
+
+    def _human_command(self, message: discord.Message, requested: str) -> str:
+        if not requested.strip():
+            return "human: on" if self.human_mode_for(message) else "human: off"
+        setting, error = parse_human_argument(requested)
+        if error is not None:
+            return error
+        assert setting is not None
+        self.memory.set_setting(human_setting_key(message), "1" if setting == "on" else "0")
+        return f"human {setting}"
 
     async def _bot_member(self, guild: discord.Guild) -> object | None:
         member = getattr(guild, "me", None)

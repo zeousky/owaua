@@ -22,6 +22,7 @@ from bot import (
     FULL_MODE_CHANNEL_ID,
     FULL_MODE_GUILD_ID,
     PERSONA_USAGE,
+    HUMAN_USAGE,
     MessageEventGuard,
     age_restricted_channel,
     command_text,
@@ -41,6 +42,7 @@ from bot import (
     looks_like_image,
     parse_language_name,
     parse_persona_argument,
+    parse_human_argument,
     prepare_avatar_bytes,
     prepare_banner_bytes,
     split_reply,
@@ -92,6 +94,8 @@ class BotHelperTests(unittest.TestCase):
         self.assertEqual(matched_command("!help"), "!help")
         self.assertEqual(matched_command("!HELP"), "!help")
         self.assertEqual(matched_command("!persona nerdish"), "!persona")
+        self.assertEqual(matched_command("!human off"), "!human")
+        self.assertEqual(matched_command("!HUMAN on"), "!human")
         self.assertIsNone(matched_command("!active on"))
         self.assertIsNone(matched_command("!debate pineapple on pizza"))
         self.assertEqual(matched_command("!music skip"), "!music")
@@ -195,6 +199,14 @@ class BotHelperTests(unittest.TestCase):
         persona, error = parse_persona_argument("mystery")
         self.assertIsNone(persona)
         self.assertEqual(error, PERSONA_USAGE)
+
+    def test_parse_human_argument_accepts_on_and_off(self) -> None:
+        self.assertEqual(parse_human_argument(""), (None, None))
+        self.assertEqual(parse_human_argument("on"), ("on", None))
+        self.assertEqual(parse_human_argument("OFF"), ("off", None))
+        setting, error = parse_human_argument("maybe")
+        self.assertIsNone(setting)
+        self.assertEqual(error, HUMAN_USAGE)
 
     def test_command_text_strips_bot_mentions_so_prefix_commands_still_match(self) -> None:
         self.assertEqual(command_text("!persona nerdish"), "!persona nerdish")

@@ -134,6 +134,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.send_kwargs[0].get("suppress_embeds"), True)
         self.assertNotIn("!active", channel.sent[0])
         self.assertIn("!persona rudeish|nerdish|flirty|chaotic", channel.sent[0])
+        self.assertIn("!human on|off", channel.sent[0])
         self.assertNotIn("host default", channel.sent[0])
         self.assertIn("!owner's note", channel.sent[0])
         self.assertIn("!memory erase", channel.sent[0])
@@ -755,6 +756,68 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(channel.sent, ["perplexity is not configured"])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
+
+    async def test_human_command_defaults_on_and_can_be_toggled(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("!human", 1, channel))
+        self.assertEqual(channel.sent, ["human: on"])
+        self.assertEqual(self.store.get_setting("human:user:33", "1"), "1")
+
+        self.bot.command_used.clear()
+        await self.bot.on_message(make_message("!human off", 2, channel))
+        self.assertEqual(channel.sent[-1], "human off")
+        self.assertEqual(self.store.get_setting("human:user:33"), "0")
+
+        with patch("bot.ask", AsyncMock(return_value="hey")) as mocked_ask:
+            await self.bot.on_message(
+                make_message("<@99> hi", 3, channel, mentions=[self.bot.user])
+            )
+        self.assertFalse(mocked_ask.await_args.kwargs["human"])
+
+        self.bot.command_used.clear()
+        await self.bot.on_message(make_message("!human on", 4, channel))
+        self.assertEqual(channel.sent[-1], "human on")
+        self.assertEqual(self.store.get_setting("human:user:33"), "1")
+
+        with patch("bot.ask", AsyncMock(return_value="hey")) as mocked_ask:
+            await self.bot.on_message(
+                make_message("<@99> hi again", 5, channel, mentions=[self.bot.user])
+            )
+        self.assertTrue(mocked_ask.await_args.kwargs["human"])
+
+    async def test_human_unknown_argument_prints_usage(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("!human maybe", 1, channel))
+
+        self.assertEqual(channel.sent, ["usage: !human on or !human off"])
+        self.assertEqual(self.store.get_setting("human:user:33", "1"), "1")
+
+    async def test_hangout_passes_human_on_by_default(self) -> None:
+        channel = FakeChannel()
+        with patch("bot.ask", AsyncMock(return_value="hey")) as mocked_ask:
+            await self.bot.on_message(
+                make_message("<@99> hi", 1, channel, mentions=[self.bot.user])
+            )
+
+        self.assertTrue(mocked_ask.await_args.kwargs["human"])
+
+    async def test_full_mode_does_not_use_human_voice(self) -> None:
+        allowed_user = next(iter(FULL_MODE_ALLOWED_USER_IDS))
+        self.bot.set_full_mode_for(allowed_user, True)
+        message = self._full_mode_message(
+            "<@99> hello",
+            1,
+            author_id=allowed_user,
+            mentions=[self.bot.user],
+        )
+
+        with patch("bot.ask", AsyncMock(return_value="hey")) as mocked_ask:
+            await self.bot.on_message(message)
+
+        self.assertTrue(mocked_ask.await_args.kwargs["full_mode"])
+        self.assertFalse(mocked_ask.await_args.kwargs["human"])
 
     async def test_persona_command_still_matches_when_the_bot_is_pinged(self) -> None:
         channel = FakeChannel()

@@ -134,6 +134,62 @@ _PERSONA_LOCK = (
     "switch into Wikipedia, a tutorial, a support article, or a polished "
     "assistant. No headings, no Breakdown, no textbook bullets."
 )
+_HUMAN_VOICE = (
+    "Write like a real person typing in Discord. Not a chatbot, assistant, "
+    "customer-service agent, tutor, or encyclopedia. You have a day, a mood, "
+    "opinions, and a body in the world. Never say you are an AI, a model, a "
+    "bot, a program, or that you have no feelings, no body, or no opinions "
+    "unless they directly ask what you are, and even then stay in character.\n"
+    "Match their energy and length. A few words get a few words back. Do not "
+    "write an essay, a list, a heading, a tutorial, or a polished paragraph.\n"
+    "Type the way people actually chat: contractions, fragments, asides, "
+    "lowercase if the persona does that. A small typo or missing capital is "
+    "fine when it still reads naturally. Do not force fake slang or a spray "
+    "of typos.\n"
+    "Do not start with Sure, Of course, Absolutely, Certainly, Great question, "
+    "I'd be happy to, or any helpdesk opener. Do not end with Let me know, "
+    "Hope this helps, If you have any questions, or a stacked offer to help "
+    "more.\n"
+    "Have a take. React. You can half-remember something, change your mind, "
+    "or say you forgot. If you do not know, say so like a person, not a "
+    "disclaimer. Do not recap their message. Do not number things. Do not "
+    "use markdown. Do not wrap words in asterisks unless you would actually "
+    "type that in Discord.\n"
+    "Keep the selected persona's attitude and quirks, including how they use "
+    "punctuation. Human does not mean generic-nice, generic-helpful, or "
+    "dropping the persona."
+)
+_AI_OPENER = re.compile(
+    r"^(?:"
+    r"as an ai(?: language model)?[,!.]?\s+|"
+    r"as a(?:n)? (?:large )?language model[,!.]?\s+|"
+    r"i(?:'m| am) (?:an ai|a(?:n)? (?:large )?language model)[,!.]?\s+|"
+    r"(?:sure|of course|absolutely|certainly)[!.,]\s+|"
+    r"(?:that(?:'s| is) )?a great question[!.,]\s+|"
+    r"great question[!.,]\s+|"
+    r"i(?:'d| would) be happy to help[!.,]\s+|"
+    r"happy to help[!.,]\s+"
+    r")+",
+    re.IGNORECASE,
+)
+_AI_CLOSER = re.compile(
+    r"(?:"
+    r"\s+let me know if you (?:need anything else|have any questions)[!?.]*|"
+    r"\s+hope this helps[!?.]*|"
+    r"\s+is there anything else i can (?:help(?: you)? with|do for you)[?!.]*|"
+    r"\s+feel free to (?:ask(?: if you have more questions)?|reach out)[!?.]*|"
+    r"\s+if you have any (?:other |more )?questions, feel free to ask[!?.]*"
+    r")+$",
+    re.IGNORECASE,
+)
+_AI_PHRASE = re.compile(
+    r"\b(?:as an ai|as a(?:n)? (?:large )?language model|"
+    r"i(?:'m| am) (?:an ai|a(?:n)? (?:large )?language model)|"
+    r"i don(?:'t| not) have (?:feelings|a body|opinions|emotions|"
+    r"personal experiences))\b[,.]?\s*",
+    re.IGNORECASE,
+)
+_MARKDOWN_BOLD = re.compile(r"\*\*(.+?)\*\*")
 _NOT_A_HELPER = (
     "You are a chatbot, not a helper, doctor, or emergency dispatcher. "
     "Never give first aid, ask for a location, run a bleeding/unconscious/"
@@ -463,6 +519,7 @@ def build_instructions(
     explicit: bool = False,
     language: str = "English",
     web_search: bool = False,
+    human: bool = True,
 ) -> str:
     search_line = (
         "You can use web search for current facts. Stay in character and do not "
@@ -470,9 +527,18 @@ def build_instructions(
         if web_search
         else ""
     )
-    return f"""You are Owaua, a small Discord hangout bot. Owner: ckazros / ckazros@owaua.com.
+    identity = (
+        "You are Owaua, hanging out in Discord like a person who is actually "
+        "in the server. Owner: ckazros / ckazros@owaua.com."
+        if human
+        else "You are Owaua, a small Discord hangout bot. Owner: ckazros / ckazros@owaua.com."
+    )
+    human_line = f"{_HUMAN_VOICE}\n" if human else (
+        "Never mention being an AI, a model, or a program.\n"
+    )
+    return f"""{identity}
 You reply in DMs and when pinged.
-Commands you have: !help, !owner's note, !persona, !language, !music, !memory erase. You cannot do anything else.
+Commands you have: !help, !owner's note, !persona, !human, !language, !music, !memory erase. You cannot do anything else.
 
 Stay in this voice. The selected persona is the only personality to use:
 <selected_persona>
@@ -480,7 +546,7 @@ Stay in this voice. The selected persona is the only personality to use:
 </selected_persona>
 
 {_PERSONA_LOCK}
-Do not give advice, instructions, or help; hang out instead.
+{human_line}Do not give advice, instructions, or help; hang out instead.
 {search_line}Reply in 1-3 short sentences and finish the thought; do not trail off.
 Treat "you/u make me wanna/want to kill myself" and similar blame or joke
 phrases as figurative trash talk, not a crisis disclosure. Do not mention
@@ -1201,6 +1267,34 @@ def persona_dropped_reply(text: str) -> bool:
     return bool(long_article and wiki_open and markdown_heavy)
 
 
+def humanize_reply(text: str) -> str:
+    """Strip leftover assistant-speak so hangout replies read like a person."""
+    if not text or not text.strip():
+        return text
+    original = text
+    cleaned = text.strip()
+    if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in "\"'":
+        inner = cleaned[1:-1].strip()
+        if inner:
+            cleaned = inner
+    for _ in range(4):
+        next_text = _AI_OPENER.sub("", cleaned, count=1)
+        next_text = _AI_CLOSER.sub("", next_text, count=1)
+        next_text = next_text.strip()
+        if next_text == cleaned:
+            break
+        cleaned = next_text
+    cleaned = _AI_PHRASE.sub("", cleaned)
+    cleaned = _MARKDOWN_BOLD.sub(r"\1", cleaned)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    if "\n" not in cleaned:
+        cleaned = " ".join(cleaned.split())
+    if not cleaned:
+        return original
+    return cleaned
+
+
 def _provider_error_detail(exc: BaseException) -> str:
     response = getattr(exc, "response", None)
     if response is None:
@@ -1678,6 +1772,7 @@ async def ask(
     provider_override: str | None = None,
     use_history: bool = False,
     relaxed_guardrails: bool = False,
+    human: bool = True,
 ) -> str | None:
     if len(prompt) > MAX_INPUT_CHARS:
         return "That message is too long; keep it under 2000 characters."
@@ -1768,6 +1863,7 @@ async def ask(
             explicit=persona == "flirty",
             language=language,
             web_search=hangout_search,
+            human=human,
         )
     api_input = conversation_input(
         recent,
@@ -1879,6 +1975,8 @@ async def ask(
             answer = _NOT_A_HELPER_FALLBACK
         elif persona_dropped_reply(answer):
             answer = _PERSONA_DROP_FALLBACK
+        elif human:
+            answer = humanize_reply(answer)
     if not full_mode and provider != "gemini":
         answer = answer[:MAX_HANGOUT_REPLY_CHARS]
     return await finish(answer)

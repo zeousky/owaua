@@ -35,6 +35,7 @@ from ask import (
     build_capable_instructions,
     build_instructions,
     chat_completion_text,
+    humanize_reply,
     conversation_input,
     conversation_text,
     credible_self_harm_risk,
@@ -184,6 +185,8 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("web search", instructions)
         self.assertNotIn("code interpreter", instructions)
         self.assertIn("!music", instructions)
+        self.assertIn("!human", instructions)
+        self.assertIn("Write like a real person typing in Discord", instructions)
         self.assertNotIn("!debate", instructions)
         self.assertNotIn("!active", instructions)
         self.assertIn("Reply in English", instructions)
@@ -663,8 +666,57 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer, wiki.strip())
         self.assertNotEqual(answer, "im a chatbot, not a wiki")
 
+    async def test_human_mode_can_be_turned_off(self) -> None:
+        await self._ask(human=False)
+
+        instructions = instructions_of(self.http.calls[0][1]["json"])
+        self.assertNotIn("Write like a real person typing in Discord", instructions)
+        self.assertIn("a small Discord hangout bot", instructions)
+        self.assertIn("Never mention being an AI", instructions)
+        self.assertIn("!human", instructions)
+
+    async def test_full_mode_ignores_human_voice(self) -> None:
+        await self._ask(full_mode=True, human=True)
+
+        instructions = instructions_of(self.http.calls[0][1]["json"])
+        self.assertNotIn("Write like a real person typing in Discord", instructions)
+        self.assertIn("directly, accurately, and completely", instructions)
+
+    async def test_human_mode_strips_assistant_tells_from_hangout_replies(self) -> None:
+        self.http.responses = model_reply(
+            "Sure! pizza is obviously better. Hope this helps!"
+        )
+
+        answer = await self._ask()
+
+        self.assertEqual(answer, "pizza is obviously better.")
+
+    async def test_human_off_keeps_assistant_tells(self) -> None:
+        canned = "Sure! pizza is obviously better. Hope this helps!"
+        self.http.responses = model_reply(canned)
+
+        answer = await self._ask(human=False)
+
+        self.assertEqual(answer, canned)
+
 
 class AskHelperTests(unittest.TestCase):
+    def test_humanize_reply_strips_assistant_tells(self) -> None:
+        self.assertEqual(
+            humanize_reply("Sure! The capital of France is Paris. Hope this helps!"),
+            "The capital of France is Paris.",
+        )
+        self.assertEqual(
+            humanize_reply("As an AI, I don't have feelings, but yeah that's rough."),
+            "but yeah that's rough.",
+        )
+        self.assertEqual(humanize_reply("yeah whatever"), "yeah whatever")
+        self.assertEqual(humanize_reply("sure, whatever"), "whatever")
+        self.assertEqual(humanize_reply(""), "")
+
+    def test_humanize_reply_keeps_a_bare_sure_instead_of_emptying_it(self) -> None:
+        self.assertEqual(humanize_reply("Sure!"), "Sure!")
+
     def test_response_text_supports_raw_responses_shape(self) -> None:
         data = {
             "output": [
