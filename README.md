@@ -7,8 +7,8 @@ by default. Personas are `rudeish` (default), `nerdish`, `flirty`, and
 `chaotic`. Normal chat uses Gemini 3.1 Flash Lite and can search the web when
 you ask about current facts.
 
-If you put this in a server, I'd like to know. DM me on Discord (`ckazros`) or
-email `ckazros@owaua.com`.
+If you put this in a server and actually like it, I'd like to know. DM me on Discord (`ckazros`) or
+email `ckazros@owaua.com`. (This will give me more motivation)
 
 ## Commands
 
