@@ -63,7 +63,6 @@ class MemoryStore:
         )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
-        # A committed charge must survive a crash before the HTTP request.
         connection.execute("PRAGMA synchronous=FULL")
         connection.execute("PRAGMA busy_timeout=10000")
         connection.execute("PRAGMA max_page_count=32768")

@@ -1,5 +1,4 @@
 'use strict';
-// All page content and navigation work without JavaScript.
 const menu = document.querySelector('.menu');
 if (menu) {
   menu.addEventListener('click', event => { if (event.target.closest('a')) menu.open = false; });

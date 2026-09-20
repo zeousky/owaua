@@ -42,8 +42,6 @@ class ApiLimits:
 
 
 API_LIMITS = ApiLimits()
-# Full mode uses the same per-user budget; there are no shared, daily, or
-# shared or lifetime API ceilings.
 FULL_MODE_API_LIMITS = API_LIMITS
 
 

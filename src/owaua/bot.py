@@ -59,7 +59,6 @@ load_dotenv(os.getenv("OWAUA_ENV_FILE") or ROOT / ".env")
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 log = logging.getLogger("owaua")
-# CDN URLs can contain bearer-like query signatures. Do not log request URLs.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "").strip().replace("\\_", "_")
@@ -149,9 +148,6 @@ OWNER_HELP_TEXT = """**Owaua commands**
 
 Each command has a 25s cooldown."""
 
-# USD per 1M tokens. These are provider list prices, not a charge made by the
-# bot. Keep this table keyed by the model IDs the bot actually uses so an env
-# override can be shown as unknown rather than being given a misleading rate.
 MODEL_PRICING = {
     "openai/gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
     "openai/gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
@@ -626,7 +622,6 @@ class PersonaBot(discord.Client):
         self.command_used: dict[tuple[int, str], float] = {}
         self.music_tracks: dict[int, dict[str, object]] = {}
         self.response_languages: dict[str, str] = {}
-        # Legacy global state was writable by arbitrary users: do not migrate it.
         self.selected_persona = "rudeish"
         self.inflight_users: set[int] = set()
         self.handler_count = 0
@@ -662,7 +657,6 @@ class PersonaBot(discord.Client):
             if full_mode_blocked(getattr(getattr(message, "author", None), "id", None)):
                 return "blocked"
             selected = self.memory.get_setting(persona_setting_key(message), "rudeish")
-            # Migrate the old persona name in existing persisted settings.
             if selected == "explicit":
                 selected = "flirty"
             if not valid_persona(selected):
@@ -726,10 +720,6 @@ class PersonaBot(discord.Client):
         self.memory.set_setting(full_mode_setting_key(user_id), "0")
 
     def full_mode_active(self, message: object) -> bool:
-        # Full mode is an opt-in capability for approved users. It is not a
-        # guild-level trust bypass: every request still goes through bounded
-        # admission, concurrency, timeout, input, output, and per-user
-        # API-budget limits.
         if not full_mode_location(message):
             return False
         author = getattr(message, "author", None)
@@ -773,9 +763,6 @@ class PersonaBot(discord.Client):
         log.info("Logged in as %s; persona=%s", self.user, self.selected_persona)
 
     async def on_disconnect(self) -> None:
-        # discord.py keeps retrying gateway connections by itself.  This event
-        # is still useful when Discord has a partial outage, because it makes
-        # the connection state visible without stopping message handling.
         if not self.is_closed():
             log.warning("Disconnected from Discord; waiting for gateway recovery")
 
@@ -807,9 +794,6 @@ class PersonaBot(discord.Client):
         normalized = command_text(message.content, None if self.user is None else self.user.id)
         if self.shutdown_requested:
             return
-        # This emergency command must be reachable even from a DM, blocked
-        # guild, or a guild where ordinary commands are filtered. It never
-        # sends an acknowledgement: once accepted, all outbound work stops.
         if normalized.casefold() == "!shutdown":
             if message.author.id in OWNER_IDS and self.message_events.claim(message.id):
                 await self._shutdown()
@@ -839,13 +823,9 @@ class PersonaBot(discord.Client):
                 and not (full_mode_location(message) and is_full_mode_command(normalized))
                 and not (self.user is not None and self.user in message.mentions)):
             return
-        # Claim the event before any cooldown, quota, or reply work. Discord can
-        # redeliver an event while the first handler is still running; doing
-        # this later allows both deliveries to pass the side-effect checks.
         if not self.message_events.claim(message.id):
             audit_filtered("duplicate_message")
             return
-        # Bound complete event handlers, including outbound Discord API waits.
         count = getattr(self, "handler_count", 0)
         if not unrestricted_music and count >= MAX_HANDLERS:
             audit_filtered("handler_capacity")
@@ -987,9 +967,6 @@ class PersonaBot(discord.Client):
         relaxed_guardrails = full_mode
         decode_now = not relaxed_guardrails and looks_like_decode_request(prompt)
         repeat_now = not relaxed_guardrails and looks_like_repeat_request(prompt)
-        # Full mode changes the provider/capabilities for approved users, but
-        # it does not receive an unbounded conversation window. Gemini hangout
-        # keeps a larger recent-turn window so search-backed replies have context.
         persona = self.persona_for(message.channel, message)
         use_history = (
             not full_mode
@@ -1009,8 +986,6 @@ class PersonaBot(discord.Client):
                 prompt = f"{quoted}\n{prompt}".strip()
                 use_history = True
         if not prompt and not image_urls:
-            # A plain mention should be cheap and reliable: it must not wait
-            # for an AI provider while Discord is recovering from an outage.
             if mentioned:
                 await self._reply(message, PING_RESPONSE)
             return
@@ -1074,8 +1049,6 @@ class PersonaBot(discord.Client):
                 answer = await asyncio.wait_for(request, timeout=ASK_TIMEOUT)
             if not answer:
                 return
-            # Full mode is a capability/provider selection, not an output
-            # limit bypass. Keep Discord replies under the normal cap too.
             await self._reply(message, answer)
         except asyncio.CancelledError:
             raise
@@ -1170,9 +1143,6 @@ class PersonaBot(discord.Client):
         if problem is not None:
             return problem
         self.memory.set_setting(persona_setting_key(message), persona)
-        # Conversation history contains assistant style as well as facts.
-        # Drop it whenever a persona is selected, including re-selecting the
-        # current persona, so the previous character cannot bleed through.
         self.memory.erase_user_memory(str(message.author.id))
         return f"persona: {persona_label(persona)}"
 
@@ -1362,8 +1332,6 @@ class PersonaBot(discord.Client):
         except Exception:
             log.exception("Profile reset failed; guild=%s", server_id)
 
-        # Reset the live music session too; stop_music is idempotent when the
-        # server is not currently playing anything.
         await stop_music(self, message.guild)
         self.music_tracks.pop(message.guild.id, None)
         log.info("Reset bot state; server=%s records=%s", server_id, removed)
@@ -1490,8 +1458,6 @@ async def main() -> None:
     audit_path = Path(os.getenv("MUSIC_AUDIT_LOG", "data/music-audit.jsonl"))
     if not audit_path.is_absolute():
         audit_path = ROOT / audit_path
-    # Initialize the audit destination before credential checks, so operators
-    # can verify its location even when startup fails configuration validation.
     configure_music_audit_log(audit_path)
     log.info("Cloudflare protection: %s", describe_protection())
     if not DISCORD_TOKEN:

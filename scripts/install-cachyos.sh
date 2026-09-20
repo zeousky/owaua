@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install Owaua and the bundled DeepGrove Maple model on a Linux machine.
-# Run this from the project copied from the USB. The model is never downloaded.
-
 SOURCE_ROOT=$(cd "$(dirname "$0")/.." && pwd -P)
 INSTALL_ROOT=${OWAUA_INSTALL_DIR:-"$HOME/owaua-persona-testbot"}
 BACKEND=${OWAUA_MLX_BACKEND:-auto}
@@ -39,7 +36,6 @@ else
   echo "Installing in place at $INSTALL_ROOT ..."
 fi
 
-# Remove macOS resource-fork files; names such as ._pack-*.idx confuse Git on Linux.
 find "$INSTALL_ROOT" -name '._*' -type f -delete
 find "$INSTALL_ROOT" -name '.DS_Store' -type f -delete
 
@@ -87,8 +83,6 @@ echo "Installing the bundled DeepGrove runtime ($BACKEND backend) ..."
   pyyaml \
   jinja2
 
-# Register the bundled source checkout in the Linux venv. This avoids relying
-# on the process working directory when importing mlx_lm.server.
 MLX_SITE_PACKAGES=$(
   "$MLX_VENV/bin/python" -c 'import site; print(site.getsitepackages()[0])'
 )

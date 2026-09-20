@@ -204,13 +204,19 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_images_are_sent_on_the_latest_user_message(self) -> None:
         answer = await self._ask("look", image_urls=["https://cdn.discordapp.com/image.png"])
-        self.assertIn("disabled", answer)
-        self.assertEqual(self.http.calls, [])
+        self.assertEqual(answer, "allowed reply")
+        self.assertEqual(len(self.http.calls), 1)
+        content = latest_user_content(self.http.calls[0][1]["json"])
+        self.assertEqual(
+            [block["image_url"] for block in content if block.get("type") == "input_image"],
+            ["https://cdn.discordapp.com/image.png"],
+        )
 
     async def test_hangout_keeps_only_one_image(self) -> None:
         answer = await self._ask("look", image_urls=["https://cdn.discordapp.com/image.png"])
-        self.assertIn("disabled", answer)
-        self.assertEqual(self.http.calls, [])
+        self.assertEqual(answer, "allowed reply")
+        content = latest_user_content(self.http.calls[0][1]["json"])
+        self.assertEqual(len([block for block in content if block.get("type") == "input_image"]), 1)
 
     async def test_standalone_message_does_not_send_previous_turns(self) -> None:
         await self._ask("what number comes after sixteen", event_id="first")
@@ -241,7 +247,11 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_host_default_gpt_keeps_images_on_luna(self) -> None:
-        answer = await self._ask("look", image_urls=["https://cdn.discordapp.com/image.png"])
+        answer = await self._ask(
+            "look",
+            image_urls=["https://cdn.discordapp.com/image.png"],
+            provider_override="gpt",
+        )
         self.assertIn("disabled", answer)
         self.assertEqual(self.http.calls, [])
 
@@ -287,13 +297,13 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
     async def test_flirty_instructions_only_when_that_persona_is_used(self) -> None:
         await self._ask(persona="flirty")
         explicit_payload = instructions_of(self.http.calls[0][1]["json"])
-        self.assertIn("put ~ and dots into ur sentences often", explicit_payload)
+        self.assertIn('be flirty, be this internet "mommy type", use dots and ~ in your sentences', explicit_payload)
         self.assertNotIn("Consensual adult sexual roleplay", explicit_payload)
 
         self.http.calls.clear()
         await self._ask(event_id="100", persona="rudeish")
         self.assertNotIn(
-            "put ~ and dots into ur sentences often",
+            'be flirty, be this internet "mommy type", use dots and ~ in your sentences',
             instructions_of(self.http.calls[0][1]["json"]),
         )
 
@@ -321,7 +331,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["model"], GEMINI_MODEL)
         self.assertEqual(payload["max_steps"], 1)
         self.assertNotIn("tools", payload)
-        self.assertIn("chaotic and silly hangout bot", instructions_of(payload).casefold())
+        self.assertIn("be energetic, be stupid, be an idiot", instructions_of(payload).casefold())
 
     async def test_provider_override_forces_groq_oss_for_restricted_users(self) -> None:
         with patch("ask.GROQ_API_KEY", "test-groq-key"):

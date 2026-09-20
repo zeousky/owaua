@@ -87,8 +87,6 @@ def provider_urls(provider: str, direct_base: str, *, full_mode: bool = False) -
     """
     path = "/responses"
     direct = f"{direct_base.rstrip('/')}{path}"
-    # Perplexity Agent API is not a Cloudflare AI Gateway provider. The
-    # compat path 403s (error 1010) and would only add hangout latency.
     if full_mode or provider == "perplexity":
         return direct, None
     gateway = gateway_base(provider)

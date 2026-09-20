@@ -31,7 +31,6 @@ if [[ "${OWAUA_LOCAL_ONLY:-$(grep -E '^OWAUA_LOCAL_ONLY=' "$ENV_FILE" | tail -n 
 fi
 if [[ "${OWAUA_VERIFY_DEPLOY:-0}" == "1" ]]; then
   "$PYTHON" scripts/check-runtime.py
-  # Use this release's suite; old server-only test files are not part of it.
   PYTHONPATH="$ROOT_DIR/src/owaua:$ROOT_DIR/tests" "$PYTHON" -m unittest -q \
     test_ask test_bot_helpers test_channel_commands test_cloudflare \
     test_memory test_music_attachments test_security

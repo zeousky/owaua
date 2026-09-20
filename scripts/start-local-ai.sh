@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start the installed DeepGrove Maple MLX server if local mode needs it.
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd -P)
 ENV_FILE=${OWAUA_ENV_FILE:-"$ROOT_DIR/.env"}
 
@@ -70,9 +69,6 @@ fi
 mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$PID_FILE")"
 echo "Starting DeepGrove Maple MLX server at $BASE_URL..."
 pushd "$MLX_ROOT" >/dev/null
-# The bundled DeepGrove checkout is the mlx_lm source tree; it is not
-# installed as a wheel because its legacy setup.py metadata is not PEP 517
-# compatible. Make the source importable explicitly on every Linux host.
 PYTHONPATH="$MLX_ROOT${PYTHONPATH:+:$PYTHONPATH}" nohup "$PYTHON" -m mlx_lm.server \
   --model "$MODEL_PATH" \
   --trust-remote-code \

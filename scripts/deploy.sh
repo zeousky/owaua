@@ -36,8 +36,6 @@ if not env_file.is_file():
     raise RuntimeError(f"Daki env file is missing: {env_file}")
 env_payload = env_file.read_bytes()
 
-# Keep Daki focused on the bot runtime. Tests, the static website, docs, and
-# setup utilities stay local; data/ remains persistent on the server.
 runtime_root_files = {
     Path("requirements.txt"),
 }
@@ -127,8 +125,6 @@ for local_path in files:
         raise RuntimeError(f"Daki verification failed for {remote_path}")
     print(f"Uploaded {remote_path} (sha256={hashlib.sha256(payload).hexdigest()[:12]})")
 
-# Keep runtime credentials out of panel startup variables. The bot loads this
-# verified Daki profile through python-dotenv when it starts.
 remote_env_path = "persona-test-bot/.env"
 client.write_file(remote_env_path, env_payload)
 encoded_env_path = remote_env_path.replace("/", "%2F")
@@ -144,10 +140,6 @@ print("Uploaded persona-test-bot/.env from .env.cloud (verified)")
 client.update_startup_variable("STARTUP_CMD", "")
 client.update_startup_variable(
     "SECOND_CMD",
-    # Daki runs this command for ordinary starts, restarts and panel-driven
-    # recovery. Deployment verification must not be part of the long-running
-    # server command: its mocked failure-path tests produce noisy warnings and
-    # can make a lifecycle operation look unhealthy even when the bot is fine.
     "cd persona-test-bot && bash scripts/run-bots.sh",
 )
 print(f"Restarting {config.get('server_name', config['server_id'])}...")

@@ -44,8 +44,6 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
 LOCAL_AI_ONLY = os.getenv("OWAUA_LOCAL_ONLY", "0").strip().casefold() in {"1", "true", "yes", "on"}
-# Local mode speaks the OpenAI-compatible API exposed by the installed local
-# runtime. OLLAMA_* remains as a backwards-compatible fallback for older envs.
 LOCAL_BASE_URL = os.getenv(
     "OWAUA_LOCAL_BASE_URL",
     os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:8080/v1"),
@@ -56,20 +54,14 @@ LOCAL_MODEL = os.getenv(
 LOCAL_ENABLE_TOOLS = os.getenv("OWAUA_LOCAL_ENABLE_TOOLS", "0").strip().casefold() in {
     "1", "true", "yes", "on"
 }
-# Compatibility names for integrations that still import the old constants.
 OLLAMA_BASE_URL = LOCAL_BASE_URL
 OLLAMA_MODEL = LOCAL_MODEL
 MODEL = LOCAL_MODEL if LOCAL_AI_ONLY else "openai/gpt-5.6-luna"
-# 3.5 Flash-Lite has been returning slow, prematurely ended fragments through
-# the Perplexity third-party-model adapter. Keep the model configurable, but
-# use the stable 3.1 Flash-Lite default for normal hangout traffic.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "google/gemini-3.1-flash-lite").strip()
 GEMINI_ONLY = os.getenv("OWAUA_GEMINI_ONLY", "0").strip().casefold() in {
     "1", "true", "yes", "on"
 }
 OPENAI_FULL_MODEL = os.getenv("OPENAI_FULL_MODEL", "gpt-5.6-luna").strip()
-# Compatibility name for integrations that imported the former full-mode
-# model constant.
 GPT_TERRA_MODEL = OPENAI_FULL_MODEL
 FULL_MODE_PROVIDERS = (
     ("gemini",)
@@ -93,10 +85,6 @@ _SOURCE_MARKER = re.compile(r"【\d+†source】")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4.1-flash").strip()
 MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "").strip() or MODEL
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
-# Non-Gemini hangout replies stay short. Gemini 3.1 Flash Lite counts
-# thinking tokens against max_output_tokens, so a 256-token cap cuts the
-# visible sentence off around 40–50 characters. 65536 lets it think and
-# ramble; 4096 is enough for thinking plus a finished hangout reply.
 MAX_HANGOUT_REPLY_CHARS = 100
 MAX_OUTPUT_TOKENS = 256
 GPT_MAX_OUTPUT_TOKENS = 256
@@ -118,8 +106,6 @@ MAX_ATTACHMENTS = 1
 CHAT_REQUEST_TIMEOUT = httpx.Timeout(12.0, connect=4.0)
 GEMINI_REQUEST_TIMEOUT = httpx.Timeout(40.0, connect=4.0)
 GPT_REQUEST_TIMEOUT = httpx.Timeout(120.0, connect=8.0)
-# Keep the old name for integrations that import it; full-mode requests now
-# use the same bounded timeout as every other provider request.
 GPT_FULL_REQUEST_TIMEOUT = GPT_REQUEST_TIMEOUT
 GPT_REASONING = {"effort": "minimal"}
 GPT_FULL_REASONING = {"effort": "medium"}
@@ -196,10 +182,6 @@ _NOT_A_HELPER = (
     "breathing checklist, or tell anyone to trigger Emergency SOS."
 )
 _NOT_A_HELPER_FALLBACK = "im a chatbot, not a helper"
-# These are common insults/hyperbole, not a disclosure of current self-harm
-# intent.  Keep this separate from ``credible_self_harm_risk``: the latter is
-# deliberately conservative, while this guard prevents the model from
-# turning a figurative complaint into an unsolicited crisis intervention.
 _FIGURATIVE_SELF_HARM = re.compile(
     r"\b(?:you|u)\s+(?:(?:really|genuinely|literally|actually|honestly|seriously)\s+)?"
     r"(?:make|made)\s+me\s+(?:want|wanna)\s+"
@@ -487,13 +469,9 @@ def full_mode_tools(provider: str) -> list[dict[str, object]]:
     if provider == "gpt":
         return gpt_full_tools()
     if provider in {"claude", "gemini", "glm"}:
-        # Perplexity Agent API provides web search for third-party models;
-        # OpenAI's hosted code interpreter is not a Perplexity tool.
         return [{"type": "web_search"}]
     if provider == "ollama":
         return ollama_full_tools()
-    # DeepSeek's official API accepts function tools only. This bot has no
-    # callable external function to expose, so send no invalid hosted tools.
     return []
 
 
@@ -1338,8 +1316,6 @@ async def _post_answer(
     fallback_url: str | None = None,
     fallback_headers: dict[str, str] | None = None,
 ) -> str:
-    # Exactly one paid reservation. Cloudflare is only retried when the edge
-    # never reached the provider; a timeout after the POST is not retried.
     await authorize()
     attempts = [(url, headers)]
     if fallback_url and fallback_url != url:
@@ -1371,7 +1347,6 @@ async def _post_answer(
                     last_error,
                 )
                 continue
-            # Provider bodies can echo prompts or credentials. Never log their text.
             log.warning("AI provider request failed (%s)", last_error)
             raise RuntimeError("The AI provider rejected the request") from None
     log.warning("AI provider request failed (%s)", last_error)
@@ -1626,9 +1601,6 @@ async def request_ai(
         full_provider = "gemini"
         payload = {**payload, "model": GEMINI_MODEL}
     if LOCAL_AI_ONLY or full_provider == "ollama":
-        # DeepGrove Maple's MLX server accepts ordinary Chat Completions but
-        # rejects the function-tool schema used by the cloud providers.
-        # Keep local tools opt-in for local servers that explicitly support it.
         tools = payload.get("tools") if LOCAL_ENABLE_TOOLS else None
         call_payload = chat_completions_payload(
             model=str(payload["model"]),
@@ -1698,10 +1670,6 @@ async def request_ai(
             reply_limit=reply_limit,
         )
     if full_mode and full_provider != "gpt":
-        # Agent API requests must stay on Perplexity's direct endpoint in full
-        # mode. The AI Gateway only supports the hangout compatibility path;
-        # routing Claude/Gemini/GLM through it causes an edge rejection before
-        # the selected model can run.
         url, fallback_url = provider_urls(
             "perplexity", PERPLEXITY_BASE_URL, full_mode=True
         )
@@ -1823,9 +1791,6 @@ async def ask(
     if repeat_now:
         return await finish(_NO_REPEAT_FALLBACK)
 
-    if image_urls and not full_mode:
-        return "Image analysis is disabled; send a text message."
-
     provider = (
         "ollama"
         if LOCAL_AI_ONLY
@@ -1835,6 +1800,9 @@ async def ask(
     )
     if GEMINI_ONLY:
         provider = "gemini"
+
+    if image_urls and not full_mode and provider != "gemini":
+        return "Image analysis is disabled; send a text message."
     hangout_gemini = not full_mode and not LOCAL_AI_ONLY and provider == "gemini"
     hangout_search = hangout_gemini and needs_web_search(prompt)
     if use_history:
@@ -1892,8 +1860,6 @@ async def ask(
         reply_limit = MAX_REPLY_CHARS
         gemini_hangout = not full and current_provider == "gemini"
         use_search = gemini_hangout and hangout_search
-        # Search-backed hangout can take a few agent steps. Plain hangout
-        # stays on the short chat deadline.
         if full:
             request_timeout = GPT_REQUEST_TIMEOUT
         elif use_search:
@@ -1940,9 +1906,6 @@ async def ask(
         elif full or (LOCAL_AI_ONLY and current_provider == "ollama"):
             payload["tools"] = full_mode_tools(current_provider)
             if current_provider != "gpt":
-                # Perplexity requires this for Anthropic models and accepts
-                # it for its other Agent API models. DeepSeek gets it in its
-                # Chat Completions adapter above.
                 payload["max_output_tokens"] = GEMINI_FULL_MAX_OUTPUT_TOKENS
         else:
             payload["max_steps"] = 1

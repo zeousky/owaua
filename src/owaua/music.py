@@ -632,7 +632,6 @@ class BoundedAudio(discord.FFmpegOpusAudio):
         self._deadline.start()
 
     def _spawn_process(self, args, **kwargs):
-        # Native media parsers must not inherit Discord/provider credentials.
         kwargs["env"] = {key: os.environ[key] for key in ("PATH", "SYSTEMROOT") if key in os.environ}
         kwargs["stderr"] = subprocess.DEVNULL
         command = [sys.executable, "-I", str(Path(__file__).with_name("media_exec.py")), *args]
@@ -675,8 +674,6 @@ class UnrestrictedAudio(discord.FFmpegOpusAudio):
         _ACTIVE_SOURCES.add(self)
 
     def _spawn_process(self, args, **kwargs):
-        # Do not expose provider or Discord credentials to FFmpeg even though
-        # this source intentionally skips the ordinary music restrictions.
         kwargs["env"] = {
             key: os.environ[key]
             for key in ("PATH", "SYSTEMROOT", "SSL_CERT_FILE")
@@ -1103,7 +1100,6 @@ async def _play_or_restart(
             track = dict(await resolve_music(query))
         track["requested_by"] = getattr(message.author, "id", None)
         audio = None if unrestricted else await download_audio(track)
-        # Validate and download before acquiring a voice connection.
         if (
             not unrestricted
             and len(bot.music_tracks) >= MAX_MUSIC_JOBS

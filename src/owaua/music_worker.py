@@ -13,7 +13,6 @@ def main() -> None:
     if len(sys.argv) not in {2, 3} or (len(sys.argv) == 3 and not unrestricted):
         raise ValueError("Invalid invocation")
     if not unrestricted:
-        # A parent deadline also kills/reaps this process on cancellation.
         try:
             import resource
             resource.setrlimit(resource.RLIMIT_CPU, (20, 20))
@@ -35,9 +34,6 @@ def main() -> None:
     if not lookup or (not unrestricted and (len(lookup) > 600 or not allowed_lookup)):
         raise ValueError("Invalid lookup")
     options = {
-        # YouTube may expose the best audio stream through a protocol other
-        # than the legacy http/https labels. The parent still accepts only
-        # HTTPS googlevideo streams before downloading.
         "format": "bestaudio/best",
         "noplaylist": not unrestricted, "playlistend": 1,
         "quiet": True, "no_warnings": True, "cachedir": False,

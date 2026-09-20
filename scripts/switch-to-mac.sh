@@ -10,9 +10,6 @@ echo "=========================================================="
 echo "    owaua: Switch Everything to Mac (Cloud -> Local)     "
 echo "=========================================================="
 
-# -----------------------------------------------------------------------------
-# 1. Stop Cloud Bot on Daki (if configured)
-# -----------------------------------------------------------------------------
 echo ""
 echo "[1/5] Checking cloud bot instance (Daki)..."
 python3 - <<'PY' || true
@@ -57,9 +54,6 @@ except Exception as exc:
     print(f"  -> Cloud check note: {exc}")
 PY
 
-# -----------------------------------------------------------------------------
-# 2. Force local-only AI configuration and local audit logs
-# -----------------------------------------------------------------------------
 echo ""
 echo "[2/5] Configuring environment for local execution..."
 if [[ -f .env ]]; then
@@ -107,7 +101,7 @@ for line in env_file.read_text(encoding="utf-8").splitlines():
     matched = False
     for key in disabled_keys:
         if stripped.startswith(f"{key}=") and not stripped.startswith(f"#{key}="):
-            lines.append(f"# {line}  # disabled for local-only Mac operation")
+            lines.append(f"# {line}")
             modified = True
             matched = True
             seen.add(key)
@@ -140,9 +134,6 @@ else
   chmod 600 .env
 fi
 
-# -----------------------------------------------------------------------------
-# 3. Setup Python 3.12 virtual environment using uv
-# -----------------------------------------------------------------------------
 echo ""
 echo "[3/5] Setting up local Python 3.12 environment..."
 mkdir -p "$HOME/.local/bin"
@@ -153,7 +144,6 @@ if ! command -v uv &>/dev/null && [[ ! -x "$HOME/.local/bin/uv" ]]; then
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
-# Recreate .venv if broken or missing Python 3.11+
 NEED_VENV=0
 if [[ ! -d .venv ]] || [[ ! -x .venv/bin/python ]]; then
   NEED_VENV=1
@@ -174,9 +164,6 @@ fi
 echo "  -> Installing / verifying dependencies..."
 uv pip install -r requirements.txt --python .venv/bin/python
 
-# -----------------------------------------------------------------------------
-# 4. Check the installed DeepGrove Maple runtime
-# -----------------------------------------------------------------------------
 echo ""
 echo "[4/5] Checking DeepGrove Maple installation..."
 if [[ -x "$HOME/mlx-lm-deepgrove/.venv/bin/python" && -d "$HOME/mlx-lm-deepgrove/maple-2bit-mlx" ]]; then
@@ -186,17 +173,8 @@ else
   echo "     Set OWAUA_LOCAL_AI_ROOT and OWAUA_LOCAL_AI_MODEL_PATH in .env."
 fi
 
-# -----------------------------------------------------------------------------
-# 5. Run Verification Tests and Start Bot
-# -----------------------------------------------------------------------------
 echo ""
 echo "[5/5] Verifying local test suite..."
-# Provider-routing tests exercise the cloud-compatible code paths with fake
-# HTTP clients; force local-only off for that test process so the real local
-# profile does not change their URL assertions.
-# Keep the test process hermetic: the local profile intentionally has no cloud
-# credentials, while these tests use mocked HTTP clients and validate provider
-# routing with placeholder credentials.
 if OWAUA_LOCAL_ONLY=0 \
   OPENAI_API_KEY=test DEEPSEEK_API_KEY=test PERPLEXITY_API_KEY=test \
   GROQ_API_KEY=test MISTRAL_API_KEY=test \
