@@ -10,7 +10,7 @@ The initial independent source audit recorded eight findings. Existing uncommitt
 
 | Original weakness | Implemented control | Regression evidence |
 | --- | --- | --- |
-| Unlimited aggregate API spending | Atomic SQLite reservation before every provider POST; rolling global/user/server and lifetime attempt ceilings; durable commits; no refunds for errors; full mode uses the same ledger | Concurrent store instances, restart, erasure, clock rollback, duplicates, every budget dimension, storage failure |
+| Unlimited per-user API spending | Atomic SQLite reservation before every provider POST; 30-request rolling 10-minute user ceiling; durable commits; no refunds for errors; full mode uses the same ledger | Concurrent store instances, rolling-window expiry, clock rollback, duplicates, user isolation, storage failure |
 | Persona/provider tampering | User-scoped settings; untrusted legacy global selection ignored | Per-user isolation and provider validation |
 | Unbounded waiting requests | Per-user and global AI admission; bounded handlers and caches; no conversation wait queue; full mode uses the same admission ceilings | Busy user across channels, global admission and cancellation cleanup |
 | Unauthorized language/profile changes | Manage Server check on both set and reset paths | Permission denial and existing legitimate profile/language tests |
@@ -19,9 +19,9 @@ The initial independent source audit recorded eight findings. Existing uncommitt
 | Permanent conversation storage | 20 records per conversation, 10,000 total, bounded content, seven-day retention with hourly maintenance; private directory/database modes | Retention, legacy startup pruning, user isolation, erasure generation fences |
 | Voice control by outsiders | Ordinary guilds require same-channel controls and do not move automatically; trusted music behavior remains separate from AI/API budgets | Voice-control denial and departure tests |
 
-Hangout modes are text-only. Hosted tools stay disabled in hangout. Normal responses have an 80-token cap and no image analysis. Approved full-mode users can select a different provider and use its capability tools in designated channels, but output, history, input, concurrency, timeout, rate, and shared API-attempt limits remain the same. Image generation is not available. Provider errors and signed CDN request URLs are not logged. Native media subprocesses do not inherit bot/provider credentials.
+Hangout Gemini 3.1 Flash Lite may use web search for current-facts prompts, with a 4,096-token hangout output budget. Ordinary hangout chat does not attach search tools. Other hangout providers stay text-only with a 100-character cap. Image analysis stays disabled in hangout. Approved full-mode users can select a different provider and use its capability tools in designated channels, but output, history, input, concurrency, timeout, rate, and shared API-attempt limits remain the same. Image generation is not available. Provider errors and signed CDN request URLs are not logged. Native media subprocesses do not inherit bot/provider credentials.
 
-See [README](../README.md#abuse-controls) and [.env.example](../.env.example) for configuration. Defaults are 12 global API attempts/minute, 30/user/day, 100/server/day, 200 globally/day, 1,000 lifetime and three concurrent AI requests. Those ceilings apply uniformly to every guild and full-mode request. `!security pause` stops future reservations, including full mode; it cannot cancel work already sent to a provider. `resume` does not reset quotas.
+See [README](../README.md) and [.env.example](../.env.example) for configuration. The default API budget is 30 requests per user in a rolling 10-minute window, shared by normal and full mode. `!security pause` stops future reservations, including full mode; it cannot cancel work already sent to a provider. `resume` does not reset quotas.
 
 ## Verification performed
 
@@ -40,7 +40,7 @@ Provider calls, media downloads and Discord interactions in the tests use local 
 
 This deployment verification predates the current bounded full-mode policy and does not validate its live deployment.
 
-The hardened runtime was deployed to the configured Daki server and Discord readiness was confirmed after dependency checks, a native decoder smoke test, and the production test suite passed. Runtime Python is 3.12.13, running as an unprivileged user. Effective settings were verified: DMs disabled; three concurrent AI requests; 12 attempts/minute, 30/user/day, 100/server/day, 200 globally/day and 1,000 lifetime.
+The hardened runtime was deployed to the configured Daki server and Discord readiness was confirmed after dependency checks, a native decoder smoke test, and the production test suite passed. Runtime Python is 3.12.13, running as an unprivileged user. Effective settings were verified: DMs disabled; three concurrent AI requests; 30 requests per user per rolling 10-minute window.
 
 The previous runtime was saved privately before deployment. The bot was stopped before uploads, uploaded files were byte-verified, and the existing credentials and persistent database were preserved. Startup now checks dependency consistency and restricts `.env` permissions. Deployment startup runs the release's explicit test modules, preventing obsolete server-only test files from being picked up. The first startup correctly failed closed on obsolete tests; the corrected startup passed and connected to Discord.
 

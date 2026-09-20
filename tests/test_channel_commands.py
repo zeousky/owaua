@@ -122,6 +122,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.bot.active_handlers = set()
 
     def tearDown(self) -> None:
+        self.store.close()
         self.temporary_directory.cleanup()
 
     async def test_help_command_lists_the_remaining_commands(self) -> None:
@@ -132,7 +133,8 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, [HELP_TEXT])
         self.assertEqual(channel.send_kwargs[0].get("suppress_embeds"), True)
         self.assertNotIn("!active", channel.sent[0])
-        self.assertIn("!persona rudeish|nerdish|flirty|chaotic|host default gpt/deepseek/mistral", channel.sent[0])
+        self.assertIn("!persona rudeish|nerdish|flirty|chaotic", channel.sent[0])
+        self.assertNotIn("host default", channel.sent[0])
         self.assertIn("!owner's note", channel.sent[0])
         self.assertIn("!memory erase", channel.sent[0])
         self.assertIn("!music help", channel.sent[0])
@@ -562,7 +564,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
             await self.bot.on_message(message)
 
         self.assertFalse(mocked_ask.await_args.kwargs["full_mode"])
-        self.assertFalse(mocked_ask.await_args.kwargs["use_history"])
+        self.assertTrue(mocked_ask.await_args.kwargs["use_history"])
 
     async def test_full_mode_requires_the_user_toggle(self) -> None:
         users = list(FULL_MODE_ALLOWED_USER_IDS)
@@ -617,7 +619,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_full_mode_reports_a_missing_gpt_key(self) -> None:
         message = self._full_mode_message("!full mode on", 1)
-        with patch("bot.host_model_error", return_value="gpt is not configured"):
+        with patch("bot.full_mode_provider_error", return_value="gpt is not configured"):
             await self.bot.on_message(message)
 
         self.assertEqual(message.channel.sent, ["gpt is not configured"])
@@ -762,55 +764,19 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, ["persona: nerdish"])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "nerdish")
 
-    async def test_host_default_persona_defaults_to_deepseek(self) -> None:
+    async def test_host_default_persona_command_is_gone(self) -> None:
         channel = FakeChannel()
-        with patch("bot.host_model_error", return_value=None):
-            await self.bot.on_message(make_message("!persona host default", 1, channel))
-
-        self.assertEqual(channel.sent, ["persona: host default (gpt)"])
-        self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "host-default-gpt")
-
-    async def test_host_default_persona_selects_deepseek_and_mistral(self) -> None:
-        channel = FakeChannel()
-        with patch("bot.host_model_error", return_value=None):
-            await self.bot.on_message(
-                make_message("!persona host default deepseek", 1, channel)
-            )
-            self.bot.command_used.clear()
-            await self.bot.on_message(
-                make_message("!persona host default mistral", 2, channel)
-            )
-            self.bot.command_used.clear()
-            await self.bot.on_message(make_message("!persona", 3, channel))
-
-        self.assertEqual(
-            channel.sent,
-            [
-                "persona: host default (deepseek)",
-                "persona: host default (mistral)",
-                "persona: host default (mistral)",
-            ],
-        )
-        self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "host-default-mistral")
-
-    async def test_host_default_rejects_an_unknown_model(self) -> None:
-        channel = FakeChannel()
-
-        await self.bot.on_message(
-            make_message("!persona host default claude", 1, channel)
-        )
-
-        self.assertIn("!persona host default gpt", channel.sent[0])
+        await self.bot.on_message(make_message("!persona host default", 1, channel))
+        self.assertIn("!persona rudeish", channel.sent[0])
+        self.assertNotIn("host default gpt", channel.sent[0])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
 
-    async def test_host_default_reports_a_missing_provider_key(self) -> None:
-        channel = FakeChannel()
-        with patch("ask.PERPLEXITY_API_KEY", ""):
-            await self.bot.on_message(
-                make_message("!persona host default deepseek", 1, channel)
-            )
-
-        self.assertEqual(channel.sent, ["deepseek is not configured"])
+        self.bot.command_used.clear()
+        channel.sent.clear()
+        await self.bot.on_message(
+            make_message("!persona host default deepseek", 2, channel)
+        )
+        self.assertIn("!persona rudeish", channel.sent[0])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
 
     async def test_active_command_is_gone(self) -> None:
@@ -863,7 +829,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
             )
 
         mocked_ask.assert_awaited_once()
-        self.assertFalse(mocked_ask.await_args.kwargs["use_history"])
+        self.assertTrue(mocked_ask.await_args.kwargs["use_history"])
 
     async def test_guild_id_does_not_disable_local_guardrails(self) -> None:
         trusted = make_message(

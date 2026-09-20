@@ -14,6 +14,7 @@ class MemoryStoreTests(unittest.TestCase):
         self.store = MemoryStore(self.path)
 
     def tearDown(self) -> None:
+        self.store.close()
         self.temporary_directory.cleanup()
 
     def test_application_settings_survive_reopening(self) -> None:
@@ -115,6 +116,30 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertEqual(
             [item["content"] for item in self.store.recent_messages("other-channel", "three", limit=10)],
             ["b-1"],
+        )
+
+    def test_begin_user_turn_returns_generation_and_ignores_duplicates(self) -> None:
+        generation, inserted = self.store.begin_user_turn(
+            event_id="discord:1",
+            scope_id="channel",
+            user_id="user",
+            server_id="server",
+            content="hello",
+        )
+        again = self.store.begin_user_turn(
+            event_id="discord:1",
+            scope_id="channel",
+            user_id="user",
+            server_id="server",
+            content="duplicate",
+        )
+
+        self.assertTrue(inserted)
+        self.assertEqual(generation, again[0])
+        self.assertFalse(again[1])
+        self.assertEqual(
+            [item["content"] for item in self.store.recent_messages("channel", "user", limit=10)],
+            ["hello"],
         )
 
 

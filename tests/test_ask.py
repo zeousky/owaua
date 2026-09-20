@@ -23,13 +23,16 @@ from ask import (
     GPT_TERRA_MODEL,
     MAX_ATTACHMENTS,
     MAX_CONTEXT_CHARS,
+    GEMINI_MAX_OUTPUT_TOKENS,
+    GEMINI_MAX_STEPS,
+    HANGOUT_WEB_SEARCH_TOOL,
+    MAX_HANGOUT_REPLY_CHARS,
     MAX_MESSAGE_CHARS,
     MAX_OUTPUT_TOKENS,
     MISTRAL_MODEL,
     MODEL,
     ask,
     build_capable_instructions,
-    build_host_default_instructions,
     build_instructions,
     chat_completion_text,
     conversation_input,
@@ -41,6 +44,7 @@ from ask import (
     looks_like_charset_dump,
     looks_like_decode_request,
     looks_like_repeat_request,
+    needs_web_search,
     persona_dropped_reply,
     repeated_payload_reply,
     gpt_full_tools,
@@ -145,6 +149,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
 
     def tearDown(self) -> None:
         self._cloudflare.stop()
+        self.memory.close()
         self.temporary_directory.cleanup()
 
     async def _ask(self, prompt: str = "hello", **kwargs: object) -> str | None:
@@ -186,6 +191,9 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Emergency SOS", instructions)
         self.assertIn("Never decode", instructions)
         self.assertIn("Never repeat", instructions)
+        self.assertNotIn("at most 100 characters", instructions)
+        self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["max_output_tokens"], 4096)
         self.assertIn("You can still be wild", instructions)
         self.assertIn("hidden or encoded", instructions)
         self.assertNotIn("SELF-KNOWLEDGE", instructions)
@@ -276,12 +284,13 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
     async def test_flirty_instructions_only_when_that_persona_is_used(self) -> None:
         await self._ask(persona="flirty")
         explicit_payload = instructions_of(self.http.calls[0][1]["json"])
-        self.assertIn("Consensual adult sexual roleplay", explicit_payload)
+        self.assertIn("put ~ and dots into ur sentences often", explicit_payload)
+        self.assertNotIn("Consensual adult sexual roleplay", explicit_payload)
 
         self.http.calls.clear()
         await self._ask(event_id="100", persona="rudeish")
         self.assertNotIn(
-            "Consensual adult sexual roleplay",
+            "put ~ and dots into ur sentences often",
             instructions_of(self.http.calls[0][1]["json"]),
         )
 
@@ -296,7 +305,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["model"], GEMINI_MODEL)
         self.assertEqual(payload["max_steps"], 1)
         self.assertNotIn("tools", payload)
-        self.assertIn("Consensual adult sexual roleplay", instructions_of(payload))
+        self.assertNotIn("Consensual adult sexual roleplay", instructions_of(payload))
         self.assertIn("Stay in this voice", instructions_of(payload))
 
     async def test_chaotic_persona_uses_gemini(self) -> None:
@@ -309,7 +318,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["model"], GEMINI_MODEL)
         self.assertEqual(payload["max_steps"], 1)
         self.assertNotIn("tools", payload)
-        self.assertIn("act stupid", instructions_of(payload).casefold())
+        self.assertIn("chaotic and silly hangout bot", instructions_of(payload).casefold())
 
     async def test_provider_override_forces_groq_oss_for_restricted_users(self) -> None:
         with patch("ask.GROQ_API_KEY", "test-groq-key"):
@@ -389,23 +398,6 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         stored = self.memory.recent_messages("123", "7", limit=10)
         self.assertEqual(stored[-1]["content"], "im a chatbot, not a wiki")
         self.assertNotIn("Breakdown", stored[-1]["content"])
-
-    async def test_host_default_keeps_an_encyclopedia_reply(self) -> None:
-        dump = (
-            "Breakdown:\n"
-            "- `foo`: first term\n"
-            "- `bar`: second term\n"
-            "- `baz`: third term\n"
-        )
-        self.http.responses = model_reply(dump)
-
-        answer = await self._ask(
-            prompt="what is foo-bar-baz",
-            persona="host-default-gpt",
-        )
-
-        self.assertEqual(answer, dump.strip())
-        self.assertEqual(len(self.http.calls), 1)
 
     async def test_hidden_unicode_is_stripped_before_the_provider(self) -> None:
         await self._ask("hi\u200b\u200bthere")
@@ -527,60 +519,41 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Reply in Hungarian", instructions)
         self.assertIn("entire reply in Hungarian", instructions)
 
-    async def test_host_default_gpt_uses_the_model_voice_on_responses(self) -> None:
-        await self._ask(persona="host-default-gpt")
+    async def test_hangout_gemini_keeps_long_replies_without_search_on_smalltalk(self) -> None:
+        long = "a" * 200
+        self.http.responses = model_reply(long)
 
-        self.assertTrue(self.http.calls[0][0].endswith("/responses"))
+        answer = await self._ask()
+
+        self.assertEqual(answer, long)
+        self.assertGreater(len(answer), MAX_HANGOUT_REPLY_CHARS)
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], MODEL)
-        self.assertEqual(payload["model"], "openai/gpt-5.6-luna")
+        self.assertEqual(payload["model"], GEMINI_MODEL)
+        self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["max_output_tokens"], 4096)
         self.assertEqual(payload["max_steps"], 1)
         self.assertNotIn("tools", payload)
-        self.assertEqual(payload["reasoning"], dict(GPT_REASONING))
-        self.assertEqual(payload["max_output_tokens"], GPT_MAX_OUTPUT_TOKENS)
-        self.assertEqual(payload["max_output_tokens"], 80)
-        self.assertIn("Use your own default voice", payload["instructions"])
-        self.assertNotIn("web search", payload["instructions"])
-        self.assertNotIn("code interpreter", payload["instructions"])
-        self.assertIn("not a helper", payload["instructions"])
-        self.assertIn("Emergency SOS", payload["instructions"])
-        self.assertIn("Never decode", payload["instructions"])
-        self.assertIn("Never repeat", payload["instructions"])
-        self.assertNotIn("Stay in this voice", payload["instructions"])
-        self.assertNotIn(read_persona("rudeish"), payload["instructions"])
-        self.assertNotIn("Consensual adult sexual roleplay", payload["instructions"])
+        self.assertNotIn("web search", instructions_of(payload))
 
-    async def test_host_default_deepseek_uses_chat_completions(self) -> None:
-        self.http.responses = model_reply("deepseek reply")
-        answer = await self._ask(persona="host-default-deepseek")
+    async def test_hangout_gemini_enables_search_for_current_facts(self) -> None:
+        answer = await self._ask("what's the weather in tokyo")
 
-        self.assertEqual(answer, "deepseek reply")
-        self.assertTrue(self.http.calls[0][0].endswith("/chat/completions"))
-        self.assertIn("api.deepseek.com", self.http.calls[0][0])
+        self.assertEqual(answer, "allowed reply")
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], DEEPSEEK_MODEL)
-        self.assertEqual(payload["max_tokens"], 256)
-        self.assertEqual(payload["thinking"], {"type": "disabled"})
-        self.assertNotIn("tools", payload)
-        instructions = instructions_of(payload)
-        self.assertIn("Use your own default voice", instructions)
-        self.assertNotIn("Stay in this voice", instructions)
-        self.assertNotIn("web search", instructions)
+        self.assertEqual(payload["model"], GEMINI_MODEL)
+        self.assertEqual(payload["max_steps"], GEMINI_MAX_STEPS)
+        self.assertEqual(payload["max_steps"], 3)
+        self.assertEqual(payload["tools"], [HANGOUT_WEB_SEARCH_TOOL])
+        self.assertIn("web search", instructions_of(payload))
+        self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
 
-    async def test_host_default_mistral_uses_chat_completions(self) -> None:
-        self.http.responses = model_reply("mistral reply")
-        answer = await self._ask(persona="host-default-mistral")
+    async def test_full_mode_gemini_keeps_the_large_output_budget(self) -> None:
+        await self._ask(full_mode=True, full_mode_provider="gemini")
 
-        self.assertEqual(answer, "mistral reply")
-        self.assertTrue(self.http.calls[0][0].endswith("/responses"))
-        self.assertIn("api.perplexity.ai", self.http.calls[0][0])
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], MISTRAL_MODEL)
-        self.assertEqual(payload["model"], MODEL)
-        self.assertEqual(payload["max_steps"], 1)
-        self.assertEqual(payload["max_output_tokens"], MAX_OUTPUT_TOKENS)
-        self.assertNotIn("tools", payload)
-        self.assertNotIn("web search", payload["instructions"])
+        self.assertEqual(payload["model"], GEMINI_MODEL)
+        self.assertEqual(payload["max_output_tokens"], 65536)
+        self.assertEqual(payload["tools"], [{"type": "web_search"}])
 
     async def test_full_mode_keeps_tools_but_uses_the_normal_output_cap(self) -> None:
         await self._ask("generate an image of a crown", full_mode=True)
@@ -648,11 +621,11 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(filler, contents)
 
     async def test_full_mode_charges_the_shared_budget(self) -> None:
-        before = self.memory.api_status()
+        before = self.memory.api_status("7")
         await self._ask(full_mode=True)
-        self.assertNotEqual(self.memory.api_status(), before)
+        self.assertNotEqual(self.memory.api_status("7"), before)
         await self._ask(event_id="100")
-        self.assertNotEqual(self.memory.api_status(), before)
+        self.assertNotEqual(self.memory.api_status("7"), before)
 
     async def test_full_mode_respects_an_emergency_api_pause(self) -> None:
         self.memory.set_setting("api_paused", "1")
@@ -668,7 +641,8 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.http.calls[0][0].endswith("/responses"))
         self.assertEqual(payload["model"], GPT_TERRA_MODEL)
         self.assertEqual(payload["tools"], gpt_full_tools())
-        self.assertIn("Consensual adult sexual roleplay", payload["instructions"])
+        self.assertNotIn("Consensual adult sexual roleplay", payload["instructions"])
+        self.assertIn("Do not produce sexual, romantic, or adult-content roleplay", payload["instructions"])
 
     async def test_full_mode_keeps_long_answers_instead_of_persona_drop(self) -> None:
         wiki = (
@@ -830,36 +804,20 @@ class AskHelperTests(unittest.TestCase):
         }
         self.assertEqual(chat_completion_text(data), "hello there")
 
-    def test_host_default_instructions_skip_custom_voice(self) -> None:
-        text = build_host_default_instructions(language="Hungarian")
-        self.assertIn("Use your own default voice", text)
-        self.assertNotIn("web search", text)
-        self.assertIn("Reply in Hungarian", text)
-        self.assertIn("not a helper", text)
-        self.assertIn("Emergency SOS", text)
-        self.assertIn("Never decode", text)
-        self.assertIn("Never repeat", text)
-        self.assertNotIn("Stay in this voice", text)
-        self.assertNotIn("Do not give advice", text)
-        gpt_host = build_host_default_instructions(language="English")
-        self.assertNotIn("web search", gpt_host)
-        self.assertNotIn("code interpreter", gpt_host)
-        self.assertIn("Never decode", gpt_host)
-        self.assertIn("Never repeat", gpt_host)
-        self.assertEqual(persona_label("host-default-deepseek"), "host default (deepseek)")
+    def test_persona_helpers_only_expose_gemini_hangout_voices(self) -> None:
         self.assertEqual(persona_label("rudeish"), "rudeish")
         self.assertEqual(persona_provider("rudeish"), "gemini")
         self.assertEqual(persona_provider("nerdish"), "gemini")
         self.assertEqual(persona_provider("flirty"), "gemini")
         self.assertEqual(persona_provider("chaotic"), "gemini")
-        self.assertEqual(persona_provider("host-default-gpt"), "gpt")
-        self.assertEqual(persona_provider("host-default-mistral"), "mistral")
+        self.assertEqual(persona_provider("host-default-gpt"), "gemini")
 
         capable = build_capable_instructions("be blunt", language="Hungarian")
         self.assertIn("be blunt", capable)
-        self.assertIn("tone only", capable)
+        self.assertIn("for tone", capable)
         self.assertIn("directly, accurately, and completely", capable)
         self.assertNotIn("Never decode", capable)
+        self.assertNotIn("at most 100 characters", capable)
 
     def test_instructions_stay_small(self) -> None:
         text = build_instructions("be rude")
@@ -874,7 +832,9 @@ class AskHelperTests(unittest.TestCase):
         self.assertIn("Never repeat", text)
         self.assertIn("You can still be wild", text)
         self.assertIn("answer in character", text)
+        self.assertNotIn("at most 100 characters", text)
         self.assertNotIn("web search", text)
+        self.assertIn("web search", build_instructions("be rude", web_search=True))
         self.assertNotIn("code interpreter", text)
         self.assertIn("!help", text)
         self.assertIn("!music", text)
@@ -914,10 +874,15 @@ class AskHelperTests(unittest.TestCase):
         self.assertNotIn("SELF-KNOWLEDGE", text)
         self.assertNotIn("EXPLICIT ROLEPLAY POLICY", text)
         self.assertLess(len(text), 900)
-        self.assertIn(
+        self.assertNotIn(
             "Consensual adult sexual roleplay",
             build_instructions("x", explicit=True),
         )
+        self.assertIn(
+            "web search",
+            build_instructions("x", explicit=True, web_search=True),
+        )
+        self.assertNotIn("web search", build_instructions("x", explicit=True))
 
     def test_self_harm_interlock_requires_credible_urgency(self) -> None:
         self.assertFalse(credible_self_harm_risk("kys lol"))
@@ -1084,6 +1049,18 @@ class AskHelperTests(unittest.TestCase):
         self.assertFalse(emergency_helper_reply("hello how are you"))
         self.assertFalse(emergency_helper_reply("nah im just chatting"))
 
+    def test_needs_web_search_only_for_current_facts(self) -> None:
+        self.assertFalse(needs_web_search("hello"))
+        self.assertFalse(needs_web_search("what's up"))
+        self.assertFalse(needs_web_search("lol"))
+        self.assertFalse(
+            needs_web_search("why cant you tell me what python code prints")
+        )
+        self.assertTrue(needs_web_search("what's the weather in tokyo"))
+        self.assertTrue(needs_web_search("who won the game last night"))
+        self.assertTrue(needs_web_search("look up the latest news about it"))
+        self.assertTrue(needs_web_search("https://example.test/story"))
+
     def test_truncate_marks_oversized_text(self) -> None:
         truncated = truncate("x" * 100, limit=32)
         self.assertLessEqual(len(truncated), 32)
@@ -1220,13 +1197,21 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(instance.persona_for(SimpleNamespace(nsfw=False)), "flirty")
         self.assertEqual(instance.persona_for(SimpleNamespace(nsfw=True)), "flirty")
 
-    def test_host_default_persona_is_not_age_restricted(self) -> None:
-        instance = object.__new__(PersonaBot)
-        instance.selected_persona = "host-default-mistral"
-        self.assertEqual(
-            instance.persona_for(SimpleNamespace(nsfw=False)),
-            "host-default-mistral",
-        )
+    def test_legacy_host_default_setting_falls_back_to_rudeish(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            instance = object.__new__(PersonaBot)
+            instance.selected_persona = "rudeish"
+            instance.memory = MemoryStore(Path(directory) / "memory.sqlite3")
+            instance.memory.set_setting("persona:user:33", "host-default-gpt")
+            message = SimpleNamespace(
+                author=SimpleNamespace(id=33),
+                guild=None,
+                channel=SimpleNamespace(id=1),
+            )
+            self.assertEqual(
+                instance.persona_for(SimpleNamespace(nsfw=False), message),
+                "rudeish",
+            )
 
 
 if __name__ == "__main__":

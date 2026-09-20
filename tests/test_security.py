@@ -36,44 +36,38 @@ class BudgetTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "memory.sqlite3"
         self.store = MemoryStore(self.path)
-        self.limits = ApiLimits(100, 100, 100, 100, 3)
+        self.addCleanup(self.store.close)
+        self.limits = ApiLimits(per_user=3)
 
     def test_concurrent_instances_cannot_overspend(self):
         stores = [MemoryStore(self.path) for _ in range(8)]
         def attempt(index):
             try:
-                stores[index].reserve_api_request(str(index), str(index), str(index), limits=self.limits)
+                stores[index].reserve_api_request(str(index), "same-user", str(index), limits=self.limits)
                 return True
             except BudgetExceeded:
                 return False
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            self.assertEqual(sum(pool.map(attempt, range(8))), 3)
+        try:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                self.assertEqual(sum(pool.map(attempt, range(8))), 3)
+        finally:
+            for store in stores:
+                store.close()
 
-    def test_restart_erase_and_rolling_retention_do_not_reset_lifetime(self):
+    def test_each_user_has_an_independent_rolling_budget(self):
         for i in range(3):
             self.store.reserve_api_request(str(i), "u", "g", limits=self.limits, now=100)
-        self.store.erase_server_memory("g")
-        self.store.erase_user_memory("u")
         with self.assertRaises(BudgetExceeded):
-            MemoryStore(self.path).reserve_api_request("next", "other", "other", limits=self.limits, now=1000000)
-
-    def test_each_budget_dimension_blocks_independently(self):
-        for field in ("per_minute", "per_user_day", "per_guild_day", "per_day", "lifetime"):
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as folder:
-                store = MemoryStore(Path(folder)/"m.sqlite3")
-                values = dict(per_minute=100, per_user_day=100, per_guild_day=100, per_day=100, lifetime=100)
-                values[field] = 1
-                limits = ApiLimits(**values)
-                store.reserve_api_request("1", "u", "g", limits=limits, now=100)
-                with self.assertRaises(BudgetExceeded):
-                    store.reserve_api_request("2", "u", "g", limits=limits, now=101)
+            self.store.reserve_api_request("next", "u", "other", limits=self.limits, now=101)
+        self.store.reserve_api_request("other", "other", "other", limits=self.limits, now=101)
+        self.store.reserve_api_request("expired", "u", "g", limits=self.limits, now=701)
 
     def test_clock_rollback_does_not_reopen_window(self):
-        limits = ApiLimits(1, 100, 100, 100, 100)
+        limits = ApiLimits(per_user=1)
         self.store.reserve_api_request("1", "u", "g", limits=limits, now=100)
         with self.assertRaises(BudgetExceeded):
-            self.store.reserve_api_request("2", "v", "h", limits=limits, now=1)
-        self.store.reserve_api_request("3", "v", "h", limits=limits, now=161)
+            self.store.reserve_api_request("2", "u", "h", limits=limits, now=1)
+        self.store.reserve_api_request("3", "v", "h", limits=limits, now=1)
 
     def test_duplicates_and_pause_apply_only_to_standard_requests(self):
         self.store.reserve_api_request("1", "u", "g")
@@ -85,24 +79,23 @@ class BudgetTests(unittest.TestCase):
         with self.assertRaises(BudgetExceeded):
             self.store.reserve_api_request("3", "u", "g")
 
-    def test_all_requests_consume_the_shared_budget(self):
-        limits = ApiLimits(100, 100, 100, 100, 2)
+    def test_requests_from_other_users_do_not_consume_the_budget(self):
+        limits = ApiLimits(per_user=1)
         self.store.reserve_api_request("full", "allow", "g", limits=limits)
         self.store.reserve_api_request("normal", "u", "g", limits=limits)
         with self.assertRaises(BudgetExceeded):
-            self.store.reserve_api_request("next", "v", "h", limits=limits)
+            self.store.reserve_api_request("next", "u", "h", limits=limits)
 
-    def test_full_mode_can_have_more_finite_user_room(self):
-        standard = ApiLimits(100, 1, 100, 100, 100)
-        full_mode = ApiLimits(100, 2, 100, 100, 100)
+    def test_full_mode_uses_the_same_user_budget(self):
+        standard = ApiLimits(per_user=1)
+        full_mode = ApiLimits(per_user=1)
         self.store.reserve_api_request("normal", "normal-user", "g", limits=standard)
         with self.assertRaises(BudgetExceeded):
             self.store.reserve_api_request("normal-2", "normal-user", "g", limits=standard)
 
         self.store.reserve_api_request("full-1", "full-user", "g", limits=full_mode)
-        self.store.reserve_api_request("full-2", "full-user", "g", limits=full_mode)
         with self.assertRaisesRegex(BudgetExceeded, r"DM ckazros.*ckazros@owaua\.com"):
-            self.store.reserve_api_request("full-3", "full-user", "g", limits=full_mode)
+            self.store.reserve_api_request("full-2", "full-user", "g", limits=full_mode)
 
     def test_unbounded_memory_keeps_full_mode_history_verbatim(self):
         content = "x" * (MAX_STORED_CHARS + 1)

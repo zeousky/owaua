@@ -21,7 +21,6 @@ from bot import (
     FULL_MODE_CHANNEL_IDS,
     FULL_MODE_CHANNEL_ID,
     FULL_MODE_GUILD_ID,
-    HOST_DEFAULT_USAGE,
     PERSONA_USAGE,
     MessageEventGuard,
     age_restricted_channel,
@@ -34,6 +33,7 @@ from bot import (
     image_url,
     is_full_mode_command,
     is_owner_note_command,
+    is_topgg_full_mode_command,
     matched_command,
     referenced_message_context,
     language_avatar_path,
@@ -98,7 +98,7 @@ class BotHelperTests(unittest.TestCase):
         self.assertEqual(matched_command("!shutdown"), "!shutdown")
         self.assertEqual(matched_command("!owner's note"), "!owner's note")
         self.assertEqual(matched_command("!OWNER’S NOTE"), "!owner's note")
-        self.assertEqual(matched_command("!persona host default gpt"), "!persona")
+        self.assertEqual(matched_command("!persona chaotic"), "!persona")
         self.assertIsNone(matched_command("!full mode on"))
         self.assertIsNone(matched_command("hello"))
         self.assertIsNone(matched_command("!unknown"))
@@ -110,6 +110,11 @@ class BotHelperTests(unittest.TestCase):
         self.assertTrue(is_full_mode_command("!full"))
         self.assertFalse(is_full_mode_command("!fully"))
         self.assertFalse(is_full_mode_command("!help"))
+
+    def test_topgg_full_mode_command_only_matches_exact_text(self) -> None:
+        self.assertTrue(is_topgg_full_mode_command(" !TOPGG full mode "))
+        self.assertFalse(is_topgg_full_mode_command("!topgg full mode now"))
+        self.assertFalse(is_topgg_full_mode_command("!topgg"))
 
     def test_full_mode_location_is_one_guild_and_channel(self) -> None:
         allowed = SimpleNamespace(
@@ -178,25 +183,15 @@ class BotHelperTests(unittest.TestCase):
             "",
         )
 
-    def test_parse_persona_argument_accepts_host_default_models(self) -> None:
+    def test_parse_persona_argument_rejects_host_default_models(self) -> None:
         self.assertEqual(parse_persona_argument("rudeish"), ("rudeish", None))
-        self.assertEqual(
-            parse_persona_argument("host default"), ("host-default-gpt", None)
-        )
-        self.assertEqual(
-            parse_persona_argument("host default GPT"), ("host-default-gpt", None)
-        )
-        self.assertEqual(
-            parse_persona_argument("host-default deepseek"),
-            ("host-default-deepseek", None),
-        )
-        self.assertEqual(
-            parse_persona_argument("host default mistral"),
-            ("host-default-mistral", None),
-        )
-        persona, error = parse_persona_argument("host default claude")
+        self.assertEqual(parse_persona_argument("chaotic"), ("chaotic", None))
+        persona, error = parse_persona_argument("host default")
         self.assertIsNone(persona)
-        self.assertEqual(error, HOST_DEFAULT_USAGE)
+        self.assertEqual(error, PERSONA_USAGE)
+        persona, error = parse_persona_argument("host default gpt")
+        self.assertIsNone(persona)
+        self.assertEqual(error, PERSONA_USAGE)
         persona, error = parse_persona_argument("mystery")
         self.assertIsNone(persona)
         self.assertEqual(error, PERSONA_USAGE)

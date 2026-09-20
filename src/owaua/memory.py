@@ -19,24 +19,58 @@ RETENTION_SECONDS = 7 * 86400
 
 
 class MemoryStore:
-    """One short-lived connection per operation."""
+    """SQLite store with one reused connection, guarded by a lock."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.path.parent, 0o700)
         self._lock = threading.RLock()
+        self._db: sqlite3.Connection | None = None
+        self._settings: dict[str, str | None] = {}
         self._initialize()
 
+    def close(self) -> None:
+        with self._lock:
+            connection = self._db
+            self._db = None
+            if connection is not None:
+                try:
+                    connection.close()
+                except sqlite3.Error:
+                    pass
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    def _reset_connection(self) -> None:
+        connection = self._db
+        self._db = None
+        if connection is not None:
+            try:
+                connection.close()
+            except sqlite3.Error:
+                pass
+
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path, timeout=10)
+        if self._db is not None:
+            return self._db
+        connection = sqlite3.connect(
+            self.path, timeout=10, check_same_thread=False
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         # A committed charge must survive a crash before the HTTP request.
         connection.execute("PRAGMA synchronous=FULL")
         connection.execute("PRAGMA busy_timeout=10000")
         connection.execute("PRAGMA max_page_count=32768")
+        connection.execute("PRAGMA temp_store=MEMORY")
+        connection.execute("PRAGMA cache_size=-4000")
         connection.execute("PRAGMA secure_delete=ON")
+        self._db = connection
         return connection
 
     @contextmanager
@@ -46,10 +80,11 @@ class MemoryStore:
             yield connection
             connection.commit()
         except BaseException:
-            connection.rollback()
+            try:
+                connection.rollback()
+            except sqlite3.Error:
+                self._reset_connection()
             raise
-        finally:
-            connection.close()
 
     def _initialize(self) -> None:
         with self._lock, self._managed_connection() as db:
@@ -85,6 +120,8 @@ class MemoryStore:
                     created_at REAL NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS api_usage_time_idx ON api_usage(created_at);
+                CREATE INDEX IF NOT EXISTS api_usage_user_time_idx
+                    ON api_usage(user_id, created_at);
                 CREATE TABLE IF NOT EXISTS api_totals (
                     id INTEGER PRIMARY KEY CHECK(id = 1),
                     requests INTEGER NOT NULL DEFAULT 0,
@@ -149,13 +186,7 @@ class MemoryStore:
         expected_generation: tuple[str, str] | None = None,
         server_id: str = "",
     ) -> None:
-        """Charge before sending, atomically across processes; never refund errors.
-
-        The lifetime counter survives rolling retention and memory erasure.
-        Time is monotonic in the ledger even after a system-clock rollback.
-        Every provider attempt is subject to the same ceilings and emergency
-        pause; the erasure fence still protects deleted data.
-        """
+        """Charge before sending against the user's rolling request budget."""
         with self._lock, self._managed_connection() as db:
             db.execute("BEGIN IMMEDIATE")
             if expected_generation is not None and self._generation(db, user_id, server_id) != expected_generation:
@@ -165,34 +196,32 @@ class MemoryStore:
                 raise BudgetExceeded("AI requests are paused by the owner")
             if db.execute("SELECT 1 FROM api_usage WHERE event_id=?", (event_id,)).fetchone():
                 raise DuplicateRequest("Already charged this event")
-            total = db.execute("SELECT requests, last_time FROM api_totals WHERE id=1").fetchone()
-            current = max(time.time() if now is None else now, total["last_time"])
-            # Rolling windows avoid a midnight burst doubling the daily budget.
-            rows = db.execute(
-                "SELECT user_id, guild_id, created_at FROM api_usage WHERE created_at>?",
-                (current - 86400,),
-            ).fetchall()
-            checks = (
-                (total["requests"], limits.lifetime),
-                (len(rows), limits.per_day),
-                (sum(r["created_at"] > current - 60 for r in rows), limits.per_minute),
-                (sum(r["user_id"] == user_id for r in rows), limits.per_user_day),
-                (sum(r["guild_id"] == guild_id for r in rows), limits.per_guild_day),
-            )
-            if any(used >= ceiling for used, ceiling in checks):
+            latest = db.execute(
+                "SELECT max(created_at) AS last_time FROM api_usage WHERE user_id=?",
+                (user_id,),
+            ).fetchone()["last_time"]
+            current = max(time.time() if now is None else now, latest or 0)
+            used = db.execute(
+                "SELECT count(*) FROM api_usage WHERE user_id=? AND created_at>?",
+                (user_id, current - limits.window_seconds),
+            ).fetchone()[0]
+            if used >= limits.per_user:
                 raise BudgetExceeded(
                     "AI request budget reached; try later or DM ckazros or email "
                     "ckazros@owaua.com to request more usage"
                 )
             db.execute("INSERT INTO api_usage VALUES (?, ?, ?, ?)", (event_id, user_id, guild_id, current))
-            db.execute("UPDATE api_totals SET requests=requests+1, last_time=? WHERE id=1", (current,))
-            db.execute("DELETE FROM api_usage WHERE created_at<?", (current - RETENTION_SECONDS,))
 
-    def api_status(self) -> str:
+    def api_status(self, user_id: str | None = None) -> str:
         with self._lock, self._managed_connection() as db:
-            total = db.execute("SELECT requests FROM api_totals WHERE id=1").fetchone()[0]
-            daily = db.execute("SELECT count(*) FROM api_usage WHERE created_at>?", (time.time()-86400,)).fetchone()[0]
-        return f"API attempts: {daily}/{API_LIMITS.per_day} in 24h; {total}/{API_LIMITS.lifetime} lifetime"
+            if user_id is None:
+                return f"API budget: {API_LIMITS.per_user} requests per user per 10 minutes"
+            current = time.time()
+            used = db.execute(
+                "SELECT count(*) FROM api_usage WHERE user_id=? AND created_at>?",
+                (user_id, current - API_LIMITS.window_seconds),
+            ).fetchone()[0]
+        return f"API budget: {used}/{API_LIMITS.per_user} requests for this user in 10 minutes"
 
     def reserve_full_image_generation(
         self, event_id: str, user_id: str, *, limit: int, now: float | None = None
@@ -260,21 +289,32 @@ class MemoryStore:
             self._prune(db)
 
     def get_setting(self, key: str, default: str = "") -> str:
-        with self._lock, self._managed_connection() as db:
-            row = db.execute(
-                "SELECT value FROM app_settings WHERE key = ?", (key,)
-            ).fetchone()
-        return default if row is None else str(row["value"])
+        with self._lock:
+            if key in self._settings:
+                cached = self._settings[key]
+                return default if cached is None else cached
+            with self._managed_connection() as db:
+                row = db.execute(
+                    "SELECT value FROM app_settings WHERE key = ?", (key,)
+                ).fetchone()
+            if row is None:
+                self._settings[key] = None
+                return default
+            value = str(row["value"])
+            self._settings[key] = value
+            return value
 
     def set_setting(self, key: str, value: str) -> None:
-        with self._lock, self._managed_connection() as db:
-            db.execute(
-                """
-                INSERT INTO app_settings (key, value) VALUES (?, ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                """,
-                (key, value),
-            )
+        with self._lock:
+            with self._managed_connection() as db:
+                db.execute(
+                    """
+                    INSERT INTO app_settings (key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (key, value),
+                )
+            self._settings[key] = value
 
     def append_message(
         self,
@@ -311,14 +351,54 @@ class MemoryStore:
                 ),
             )
             inserted = cursor.rowcount == 1
-            db.execute(
-                "DELETE FROM messages WHERE unbounded=0 AND scope_id=? AND user_id=? AND id NOT IN "
-                "(SELECT id FROM messages WHERE unbounded=0 AND scope_id=? AND user_id=? ORDER BY id DESC LIMIT ?)",
-                (scope_id, user_id, scope_id, user_id, CONVERSATION_MESSAGES),
-            )
-            db.execute("DELETE FROM messages WHERE unbounded=0 AND created_at<?", (time.time()-RETENTION_SECONDS,))
-            db.execute("DELETE FROM messages WHERE id IN (SELECT id FROM messages WHERE unbounded=0 ORDER BY id DESC LIMIT -1 OFFSET ?)", (MAX_STORED_MESSAGES,))
+            if inserted and not unbounded:
+                db.execute(
+                    "DELETE FROM messages WHERE unbounded=0 AND scope_id=? AND user_id=? AND id NOT IN "
+                    "(SELECT id FROM messages WHERE unbounded=0 AND scope_id=? AND user_id=? ORDER BY id DESC LIMIT ?)",
+                    (scope_id, user_id, scope_id, user_id, CONVERSATION_MESSAGES),
+                )
             return inserted
+
+    def begin_user_turn(
+        self,
+        *,
+        event_id: str,
+        scope_id: str,
+        user_id: str,
+        server_id: str,
+        content: str,
+        created_at: float | None = None,
+        unbounded: bool = False,
+    ) -> tuple[tuple[str, str], bool]:
+        """Record the user turn and return ``(generation, inserted)``."""
+        with self._lock, self._managed_connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            generation = self._generation(db, user_id, server_id)
+            cursor = db.execute(
+                """
+                INSERT OR IGNORE INTO messages
+                    (event_id, scope_id, user_id, server_id, role, content, unbounded, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    scope_id,
+                    user_id,
+                    server_id,
+                    "user",
+                    content if unbounded else content[:MAX_STORED_CHARS],
+                    int(unbounded),
+                    time.time() if created_at is None else created_at,
+                ),
+            )
+            inserted = cursor.rowcount == 1
+            if inserted and not unbounded:
+                db.execute(
+                    "DELETE FROM messages WHERE unbounded=0 AND scope_id=? AND user_id=? AND id NOT IN "
+                    "(SELECT id FROM messages WHERE unbounded=0 AND scope_id=? AND user_id=? ORDER BY id DESC LIMIT ?)",
+                    (scope_id, user_id, scope_id, user_id, CONVERSATION_MESSAGES),
+                )
+            return generation, inserted
 
     def erase_user_memory(self, user_id: str) -> int:
         with self._lock, self._managed_connection() as db:
@@ -330,14 +410,18 @@ class MemoryStore:
         self, scope_id: str, user_id: str, *, limit: int | None
     ) -> list[dict[str, object]]:
         with self._lock, self._managed_connection() as db:
-            db.execute("DELETE FROM messages WHERE unbounded=0 AND created_at<?", (time.time()-RETENTION_SECONDS,))
             query = """
                 SELECT id, role, content, created_at
                 FROM messages
                 WHERE scope_id = ? AND user_id = ?
+                  AND (unbounded = 1 OR created_at >= ?)
                 ORDER BY id DESC
             """
-            parameters: tuple[object, ...] = (scope_id, user_id)
+            parameters: tuple[object, ...] = (
+                scope_id,
+                user_id,
+                time.time() - RETENTION_SECONDS,
+            )
             if limit is not None:
                 query += " LIMIT ?"
                 parameters += (limit,)
@@ -369,10 +453,12 @@ class MemoryStore:
             cursor = db.execute(
                 "DELETE FROM messages WHERE server_id = ?", (server_id,)
             )
+            language_key = f"response_language:guild:{server_id}"
             db.execute(
                 "DELETE FROM app_settings WHERE key = ?",
-                (f"response_language:guild:{server_id}",),
+                (language_key,),
             )
+            self._settings.pop(language_key, None)
             return cursor.rowcount
 
     def set_active_mode(self, scope_id: str, enabled: bool) -> None:

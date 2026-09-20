@@ -130,6 +130,7 @@ class CloudflareAskTests(unittest.IsolatedAsyncioTestCase):
         self.http = FakeHTTP()
 
     def tearDown(self) -> None:
+        self.memory.close()
         self.temporary_directory.cleanup()
 
     async def _ask(self, **kwargs: object) -> str | None:

@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from pathlib import Path
 from typing import Awaitable, Callable
 
@@ -22,7 +22,6 @@ from ask import (
     FULL_MODE_PROVIDERS,
     GEMINI_ONLY,
     FULL_MODE_MODELS,
-    HOST_DEFAULT_MODELS,
     LOCAL_AI_ONLY,
     MAX_ATTACHMENTS,
     MODEL,
@@ -32,7 +31,6 @@ from ask import (
     MISTRAL_MODEL,
     PERSONAS,
     ask,
-    host_default_persona,
     host_model_error,
     full_mode_provider_error,
     looks_like_decode_request,
@@ -86,7 +84,7 @@ COMMANDS = frozenset(
     }
 )
 DISCORD_MESSAGE_LIMIT = 1900
-ASK_TIMEOUT = 40.0
+ASK_TIMEOUT = 80.0
 HANDLER_TIMEOUT = 140.0
 MAX_HANDLERS = 16
 FULL_MODE_GUILD_ID = 1535083112709496903
@@ -124,7 +122,7 @@ PROMOTED_FULL_MODE_PROMPT_LIMIT = 8
 HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
-`!persona rudeish|nerdish|flirty|chaotic|host default gpt/deepseek/mistral` — view or switch your persona
+`!persona rudeish|nerdish|flirty|chaotic` — view or switch your persona
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
@@ -136,7 +134,7 @@ Each command has a 25s cooldown."""
 OWNER_HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
-`!persona rudeish|nerdish|flirty|chaotic|host default gpt/deepseek/mistral` — view or switch your persona
+`!persona rudeish|nerdish|flirty|chaotic` — view or switch your persona
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
@@ -293,12 +291,8 @@ def discordify_full_mode_setting_key(user_id: object) -> str:
 
 
 PERSONA_USAGE = (
-    "usage: !persona rudeish, !persona nerdish, !persona flirty, !persona chaotic, "
-    "or !persona host default gpt/deepseek/mistral"
-)
-HOST_DEFAULT_USAGE = (
-    "usage: !persona host default gpt, !persona host default deepseek, "
-    "or !persona host default mistral"
+    "usage: !persona rudeish, !persona nerdish, !persona flirty, "
+    "or !persona chaotic"
 )
 
 
@@ -309,13 +303,6 @@ def parse_persona_argument(argument: str) -> tuple[str | None, str | None]:
         return None, None
     if text in PERSONAS:
         return text, None
-    if text == "host default" or text.startswith("host default "):
-        rest = text[len("host default") :].strip()
-        if not rest:
-            return host_default_persona(), None
-        if rest in HOST_DEFAULT_MODELS:
-            return host_default_persona(rest), None
-        return None, HOST_DEFAULT_USAGE
     return None, PERSONA_USAGE
 
 
@@ -578,17 +565,15 @@ class MessageEventGuard:
     def __init__(self, *, ttl: float = 900.0) -> None:
         self.ttl = ttl
         self.capacity = 4096
-        self._seen: dict[int, float] = {}
+        self._seen: OrderedDict[int, float] = OrderedDict()
 
     def claim(self, message_id: int, *, now: float | None = None) -> bool:
         current = time.monotonic() if now is None else now
-        expired = [
-            event_id
-            for event_id, timestamp in self._seen.items()
-            if current - timestamp >= self.ttl
-        ]
-        for event_id in expired:
-            self._seen.pop(event_id, None)
+        while self._seen:
+            event_id, timestamp = next(iter(self._seen.items()))
+            if current - timestamp < self.ttl:
+                break
+            self._seen.popitem(last=False)
         if message_id in self._seen:
             return False
         if len(self._seen) >= self.capacity:
@@ -608,7 +593,11 @@ class PersonaBot(discord.Client):
         self.provider_http = httpx.AsyncClient(
             timeout=httpx.Timeout(60.0, connect=4.0),
             trust_env=False, follow_redirects=False,
-            limits=httpx.Limits(max_connections=16)
+            limits=httpx.Limits(
+                max_connections=16,
+                max_keepalive_connections=16,
+                keepalive_expiry=120.0,
+            ),
         )
         self.message_events = MessageEventGuard()
         self.conversation_locks: defaultdict[tuple[str, str], asyncio.Lock] = (
@@ -716,13 +705,13 @@ class PersonaBot(discord.Client):
     def full_mode_active(self, message: object) -> bool:
         # Full mode is an opt-in capability for approved users. It is not a
         # guild-level trust bypass: every request still goes through bounded
-        # admission, concurrency, timeout, input, output, and API-budget
-        # limits. Allowlisted users get a higher finite API budget.
+        # admission, concurrency, timeout, input, output, and per-user
+        # API-budget limits.
         if not full_mode_location(message):
             return False
         author = getattr(message, "author", None)
         user_id = getattr(author, "id", None)
-        return full_mode_allowed(user_id) and self.full_mode_enabled_for(user_id)
+        return self.full_mode_allowed_for(user_id) and self.full_mode_enabled_for(user_id)
 
     def admit_request(self, user_id: int) -> tuple[bool, int]:
         now = time.monotonic()
@@ -813,7 +802,7 @@ class PersonaBot(discord.Client):
                     message, music_argument, outcome="rejected", reason=reason
                 )
 
-        personal_erasure = command_text(message.content, None if self.user is None else self.user.id).casefold() == "!memory erase mine"
+        personal_erasure = normalized.casefold() == "!memory erase mine"
         if message.guild is None and not ALLOW_DMS and message.author.id not in OWNER_IDS and not personal_erasure:
             audit_filtered("direct_messages_disabled")
             return
@@ -911,7 +900,7 @@ class PersonaBot(discord.Client):
                 return
             if argument.casefold() in {"pause", "resume"}:
                 self.memory.set_setting("api_paused", "1" if argument.casefold() == "pause" else "0")
-            await self._reply(message, self.memory.api_status() + "; paused=" + self.memory.get_setting("api_paused", "0"))
+            await self._reply(message, self.memory.api_status(str(message.author.id)) + "; paused=" + self.memory.get_setting("api_paused", "0"))
             return
         if name == "!help":
             help_text = OWNER_HELP_TEXT if message.author.id == HELP_OWNER_ID else HELP_TEXT
@@ -973,8 +962,15 @@ class PersonaBot(discord.Client):
         decode_now = not relaxed_guardrails and looks_like_decode_request(prompt)
         repeat_now = not relaxed_guardrails and looks_like_repeat_request(prompt)
         # Full mode changes the provider/capabilities for approved users, but
-        # it does not receive an unbounded conversation window.
-        use_history = False
+        # it does not receive an unbounded conversation window. Gemini hangout
+        # keeps a larger recent-turn window so search-backed replies have context.
+        persona = self.persona_for(message.channel, message)
+        use_history = (
+            not full_mode
+            and not LOCAL_AI_ONLY
+            and not full_mode_blocked(message.author.id)
+            and persona_provider(persona) == "gemini"
+        )
         if decode_now or repeat_now:
             image_urls = []
         elif prompt or image_urls:
@@ -1033,7 +1029,7 @@ class PersonaBot(discord.Client):
                         ),
                         prompt=prompt,
                         image_urls=image_urls,
-                        persona=self.persona_for(message.channel, message),
+                        persona=persona,
                         language=self.response_language(message),
                         created_at=message.created_at.timestamp(),
                         full_mode=full_mode,
@@ -1065,7 +1061,11 @@ class PersonaBot(discord.Client):
 
     def _full_mode_command(self, message: discord.Message, requested: str) -> str:
         user_id = message.author.id
-        if full_mode_blocked(user_id) or not full_mode_can_enable(user_id):
+        if (
+            full_mode_blocked(user_id)
+            or not self.full_mode_allowed_for(user_id)
+            and not full_mode_can_enable(user_id)
+        ):
             return "you can't use this"
         text = " ".join(requested.casefold().split())
         if text in {"", "mode"}:
@@ -1379,6 +1379,9 @@ class PersonaBot(discord.Client):
             voice.stop()
             await voice.disconnect(force=True)
         await self.provider_http.aclose()
+        closer = getattr(self.memory, "close", None)
+        if callable(closer):
+            closer()
         await super().close()
 
 
