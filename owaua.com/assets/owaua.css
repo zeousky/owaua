@@ -171,6 +171,35 @@ main.wrap {
   background: var(--blurple-hover);
 }
 
+.secret-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  padding: 0;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.secret-button:hover,
+.secret-button:focus-visible {
+  background: var(--line);
+  color: var(--text);
+}
+.secret-button.is-revealed {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 0.28rem 0.55rem;
+}
+
 .menu { display: none; }
 .menu summary {
   list-style: none;

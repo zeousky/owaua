@@ -16,6 +16,16 @@ if (menu) {
   });
 }
 
+for (const button of document.querySelectorAll('[data-secret-button]')) {
+  button.addEventListener('click', event => {
+    if (button.classList.contains('is-revealed')) return;
+    event.preventDefault();
+    button.textContent = 'secret button';
+    button.setAttribute('aria-label', 'secret button');
+    button.classList.add('is-revealed');
+  });
+}
+
 const contactLinks = document.querySelectorAll('.contact-link[data-contact-email]');
 if (contactLinks.length) {
   const status = document.createElement('div');
