@@ -48,7 +48,7 @@ owaua
 <header class="page-head">
 <p>privacy</p>
 <h1>what it remembers</h1>
-<p>Last updated September 19, 2026. owaua keeps a short, scoped conversation history so it can talk back. This page is the honest version of what that means.</p>
+<p>Last updated September 21, 2026. owaua keeps a short, scoped conversation history, plus a short log of recent channel lines, so it can talk back. This page is the honest version of what that means.</p>
 </header>
 
 <section class="section" id="covers">
@@ -73,20 +73,20 @@ owaua
 <p>Only what it needs to answer you, and to remember a little of the conversation so the next reply is not from nowhere.</p>
 <ul class="list">
 <li><strong>Discord ids</strong><span>Your user id, and the server and channel ids when you talk in a server. Display names come along with the message Discord already sent. Server id is stored so one guild can be wiped without touching others. DMs have an empty server id.</span></li>
-<li><strong>messages</strong><span>Pings and replies, plus DMs only when the operator enables them. Ordinary unmentioned messages are not conversation. Prefix commands are handled as commands, not as conversation.</span></li>
-<li><strong>attachments</strong><span>Normal hangout mode is text-only and does not look at images. Audio attachments can be used by <code>!music</code> within its safety limits.</span></li>
+<li><strong>messages</strong><span>Pings and replies, plus DMs only when the operator enables them, are the conversation. In a server channel it can read, it also keeps a short recent line (display name, user id, and up to 180 characters) so a later ping can follow the room. That log is not your persona and not your private thread. Prefix commands can show up in it because they were said in the channel. Other bots are ignored. DMs are not scanned for anyone else’s chatter.</span></li>
+<li><strong>attachments</strong><span>Gemini hangout can look at one image. Other normal-mode providers stay text-only. Audio attachments can be used by <code>!music</code> within its safety limits.</span></li>
 <li><strong>channel and server settings</strong><span>The selected persona, reply language, and provider choice. Those live in the same SQLite file so they survive a restart. Public DMs are off by default.</span></li>
 <li><strong>usage limits</strong><span>Persistent usage records cover 30 AI requests per user per rolling 10 minutes. The running process also allows eight AI-admission attempts per user per minute, and up to three AI users can be in flight. Command cooldowns are separate.</span></li>
 <li><strong>voice and music</strong><span><code>!music</code> sees the author’s voice channel and a single YouTube or Twitter/X video link, or a supported audio attachment. Ordinary playback is capped at 15 minutes and 20 MiB where downloaded audio is involved. The current track is not saved across restarts, and playlists are rejected.</span></li>
 <li><strong>mail you send us</strong><span>If you email or DM the operator, that message is just a message. We keep what we need to answer it.</span></li>
 </ul>
-<p class="note">It does not scrape every channel it can see. No ping, no DM, and no active-mode hit means it stays out. Other bots are ignored.</p>
+<p class="note">It still does not reply unless pinged. It does keep those short channel lines from channels it can read. Other bots are ignored.</p>
 </section>
 
 <section class="section" id="why">
 <h2>why it keeps any of this</h2>
 <div class="body">
-<p>To reply. To remember the last few turns so the next message is not starting from zero. To keep the persona, language, and active-mode settings you asked for. To slow down people who would otherwise melt it. To play a track you asked for.</p>
+<p>To reply. To remember the last few turns so the next message is not starting from zero, and a little of the room so it is not blind. To keep the persona and language you asked for. To slow down people who would otherwise melt it. To play a track you asked for.</p>
 <p>We do not sell this. We do not run ads against it. We do not build a marketing list out of your DMs.</p>
 </div>
 </section>
@@ -94,8 +94,8 @@ owaua
 <section class="section" id="memory">
 <h2>how memory works</h2>
 <div class="body">
-<p>Data lives in a local SQLite file on the host (<code>data/memory.sqlite3</code>, WAL mode). Each conversation is keyed by channel + user. Two people in the same channel have separate histories. The same person in two channels has two histories. Up to 20 records (you + the bot) are sent back to the model, with inputs capped at 2,000 characters.</p>
-<p>There is no privacy opt-in gate: the recent chat is stored because the bot needs it to talk. It is pruned after seven days, beyond the 20-record conversation window, or when the database reaches its 10,000-record cap. Duplicate Discord events for the same message id are not stored twice.</p>
+<p>Data lives in a local SQLite file on the host (<code>data/memory.sqlite3</code>, WAL mode). Each conversation is keyed by channel + user. Two people in the same channel have separate histories and separate personas. The same person in two channels has two histories. Up to 12 of the last 20 records in your thread can go back to the model, with inputs capped at 2,000 characters. Up to 12 recent channel lines can go with that reply, as untrusted room context. The channel log keeps at most 40 lines per channel.</p>
+<p>There is no privacy opt-in gate: the recent chat is stored because the bot needs it to talk. Threads and channel lines are pruned after seven days. A thread also falls off beyond 20 records, and the message table tops out at 10,000 records. Duplicate Discord events for the same message id are not stored twice.</p>
 <p>Please don’t send passwords, tokens, private keys, or anything you would not want saved. If you already did, have someone with Manage Server run <code>!memory erase</code> in that server, or write us.</p>
 </div>
 </section>
@@ -104,7 +104,7 @@ owaua
 <h2>who else sees it</h2>
 <div class="body">
 <p>Discord already has the message. That is their platform, their rules.</p>
-<p>To generate a reply, the bot sends the current prompt and, when conversation context is useful, up to the last four stored messages for that channel + user to the configured model provider. Gemini 3.1 Flash Lite hangout requests can include one image attachment; other normal-mode providers remain text-only. Approved full-mode requests can also include one image attachment. Provider-side storage is requested off. A local self-harm check and other refusal guards can answer without calling the model at all.</p>
+<p>To generate a reply, the bot sends the current prompt and, when conversation context is useful, up to the last 12 stored messages for that channel + user, plus up to 12 recent channel lines, to the configured model provider. Gemini 3.1 Flash Lite hangout requests can include one image attachment; other normal-mode providers remain text-only. Approved full-mode requests can also include one image attachment and do not include the channel-line block. Provider-side storage is requested off. A local self-harm check and other refusal guards can answer without calling the model at all.</p>
 <p>Other services only see what that feature needs:</p>
 </div>
 <ul class="list">
@@ -116,7 +116,7 @@ owaua
 <section class="section" id="keep">
 <h2>how long it stays</h2>
 <div class="body">
-<p>Recent conversation stays until it falls off the 20-record-per-conversation window, expires after seven days, until an erase command wipes it, or until we delete it for you. Persona, language, and provider settings stay until they are changed.</p>
+<p>Recent conversation stays until it falls off the 20-record-per-conversation window, expires after seven days, until an erase command wipes it, or until we delete it for you. Channel lines stay until they fall off the 40-line channel window, expire after seven days, or an erase command wipes them. Persona, language, and provider settings stay until they are changed.</p>
 <p>Rate-limit counts and the duplicate-message guard live in memory and disappear when the process restarts. The current music track is not kept as conversation history.</p>
 <p>Backups of the host can hold a copy of the SQLite file for as long as those backups exist. Treat that file like private chat, because it is.</p>
 </div>
@@ -126,7 +126,7 @@ owaua
 <h2>your choices</h2>
 <div class="body">
 <p>If you don’t want a record, don’t talk to it. Leaving a server stops new server memory for you there. It does not, by itself, wipe what is already stored.</p>
-<p>There is no per-user export command. You can run <code>!memory erase mine</code> to delete your own history. Someone with Manage Server can run <code>!memory erase</code> to delete every stored conversation message for that server. That does not erase other servers, DMs, or settings such as persona, language, or provider choice.</p>
+<p>There is no per-user export command. You can run <code>!memory erase mine</code> to delete your own thread and your channel lines, including short copies of replies that were to you. Someone with Manage Server can run <code>!memory erase</code> to delete every stored conversation and channel line for that server. That does not erase other servers, DMs, or settings such as persona, language, or provider choice.</p>
 <p>If that is not enough, email <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a> with the Discord user id. Say whether you mean DMs, a server, or both. Discord messages in the channel itself are Discord’s, not ours.</p>
 <p>You can also stop using the bot, kick it from a server, or close your Discord account. Kicking it stops new collection in that server. It does not automatically purge the SQLite file.</p>
 </div>

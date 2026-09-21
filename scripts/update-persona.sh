@@ -37,6 +37,7 @@ model_files = {
     "nerdish": "personas/nerdish.txt",
     "flirty": "personas/flirty.txt",
     "chaotic": "personas/chaotic.txt",
+    "cute": "personas/cute.txt",
 }
 requested = os.environ["PERSONA_MODELS"].replace(",", " ").replace("/", " ").split()
 models = []

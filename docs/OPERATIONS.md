@@ -39,7 +39,7 @@ For local-only work, use `./scripts/deploy-local.sh`; it never contacts Daki.
 
 ## Persona updates
 
-`update persona [rudeish|nerdish|flirty|chaotic]` (from `~/.local/bin/update`)
+`update persona [rudeish|nerdish|flirty|chaotic|cute]` (from `~/.local/bin/update`)
 keeps the local `personas/*.txt` files live for the Mac bot and uploads the
 same files to Daki. `OWAUA_LOCAL_ONLY` does not skip the Daki upload. Preview
 with `OWAUA_DAKI_DRY_RUN=1 update persona rudeish`. Neither side needs a

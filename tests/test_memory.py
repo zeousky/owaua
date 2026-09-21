@@ -142,6 +142,65 @@ class MemoryStoreTests(unittest.TestCase):
             ["hello"],
         )
 
+    def test_channel_lines_stay_in_one_channel_and_erase_with_the_user(self) -> None:
+        self.assertTrue(
+            self.store.record_channel_line(
+                event_id="line:1",
+                scope_id="room",
+                server_id="server-a",
+                user_id="ada",
+                author="Ada",
+                content="the patch dropped",
+            )
+        )
+        self.assertFalse(
+            self.store.record_channel_line(
+                event_id="line:1",
+                scope_id="room",
+                server_id="server-a",
+                user_id="ada",
+                author="Ada",
+                content="duplicate",
+            )
+        )
+        self.store.record_channel_line(
+            event_id="line:2",
+            scope_id="room",
+            server_id="server-a",
+            user_id="bea",
+            author="Bea",
+            content="finally",
+        )
+        self.store.record_channel_line(
+            event_id="line:3",
+            scope_id="other",
+            server_id="server-b",
+            user_id="ada",
+            author="Ada",
+            content="somewhere else",
+        )
+
+        room = self.store.recent_channel_lines("room", limit=10, exclude_event_id="line:2")
+        self.assertEqual([line["content"] for line in room], ["the patch dropped"])
+
+        self.store.erase_user_memory("ada")
+        self.assertEqual(
+            [line["content"] for line in self.store.recent_channel_lines("room", limit=10)],
+            ["finally"],
+        )
+        self.assertEqual(self.store.recent_channel_lines("other", limit=10), [])
+
+        self.store.record_channel_line(
+            event_id="line:4",
+            scope_id="room",
+            server_id="server-a",
+            user_id="bea",
+            author="Bea",
+            content="still here",
+        )
+        self.store.erase_server_memory("server-a")
+        self.assertEqual(self.store.recent_channel_lines("room", limit=10), [])
+
 
 if __name__ == "__main__":
     unittest.main()

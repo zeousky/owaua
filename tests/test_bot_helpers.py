@@ -103,6 +103,7 @@ class BotHelperTests(unittest.TestCase):
         self.assertEqual(matched_command("!owner's note"), "!owner's note")
         self.assertEqual(matched_command("!OWNER’S NOTE"), "!owner's note")
         self.assertEqual(matched_command("!persona chaotic"), "!persona")
+        self.assertEqual(matched_command("!persona cute"), "!persona")
         self.assertIsNone(matched_command("!full mode on"))
         self.assertIsNone(matched_command("hello"))
         self.assertIsNone(matched_command("!unknown"))
@@ -190,6 +191,7 @@ class BotHelperTests(unittest.TestCase):
     def test_parse_persona_argument_rejects_host_default_models(self) -> None:
         self.assertEqual(parse_persona_argument("rudeish"), ("rudeish", None))
         self.assertEqual(parse_persona_argument("chaotic"), ("chaotic", None))
+        self.assertEqual(parse_persona_argument("cute"), ("cute", None))
         persona, error = parse_persona_argument("host default")
         self.assertIsNone(persona)
         self.assertEqual(error, PERSONA_USAGE)

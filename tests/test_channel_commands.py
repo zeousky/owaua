@@ -928,6 +928,57 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         mocked_ask.assert_not_awaited()
         self.assertEqual(channel.sent, [PING_RESPONSE])
 
+    async def test_channel_chatter_is_remembered_without_a_reply(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("the patch dropped", 1, channel, author_id=44))
+
+        self.assertEqual(channel.sent, [])
+        lines = self.store.recent_channel_lines("22", limit=10)
+        self.assertEqual(lines[0]["content"], "the patch dropped")
+        self.assertEqual(lines[0]["user_id"], "44")
+
+    async def test_ping_includes_other_peoples_lines_but_not_itself(self) -> None:
+        channel = FakeChannel()
+        await self.bot.on_message(make_message("the patch dropped", 1, channel, author_id=44))
+
+        with patch("bot.ask", AsyncMock(return_value="finally")) as mocked_ask:
+            await self.bot.on_message(
+                make_message("<@99> did it", 2, channel, mentions=[self.bot.user])
+            )
+
+        lines = mocked_ask.await_args.kwargs["channel_lines"]
+        self.assertTrue(any("patch" in line["content"] for line in lines))
+        self.assertFalse(any("did it" in line["content"] for line in lines))
+        stored = self.store.recent_channel_lines("22", limit=10)
+        self.assertTrue(any(line["author"] == "owaua" and line["content"] == "finally" for line in stored))
+
+    async def test_memory_erase_mine_removes_channel_lines(self) -> None:
+        channel = FakeChannel()
+        self.store.record_channel_line(
+            event_id="line:mine",
+            scope_id="22",
+            server_id="11",
+            user_id="33",
+            author="33",
+            content="my line",
+        )
+        self.store.record_channel_line(
+            event_id="line:theirs",
+            scope_id="22",
+            server_id="11",
+            user_id="44",
+            author="44",
+            content="their line",
+        )
+
+        await self.bot.on_message(make_message("!memory erase mine", 1, channel))
+
+        self.assertEqual(
+            [line["content"] for line in self.store.recent_channel_lines("22", limit=10)],
+            ["their line"],
+        )
+
     async def test_image_only_ping_still_calls_the_provider(self) -> None:
         channel = FakeChannel()
         image = SimpleNamespace(

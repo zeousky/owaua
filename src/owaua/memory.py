@@ -15,6 +15,9 @@ from security import API_LIMITS, ApiLimits, BudgetExceeded, DuplicateRequest
 MAX_STORED_CHARS = 5700
 MAX_STORED_MESSAGES = 10000
 CONVERSATION_MESSAGES = 20
+CHANNEL_LINE_CHARS = 180
+CHANNEL_LINES_KEPT = 40
+CHANNEL_CONTEXT_LINES = 12
 RETENTION_SECONDS = 7 * 86400
 
 
@@ -112,6 +115,22 @@ class MemoryStore:
                 );
                 CREATE INDEX IF NOT EXISTS messages_conversation_idx
                     ON messages(scope_id, user_id, id);
+                CREATE TABLE IF NOT EXISTS channel_lines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL UNIQUE,
+                    scope_id TEXT NOT NULL,
+                    server_id TEXT NOT NULL DEFAULT '',
+                    user_id TEXT NOT NULL,
+                    author TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS channel_lines_scope_idx
+                    ON channel_lines(scope_id, id);
+                CREATE INDEX IF NOT EXISTS channel_lines_server_idx
+                    ON channel_lines(server_id);
+                CREATE INDEX IF NOT EXISTS channel_lines_user_idx
+                    ON channel_lines(user_id);
                 CREATE TABLE IF NOT EXISTS api_usage (
                     event_id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
@@ -162,6 +181,15 @@ class MemoryStore:
             "(SELECT id, row_number() OVER (PARTITION BY scope_id,user_id ORDER BY id DESC) AS n FROM messages WHERE unbounded=0) WHERE n>?)",
             (CONVERSATION_MESSAGES,),
         )
+        db.execute(
+            "DELETE FROM channel_lines WHERE created_at<?",
+            (time.time() - RETENTION_SECONDS,),
+        )
+        db.execute(
+            "DELETE FROM channel_lines WHERE id IN (SELECT id FROM "
+            "(SELECT id, row_number() OVER (PARTITION BY scope_id ORDER BY id DESC) AS n FROM channel_lines) WHERE n>?)",
+            (CHANNEL_LINES_KEPT,),
+        )
 
     @staticmethod
     def _generation(db: sqlite3.Connection, user_id: str, server_id: str) -> tuple[str, str]:
@@ -210,6 +238,19 @@ class MemoryStore:
                     "ckazros@owaua.com to request more usage"
                 )
             db.execute("INSERT INTO api_usage VALUES (?, ?, ?, ?)", (event_id, user_id, guild_id, current))
+
+    def ensure_active_turn(
+        self, user_id: str, server_id: str, expected_generation: tuple[str, str]
+    ) -> None:
+        """Reject a follow-up draft after erasure or an owner pause, without charging."""
+        with self._lock, self._managed_connection() as db:
+            if self._generation(db, user_id, server_id) != expected_generation:
+                raise BudgetExceeded("This request was cancelled by memory erasure")
+            row = db.execute(
+                "SELECT value FROM app_settings WHERE key='api_paused'"
+            ).fetchone()
+            if row is not None and row[0] == "1":
+                raise BudgetExceeded("AI requests are paused by the owner")
 
     def api_status(self, user_id: str | None = None) -> str:
         with self._lock, self._managed_connection() as db:
@@ -403,6 +444,7 @@ class MemoryStore:
         with self._lock, self._managed_connection() as db:
             db.execute("BEGIN IMMEDIATE")
             self._bump_generation(db, f"memory_user_epoch:{user_id}")
+            db.execute("DELETE FROM channel_lines WHERE user_id=?", (user_id,))
             return db.execute("DELETE FROM messages WHERE user_id=?", (user_id,)).rowcount
 
     def recent_messages(
@@ -442,6 +484,7 @@ class MemoryStore:
             cursor = db.execute(
                 "DELETE FROM messages WHERE server_id = ?", (server_id,)
             )
+            db.execute("DELETE FROM channel_lines WHERE server_id = ?", (server_id,))
             return cursor.rowcount
 
     def reset_server_data(self, server_id: str) -> int:
@@ -452,6 +495,7 @@ class MemoryStore:
             cursor = db.execute(
                 "DELETE FROM messages WHERE server_id = ?", (server_id,)
             )
+            db.execute("DELETE FROM channel_lines WHERE server_id = ?", (server_id,))
             language_key = f"response_language:guild:{server_id}"
             db.execute(
                 "DELETE FROM app_settings WHERE key = ?",
@@ -459,6 +503,80 @@ class MemoryStore:
             )
             self._settings.pop(language_key, None)
             return cursor.rowcount
+
+    def record_channel_line(
+        self,
+        *,
+        event_id: str,
+        scope_id: str,
+        server_id: str,
+        user_id: str,
+        author: str,
+        content: str,
+        created_at: float | None = None,
+    ) -> bool:
+        if not isinstance(content, str) or not isinstance(author, str):
+            return False
+        text = " ".join(content.split())[:CHANNEL_LINE_CHARS]
+        name = " ".join(author.split())[:32]
+        if not text or not scope_id:
+            return False
+        if not name:
+            name = "someone"
+        with self._lock, self._managed_connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            cursor = db.execute(
+                """
+                INSERT OR IGNORE INTO channel_lines
+                    (event_id, scope_id, server_id, user_id, author, content, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    scope_id,
+                    server_id,
+                    user_id,
+                    name,
+                    text,
+                    time.time() if created_at is None else created_at,
+                ),
+            )
+            inserted = cursor.rowcount == 1
+            db.execute(
+                "DELETE FROM channel_lines WHERE scope_id=? AND id NOT IN "
+                "(SELECT id FROM channel_lines WHERE scope_id=? ORDER BY id DESC LIMIT ?)",
+                (scope_id, scope_id, CHANNEL_LINES_KEPT),
+            )
+            return inserted
+
+    def recent_channel_lines(
+        self,
+        scope_id: str,
+        *,
+        limit: int,
+        exclude_event_id: str = "",
+    ) -> list[dict[str, str]]:
+        with self._lock, self._managed_connection() as db:
+            query = """
+                SELECT user_id, author, content
+                FROM channel_lines
+                WHERE scope_id = ? AND created_at >= ?
+            """
+            parameters: list[object] = [scope_id, time.time() - RETENTION_SECONDS]
+            if exclude_event_id:
+                query += " AND event_id != ?"
+                parameters.append(exclude_event_id)
+            query += " ORDER BY id DESC LIMIT ?"
+            parameters.append(limit)
+            rows = db.execute(query, parameters).fetchall()
+        return [
+            {
+                "user_id": str(row["user_id"]),
+                "author": str(row["author"]),
+                "content": str(row["content"]),
+            }
+            for row in reversed(rows)
+        ]
 
     def set_active_mode(self, scope_id: str, enabled: bool) -> None:
         with self._lock, self._managed_connection() as db:

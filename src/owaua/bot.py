@@ -42,7 +42,7 @@ from ask import (
     valid_persona,
 )
 from cloudflare import describe_protection
-from memory import MemoryStore
+from memory import CHANNEL_CONTEXT_LINES, MemoryStore
 from security import (OWNER_IDS, BLOCKED_USERS, ALLOWED_GUILDS, ALLOW_DMS,
                       MAX_INFLIGHT, MAX_INPUT_CHARS, MAX_REPLY_CHARS, MAX_TRACKED_USERS)
 from music import (
@@ -122,7 +122,7 @@ PROMOTED_FULL_MODE_PROMPT_LIMIT = 8
 HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
-`!persona rudeish|nerdish|flirty|chaotic` — view or switch your persona
+`!persona rudeish|nerdish|flirty|chaotic|cute` — view or switch your persona
 `!human on|off` — talk like a person, or use the usual hangout-bot voice
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
@@ -135,7 +135,7 @@ Each command has a 25s cooldown."""
 OWNER_HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
-`!persona rudeish|nerdish|flirty|chaotic` — view or switch your persona
+`!persona rudeish|nerdish|flirty|chaotic|cute` — view or switch your persona
 `!human on|off` — talk like a person, or use the usual hangout-bot voice
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
@@ -291,7 +291,7 @@ def discordify_full_mode_setting_key(user_id: object) -> str:
 
 PERSONA_USAGE = (
     "usage: !persona rudeish, !persona nerdish, !persona flirty, "
-    "or !persona chaotic"
+    "!persona chaotic, or !persona cute"
 )
 HUMAN_USAGE = "usage: !human on or !human off"
 
@@ -788,6 +788,59 @@ class PersonaBot(discord.Client):
     ) -> None:
         await abandon_music_if_needed(self, member, before, after)
 
+    def _speaker_name(self, author: object) -> str:
+        for attr in ("display_name", "global_name", "name"):
+            value = getattr(author, attr, None)
+            if value:
+                return " ".join(str(value).split())[:32]
+        return str(getattr(author, "id", "someone"))[:32]
+
+    async def _remember_channel_text(
+        self,
+        *,
+        event_id: str,
+        scope_id: str,
+        server_id: str,
+        user_id: str,
+        author: str,
+        content: str,
+        created_at: float,
+    ) -> None:
+        try:
+            await asyncio.to_thread(
+                self.memory.record_channel_line,
+                event_id=event_id,
+                scope_id=scope_id,
+                server_id=server_id,
+                user_id=user_id,
+                author=author,
+                content=content,
+                created_at=created_at,
+            )
+        except Exception:
+            log.exception("Could not store a channel line")
+
+    async def _remember_channel_line(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        raw_content = message.content
+        if not isinstance(raw_content, str):
+            return
+        raw = sanitize_user_text(raw_content).strip()
+        if not raw:
+            return
+        created = getattr(message, "created_at", None)
+        stamp = created.timestamp() if created is not None else time.time()
+        await self._remember_channel_text(
+            event_id=f"line:{message.id}",
+            scope_id=str(message.channel.id),
+            server_id=str(message.guild.id),
+            user_id=str(message.author.id),
+            author=self._speaker_name(message.author),
+            content=raw,
+            created_at=stamp,
+        )
+
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or getattr(message, "webhook_id", None):
             return
@@ -816,6 +869,8 @@ class PersonaBot(discord.Client):
         if message.guild is not None and ALLOWED_GUILDS and message.guild.id not in ALLOWED_GUILDS and not unrestricted_music:
             audit_filtered("guild_not_allowlisted")
             return
+        if message.guild is not None:
+            await self._remember_channel_line(message)
         if not unrestricted_music and len(message.content) > MAX_INPUT_CHARS:
             audit_filtered("message_too_long")
             return
@@ -996,6 +1051,14 @@ class PersonaBot(discord.Client):
             return
         scope_id = str(message.channel.id)
         user_id = str(message.author.id)
+        channel_lines: list[dict[str, str]] = []
+        if message.guild is not None and not full_mode:
+            channel_lines = await asyncio.to_thread(
+                self.memory.recent_channel_lines,
+                scope_id,
+                limit=CHANNEL_CONTEXT_LINES,
+                exclude_event_id=f"line:{message.id}",
+            )
         inflight = getattr(self, "inflight_users", None)
         if inflight is None:
             self.inflight_users = inflight = set()
@@ -1045,11 +1108,22 @@ class PersonaBot(discord.Client):
                         use_history=use_history,
                         relaxed_guardrails=relaxed_guardrails,
                         human=not full_mode and self.human_mode_for(message),
+                        channel_lines=channel_lines,
                     )
                 answer = await asyncio.wait_for(request, timeout=ASK_TIMEOUT)
             if not answer:
                 return
             await self._reply(message, answer)
+            if message.guild is not None and not full_mode:
+                await self._remember_channel_text(
+                    event_id=f"line:assistant:{message.id}",
+                    scope_id=scope_id,
+                    server_id=str(message.guild.id),
+                    user_id=user_id,
+                    author="owaua",
+                    content=answer,
+                    created_at=time.time(),
+                )
         except asyncio.CancelledError:
             raise
         except Exception:

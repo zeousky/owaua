@@ -97,11 +97,11 @@ owaua
 <p>Ping it when you want it in the conversation. It answers in the voice and language that server already chose.</p>
 <ul class="list">
 <li><strong>it waits until you ask</strong><span>Ping it in a server and it replies. A lonely <code>@owaua</code> with nothing else gets a tiny local “yeah?” — no model call. Other bots are ignored. DMs only work if the operator turns on <code>BOT_ALLOW_DMS=1</code>.</span></li>
-<li><strong>it remembers your thread, not the room</strong><span>Your history with it is just you, in that channel. It keeps up to 20 turns, they fade after a week, and the whole file tops out at 10,000 records. The person next to you has a separate memory.</span></li>
-<li><strong>a few voices, and a few brains</strong><span>Pick <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code>, or <code>chaotic</code> for yourself. By default it also talks like a person in the room; <code>!human off</code> turns that down. Full mode is a separate opt-in for approved users.</span></li>
+<li><strong>it remembers your thread, and a little of the room</strong><span>Your history with it is still just you, in that channel: up to 20 turns, they fade after a week, and the file tops out at 10,000 records. It also keeps a short recent line from that channel so a ping is not blind. The person next to you still has their own thread and their own persona.</span></li>
+<li><strong>a few voices, and a few brains</strong><span>Pick <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code>, <code>chaotic</code>, or <code>cute</code> for yourself. By default it also talks like a person in the room; <code>!human off</code> turns that down. Full mode is a separate opt-in for approved users.</span></li>
 <li><strong>it can answer in your language</strong><span>Admins set a full language name, like <code>!language hungarian</code>. When matching art exists, owaua can change that server’s bot avatar and banner too, so it looks like it belongs there.</span></li>
 <li><strong>a song in voice, if you ask</strong><span><code>!music</code> plays a single YouTube video or Twitter/X post with video, or a supported audio attachment. Pause, resume, restart, skip, stop, now, and leave. No name searches or playlists.</span></li>
-<li><strong>short answers, on purpose</strong><span>Normal hangout mode stays text-only, with a small 80-token cap, and it does not look at images. Approved people can open <code>!full mode on</code> in the designated channels. Full mode still uses the same per-user request budget.</span></li>
+<li><strong>short answers, on purpose</strong><span>Normal hangout replies stay short and finish the sentence. Gemini hangout can look at one image. Approved people can open <code>!full mode on</code> in the designated channels. Full mode still uses the same per-user request budget.</span></li>
 </ul>
 </section>
 
@@ -110,7 +110,7 @@ owaua
 <p>Each command has its own 25-second per-user cooldown. Changing server settings needs Manage Server. Music controls only work if you are in the same voice channel as the bot.</p>
 <div class="commands">
 <div class="command"><code>!help</code><p>The list, when you forget.</p></div>
-<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic</code><p>Hear or change your general-audience voice.</p></div>
+<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic|cute</code><p>Hear or change your general-audience voice.</p></div>
 <div class="command"><code>!human on|off</code><p>Talk like a person in the server (on by default), or go back to the usual hangout-bot voice.</p></div>
 <div class="command"><code>!language &lt;full name&gt;|reset</code><p>Set or clear the server’s reply language, and the matching profile art when it exists.</p></div>
 <div class="command"><code>!music &lt;YouTube/X URL or attachment&gt;</code><p>Put one supported track on. Or <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code>, and <code>leave</code>.</p></div>
@@ -134,7 +134,7 @@ owaua
 <section class="section" id="data">
 <h2>what it keeps</h2>
 <div class="body">
-<p>It holds a little recent chat so the next reply is not from nowhere. That lives in a local SQLite file, keyed by channel and person. Old turns fall off on their own. <code>!memory erase</code> clears a server’s stored conversations. <code>!memory erase mine</code> clears yours.</p>
+<p>It holds your thread with it, and a short log of recent lines in that channel, so the next reply is not from nowhere. Your persona stays yours. That lives in a local SQLite file. Old turns fall off on their own. <code>!memory erase</code> clears a server’s stored conversations and those lines. <code>!memory erase mine</code> clears yours.</p>
 <p>Hangout requests go to the configured model with provider-side storage turned off. Music requests land in a small audit log for the operator; it records operational metadata and hashes the raw argument. Passwords, signed media links, and provider error text are not written down.</p>
 <p>The longer, careful version is the <a href="/privacy">privacy policy</a>. Inviting it also means the <a href="/terms">terms</a>.</p>
 </div>
@@ -145,7 +145,7 @@ owaua
 <div class="faq">
 <details>
 <summary>Does it reply to every message?</summary>
-<p>No. Mention it when you want it. Ordinary chat is left alone. DMs only if the operator has turned those on. Other bots never get an answer.</p>
+<p>No. Mention it when you want a reply. It does keep a short recent line from the channel so it is not blind when you do. DMs only if the operator has turned those on. Other bots never get an answer.</p>
 </details>
 <details>
 <summary>Why didn’t it answer?</summary>
@@ -153,7 +153,7 @@ owaua
 </details>
 <details>
 <summary>Can I change how it sounds?</summary>
-<p>Yes. <code>!persona rudeish</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, or <code>!persona chaotic</code>. <code>!human off</code> drops the person-in-the-room voice if you want the older hangout-bot sound.</p>
+<p>Yes. <code>!persona rudeish</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona chaotic</code>, or <code>!persona cute</code>. <code>!human off</code> drops the person-in-the-room voice if you want the older hangout-bot sound.</p>
 </details>
 <details>
 <summary>Does the music actually play?</summary>
