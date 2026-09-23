@@ -2,11 +2,11 @@
 
 Discord bot I made for hanging out in servers.
 
-Ping it and it talks back. By default it tries to sound like a person in the
-server; `!human off` goes back to the usual hangout-bot voice. It keeps a
-little of your thread and recent lines from the channel. DMs are off by default. Personas are `rudeish`
-(default), `nerdish`, `flirty`, `chaotic`, and `cute`. Normal chat uses Gemini 3.1
-Flash Lite and can search the web when you ask about current facts.
+Ping it and it talks back. The person-in-the-room voice is off by default;
+`!human on` turns it on. It keeps a
+little of your thread and recent lines from the channel. DMs are off by default. Personas are
+`rudeish` (levels `low`, `medium`, `high`; medium by default), `nerdish`, `flirty`, `irritating`, `cute`, and `normal`. Ordinary chat uses Gemini 3.1 Flash Lite
+and stays text-only; web search is available only to approved full-mode users.
 
 If you put this in a server and actually like it, I'd like to know. DM me on Discord (`ckazros`) or
 email `ckazros@owaua.com`. (This will give me more motivation)
@@ -15,8 +15,8 @@ email `ckazros@owaua.com`. (This will give me more motivation)
 
 `!help` prints these. 25 second cooldown.
 
-- `!persona rudeish|nerdish|flirty|chaotic|cute`
-- `!human on|off` — talk like a person (on by default), or the usual hangout-bot voice
+- `!persona rudeish low|medium|high` (or `nerdish|flirty|irritating|cute|normal`)
+- `!human on|off` — the person-in-the-room voice (off by default), or the usual hangout-bot voice
 - `!language <full name>|reset` — this server's reply language (Manage Server)
 - `!music help`
 - `!memory erase` — erase server memory (Manage Server)

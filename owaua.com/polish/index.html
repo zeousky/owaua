@@ -43,6 +43,7 @@ owaua
 <a href="#commands">komendy</a>
 <a href="#limits">limity</a>
 <a href="/privacy">prywatność</a>
+<a class="secret-button" href="/larpabdadelta" data-secret-button aria-label="hidden"></a>
 <a class="cta" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">zaproś</a>
 </div>
 <details class="menu">
@@ -52,6 +53,7 @@ owaua
 <a href="#commands">komendy</a>
 <a href="#limits">limity</a>
 <a href="/privacy">prywatność</a>
+<a class="secret-button" href="/larpabdadelta" data-secret-button aria-label="hidden"></a>
 <a href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">zaproś</a>
 </div>
 </details>
@@ -67,7 +69,7 @@ owaua
 </div>
 </div>
 <h1>bot, który wisi na twoim serwerze</h1>
-<p class="lede">Oznacz go, kiedy chcesz odpowiedzi. Pamięta trochę tego, co właśnie sobie powiedzieliście — nie całego pokoju — i może zmienić głos albo puścić piosenkę na voice. Mały, specjalnie.</p>
+<p class="lede">Oznacz go, kiedy chcesz odpowiedzi. Pamięta trochę tego, co właśnie sobie powiedzieliście — nie całego pokoju — a do tego może zmienić, jak brzmi, odpowiadać w języku serwera albo puścić piosenkę na voice. Mały, specjalnie.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">wpadnij na Discord</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">zaproś owaua</a>
@@ -88,7 +90,7 @@ owaua
 
 <figure class="shot">
 <img src="/image.webp?v=20260919a" width="738" height="408" alt="owaua odpowiada na kanale Discord" loading="lazy">
-<figcaption>Daj mu oznaczenie, myśl albo piosenkę. Jest do gadania, nie do prowadzenia serwera.</figcaption>
+<figcaption>mój ulubiony zrzut ekranu</figcaption>
 </figure>
 
 <section class="section" id="what">
@@ -96,25 +98,27 @@ owaua
 <p>Pingnij, kiedy chcesz go w rozmowie. Odpowiada głosem i językiem, które serwer już wybrał.</p>
 <ul class="list">
 <li><strong>czeka, aż zapytasz</strong><span>Pingnij go na serwerze, a odpisze. Samotne <code>@owaua</code> bez niczego dostaje małe lokalne „yeah?” — bez wołania modelu. Inne boty są ignorowane. Privy działają tylko, gdy operator włączy <code>BOT_ALLOW_DMS=1</code>.</span></li>
-<li><strong>pamięta wasz wątek, nie pokój</strong><span>Twoja historia z nim to tylko ty, na tym kanale. Trzyma do 20 tur, po tygodniu znikają, a cały plik kończy się na 10 000 rekordów. Osoba obok ma osobną pamięć.</span></li>
-<li><strong>kilka głosów i kilka głów</strong><span>Wybierz <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code> albo <code>chaotic</code>. Domyślnie gada też jak człowiek w pokoju; <code>!human off</code> to wyłącza.</span></li>
+<li><strong>pamięta wasz wątek i trochę pokoju</strong><span>Twoja historia z nim to nadal tylko ty, na tym kanale: do 20 tur, po tygodniu znikają, a plik kończy się na 10 000 rekordów. Trzyma też krótką, świeżą linijkę z tego kanału, żeby ping nie był ślepy. Osoba obok ma swój własny wątek i swoją personę.</span></li>
+<li><strong>kilka głosów i kilka głów</strong><span>Wybierz dla siebie <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> albo <code>normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go dodaje. Tryb pełny to osobne włączenie dla zatwierdzonych osób.</span></li>
 <li><strong>może odpowiadać w twoim języku</strong><span>Admini ustawiają pełną nazwę języka, na przykład <code>!language hungarian</code>. Gdy jest pasująca grafika, owaua może też zmienić avatar i banner bota na tym serwerze, żeby wyglądał jak u siebie.</span></li>
-<li><strong>piosenka na voice, jeśli poprosisz</strong><span><code>!music</code> puszcza utwór, link z YouTube albo plik audio, który załączysz. Pauza, wznów, restart, skip, leave. Jeden track na raz. Bez zrzucania playlisty.</span></li>
-<li><strong>krótkie odpowiedzi, specjalnie</strong><span>Zwykły hangout zostaje samym tekstem, z małym limitem 80 tokenów, i nie ogląda obrazków. Osoba, która go trzyma, może włączyć <code>!full mode on</code> na jednym prywatnym kanale dla ludzi, którym ufa.</span></li>
+<li><strong>piosenka na voice, jeśli poprosisz</strong><span><code>!music</code> puszcza jeden film z YouTube albo post z Twittera/X z wideo, albo obsługiwany załącznik audio. Pauza, wznów, restart, skip, stop, teraz i wyjdź. Bez szukania po nazwie i bez playlist.</span></li>
+<li><strong>krótkie odpowiedzi, specjalnie</strong><span>Zwykłe odpowiedzi w hangoucie zostają krótkie i kończą zdanie. Gemini w hangoucie może spojrzeć na jeden obrazek. Zatwierdzone osoby mogą włączyć <code>!full mode on</code> na wyznaczonych kanałach. Tryb pełny dzieli te same limity.</span></li>
 </ul>
 </section>
 
 <section class="section" id="commands">
 <h2>jak z nim gadać</h2>
-<p>Każda komenda czeka 25 sekund przed następną. Zmiana ustawień serwera wymaga Zarządzania serwerem. Sterowanie muzyką działa tylko, gdy jesteś na tym samym kanale głosowym co bot.</p>
+<p>Każda komenda ma własny, 25-sekundowy cooldown na osobę. Zmiana ustawień serwera wymaga Zarządzania serwerem. Sterowanie muzyką działa tylko, gdy jesteś na tym samym kanale głosowym co bot.</p>
 <div class="commands">
 <div class="command"><code>!help</code><p>Lista, kiedy zapomnisz.</p></div>
-<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic</code><p>Posłuchać albo zmienić głos dla ogólnej publiczności.</p></div>
-<div class="command"><code>!human on|off</code><p>Gadaj jak człowiek na serwerze (domyślnie włączone) albo wróć do zwykłego głosu hangout.</p></div>
+<div class="command"><code>!persona rudeish low|medium|high</code><p>Posłuchać albo zmienić swój głos dla ogólnej publiczności. Też <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> i <code>normal</code>.</p></div>
+<div class="command"><code>!human on|off</code><p>Włączyć głos człowieka w pokoju albo wrócić do zwykłego głosu hangout bota. Jest domyślnie wyłączony.</p></div>
 <div class="command"><code>!language &lt;pełna nazwa&gt;|reset</code><p>Ustawić albo zdjąć język odpowiedzi serwera i pasującą grafikę profilu, gdy jest.</p></div>
-<div class="command"><code>!music &lt;piosenka, URL YouTube albo audio&gt;</code><p>Puścić coś. Albo <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code> i <code>leave</code>.</p></div>
+<div class="command"><code>!music &lt;URL YouTube/X albo załącznik&gt;</code><p>Puścić jeden obsługiwany utwór. Albo <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code> i <code>leave</code>.</p></div>
 <div class="command"><code>!memory erase</code> / <code>!memory erase mine</code><p>Admini mogą wyczyścić zapisane czaty serwera. Każdy może wyczyścić swoje, w tym privy, gdy są włączone.</p></div>
+<div class="command"><code>!reset all</code><p>Zarządzanie serwerem. Czyści zapisane czaty tego serwera, linijki z kanałów, język odpowiedzi i grafikę profilu, i zatrzymuje jego muzykę.</p></div>
 <div class="command"><code>!security status|pause|resume</code><p>Tylko właściciel. Jak bardzo jest zajęty i awaryjna pauza, gdy coś idzie nie tak.</p></div>
+<div class="command"><code>!shutdown</code> / <code>!pricing</code><p>Tylko właściciel. Zatrzymać bota albo pokazać aktualne ceny modeli.</p></div>
 <div class="command"><code>!owner's note</code><p>Krótka notka od osoby, która go zrobiła.</p></div>
 </div>
 </section>
@@ -123,9 +127,9 @@ owaua
 <h2>limity, powiedziane wprost</h2>
 <p>Są po to, żeby jedna osoba nie mogła go stopić, i żeby został na tyle tani, żeby go trzymać. To sufity zapytań, nie obietnica darmowego użytku.</p>
 <ul class="list">
-<li><strong>12 prób na minutę, dla wszystkich razem</strong><span>Do tego: 30 na osobę dziennie, 100 na serwer dziennie, 200 łącznie dziennie i 1 000 przez życie obecnego rejestru.</span></li>
-<li><strong>trzy odpowiedzi AI naraz</strong><span>Jeśli próba padnie albo ją anulujesz, i tak się liczy. Nie ma automatycznego płatnego ponowienia i nie przeskoczy dla ciebie na innego dostawcę.</span></li>
-<li><strong>muzyka zostaje mała</strong><span>Tylko YouTube, filmy do 15 minut, pobrania do 20 MiB, najwyżej dwie sesje, a odtwarzanie kończy się po 15 minutach. Natywne odtwarzanie potrzebuje Linuksa i FFmpeg.</span></li>
+<li><strong>osiem prób AI na minutę, na osobę</strong><span>Ten licznik siedzi w działającym procesie i zeruje się przy restarcie. Nie ma osobnego, zapisywanego limitu dziennego ani dziesięciominutowego. Tryb pełny dzieli te same limity.</span></li>
+<li><strong>trzy osoby na AI naraz</strong><span>Najwyżej trzy osoby mogą naraz zajmować miejsce na odpowiedź AI. Komenda ma dodatkowo własny, 25-sekundowy cooldown na osobę.</span></li>
+<li><strong>muzyka zostaje mała</strong><span>Obsługiwane linki do wideo z YouTube albo Twittera/X muszą wskazywać jeden utwór krótszy niż 15 minut. Załączniki audio i pobrane audio mają limit 20 MiB, a zwykłych sesji muzycznych są najwyżej dwie. Natywne odtwarzanie potrzebuje Linuksa i FFmpeg.</span></li>
 </ul>
 <p class="note">Może się mylić i brzmieć pewnie. Sprawdzaj to, co się liczy.</p>
 </section>
@@ -133,8 +137,8 @@ owaua
 <section class="section" id="data">
 <h2>co zatrzymuje</h2>
 <div class="body">
-<p>Trzyma trochę niedawnego czatu, żeby kolejna odpowiedź nie brała się znikąd. Siedzi w lokalnym pliku SQLite, klucz kanał i osoba. Stare tury spadają same. <code>!memory erase</code> czyści zapisane rozmowy serwera. <code>!memory erase mine</code> czyści twoje.</p>
-<p>Zapytania hangout idą do ustawionego modelu, z wyłączonym storage. Zapytania muzyki lądują w małym logu audytu dla operatora. Haseł, podpisanych linków do mediów i tekstu błędu dostawcy nikt nie zapisuje.</p>
+<p>Trzyma twój wątek z nim i krótki log świeżych linijek z tego kanału, żeby kolejna odpowiedź nie brała się znikąd. Twoja persona zostaje twoja. To siedzi w lokalnym pliku SQLite. Stare tury spadają same. <code>!memory erase</code> czyści zapisane rozmowy serwera i te linijki. <code>!memory erase mine</code> czyści twoje.</p>
+<p>Zapytania hangout idą do ustawionego modelu, z wyłączonym storage po stronie dostawcy. Zapytania muzyki lądują w małym logu audytu dla operatora; zapisuje metadane operacyjne i haszuje surowy argument. Haseł, podpisanych linków do mediów i tekstu błędu dostawcy nikt nie zapisuje.</p>
 <p>Dłuższa, ostrożna wersja to <a href="/privacy">polityka prywatności</a>. Zaproszenie oznacza też <a href="/terms">regulamin</a>.</p>
 </div>
 </section>
@@ -144,15 +148,15 @@ owaua
 <div class="faq">
 <details>
 <summary>Odpowiada na każdą wiadomość?</summary>
-<p>Nie. Oznacz go, kiedy go chcesz. Zwykły czat zostawia w spokoju. Privy tylko, gdy operator je włączył. Inne boty nigdy nie dostają odpowiedzi.</p>
+<p>Nie. Oznacz go, kiedy chcesz odpowiedzi. Trzyma za to krótką, świeżą linijkę z kanału, żeby nie był ślepy, kiedy to zrobisz. Privy tylko, gdy operator je włączył. Inne boty nigdy nie dostają odpowiedzi.</p>
 </details>
 <details>
 <summary>Dlaczego nie odpisał?</summary>
-<p>Sprawdź, czy naprawdę go pingnąłeś. Daj mu chwilę — pokazuje typing, jak pracuje. Między komendami jest 25 sekund, a wyżej są dzienne sufity. Inne boty są ignorowane specjalnie.</p>
+<p>Sprawdź, czy naprawdę go pingnąłeś. Daj mu chwilę — pokazuje typing, jak pracuje. Zobacz limity i cooldowny komend wyżej. Inne boty są ignorowane specjalnie.</p>
 </details>
 <details>
 <summary>Mogę zmienić, jak brzmi?</summary>
-<p>Tak. <code>!persona rudeish</code>, <code>!persona nerdish</code>, <code>!persona flirty</code> albo <code>!persona chaotic</code>.</p>
+<p>Tak. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> albo <code>!persona normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go przywraca.</p>
 </details>
 <details>
 <summary>Muzyka naprawdę gra?</summary>

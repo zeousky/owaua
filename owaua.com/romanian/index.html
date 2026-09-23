@@ -66,8 +66,8 @@ owaua
 <span>the annoying discord bot</span>
 </div>
 </div>
-<h1>botul care stă pe server și vorbește</h1>
-<p class="lede">Menționează-l când vrei un răspuns. Ține minte un pic din ce v-ați zis tocmai — nu toată camera — și poate schimba vocea, sau pune o piesă pe voice. Mic, dinadins.</p>
+<h1>botul care stă de vorbă pe serverul tău</h1>
+<p class="lede">Menționează-l când vrei un răspuns. Ține minte un pic din ce ați zis voi doi tocmai — nu toată camera — și își poate schimba vocea, poate răspunde în limba serverului sau poate pune o piesă pe voice. Mic, dinadins.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">vino pe Discord</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">invită owaua</a>
@@ -88,33 +88,35 @@ owaua
 
 <figure class="shot">
 <img src="/image.webp?v=20260919a" width="738" height="408" alt="owaua răspunzând pe un canal Discord" loading="lazy">
-<figcaption>Dă-i o mențiune, un gând, sau o piesă. E aici să vorbească, nu să țină serverul.</figcaption>
+<figcaption>screenshotul meu preferat</figcaption>
 </figure>
 
 <section class="section" id="what">
 <h2>ce face de fapt</h2>
 <p>Ping-uiește-l când îl vrei în conversație. Răspunde cu vocea și limba pe care serverul le-a ales deja.</p>
 <ul class="list">
-<li><strong>așteaptă să-l întrebi</strong><span>Ping-uiește-l pe un server și răspunde. Un <code>@owaua</code> singur, fără altceva, primește un mic „yeah?” local — fără să cheme modelul. Alți boți sunt ignorați. DM-urile merg doar dacă operatorul pornește <code>BOT_ALLOW_DMS=1</code>.</span></li>
-<li><strong>ține minte firul vostru, nu camera</strong><span>Istoricul tău cu el ești doar tu, pe canalul ăla. Ține până la 20 de ture, dispar după o săptămână, și tot fișierul se oprește la 10.000 de înregistrări. Persoana de lângă tine are o memorie separată.</span></li>
-<li><strong>câteva voci, și câteva creiere</strong><span>Alege <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code> sau <code>chaotic</code>. Implicit vorbește și ca un om în cameră; <code>!human off</code> oprește asta.</span></li>
-<li><strong>poate răspunde în limba ta</strong><span>Adminii pun un nume de limbă întreg, gen <code>!language hungarian</code>. Când există imaginea potrivită, owaua poate schimba și avatarul și bannerul botului pe serverul ăla, ca să pară de-al locului.</span></li>
-<li><strong>o piesă pe voice, dacă ceri</strong><span><code>!music</code> cântă o melodie, un link YouTube, sau un fișier audio pe care-l atașezi. Pauză, continuă, restart, skip, leave. Un track pe rând. Fără playlist întreg.</span></li>
-<li><strong>răspunsuri scurte, dinadins</strong><span>Modul hangout normal rămâne doar text, cu un plafon mic de 80 de tokeni, și nu se uită la imagini. Persoana care-l ține poate deschide <code>!full mode on</code> pe un canal privat, pentru oamenii în care are încredere.</span></li>
+<li><strong>așteaptă să-i ceri</strong><span>Ping-uiește-l pe un server și răspunde. Un <code>@owaua</code> singur, fără altceva, primește un mic „yeah?” local — fără să cheme modelul. Alți boți sunt ignorați. DM-urile merg doar dacă operatorul pornește <code>BOT_ALLOW_DMS=1</code>.</span></li>
+<li><strong>ține minte firul vostru, și un pic din cameră</strong><span>Istoricul tău cu el ești doar tu, pe canalul ăla: până la 20 de ture, se șterg după o săptămână, iar fișierul se oprește la 10.000 de înregistrări. Ține și o linie recentă scurtă din canalul respectiv, ca un ping să nu fie orb. Persoana de lângă tine are tot firul ei și persona ei.</span></li>
+<li><strong>câteva voci, și câteva creiere</strong><span>Alege <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> sau <code>normal</code>, pentru tine. Vocea de om în cameră e oprită implicit; <code>!human on</code> o adaugă. Modul full e un opt-in separat pentru utilizatorii aprobați.</span></li>
+<li><strong>poate răspunde în limba ta</strong><span>Adminii pun un nume de limbă întreg, gen <code>!language hungarian</code>. Când există arta potrivită, owaua poate schimba și avatarul și bannerul botului pe serverul ăla, ca să pară de-al locului.</span></li>
+<li><strong>o piesă pe voice, dacă ceri</strong><span><code>!music</code> cântă un singur videoclip YouTube sau o postare Twitter/X cu video, sau un atașament audio suportat. Pauză, continuă, restart, skip, stop, now și leave. Fără căutări după nume sau playlisturi.</span></li>
+<li><strong>răspunsuri scurte, dinadins</strong><span>Răspunsurile normale de hangout rămân scurte și încheie fraza. Gemini hangout se poate uita la o imagine. Oamenii aprobați pot deschide <code>!full mode on</code> pe canalele desemnate. Modul full împarte aceleași limite.</span></li>
 </ul>
 </section>
 
 <section class="section" id="commands">
 <h2>cum vorbești cu el</h2>
-<p>Fiecare comandă așteaptă 25 de secunde înainte de următoarea. Schimbarea setărilor serverului cere Gestionează serverul. Controalele de muzică merg doar dacă ești pe același canal vocal cu botul.</p>
+<p>Fiecare comandă are propriul cooldown de 25 de secunde per utilizator. Schimbarea setărilor serverului cere Gestionează serverul. Controalele de muzică merg doar dacă ești pe același canal vocal cu botul.</p>
 <div class="commands">
 <div class="command"><code>!help</code><p>Lista, când uiți.</p></div>
-<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic</code><p>Să auzi sau să schimbi vocea general-audience.</p></div>
-<div class="command"><code>!human on|off</code><p>Vorbește ca un om pe server (pornit implicit), sau revino la vocea hangout obișnuită.</p></div>
-<div class="command"><code>!language &lt;nume complet&gt;|reset</code><p>Pune sau scoate limba de răspuns a serverului, și imaginea de profil potrivită când există.</p></div>
-<div class="command"><code>!music &lt;piesă, URL YouTube, sau audio&gt;</code><p>Pune ceva. Sau <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, și <code>leave</code>.</p></div>
-<div class="command"><code>!memory erase</code> / <code>!memory erase mine</code><p>Adminii pot șterge conversațiile salvate ale serverului. Oricine își poate șterge pe ale lui, inclusiv DM-urile când sunt pornite.</p></div>
+<div class="command"><code>!persona rudeish low|medium|high</code><p>Ascultă sau schimbă vocea ta pentru publicul general. Și <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> și <code>normal</code>.</p></div>
+<div class="command"><code>!human on|off</code><p>Pornește vocea de om în cameră, sau revino la vocea obișnuită de bot de hangout. E oprită implicit.</p></div>
+<div class="command"><code>!language &lt;nume complet&gt;|reset</code><p>Pune sau șterge limba de răspuns a serverului, și imaginea de profil potrivită când există.</p></div>
+<div class="command"><code>!music &lt;URL YouTube/X sau atașament&gt;</code><p>Pune o singură piesă suportată. Sau <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code> și <code>leave</code>.</p></div>
+<div class="command"><code>!memory erase</code> / <code>!memory erase mine</code><p>Adminii pot șterge chat-urile salvate ale serverului. Oricine și le poate șterge pe ale lui, inclusiv DM-urile când sunt pornite.</p></div>
+<div class="command"><code>!reset all</code><p>Gestionează serverul. Șterge chat-urile salvate ale serverului, liniile de canal, limba de răspuns și imaginea de profil, și oprește muzica lui.</p></div>
 <div class="command"><code>!security status|pause|resume</code><p>Doar ownerul. Cât e de ocupat, și o pauză de urgență dacă ceva merge prost.</p></div>
+<div class="command"><code>!shutdown</code> / <code>!pricing</code><p>Doar ownerul. Oprește botul, sau arată prețurile actuale ale modelelor.</p></div>
 <div class="command"><code>!owner's note</code><p>O notă scurtă de la persoana care l-a făcut.</p></div>
 </div>
 </section>
@@ -123,9 +125,9 @@ owaua
 <h2>limitele, spuse clar</h2>
 <p>Există ca o persoană să nu-l poată topi, și ca să rămână suficient de ieftin de ținut pornit. Sunt plafoane de cereri, nu o promisiune de folosire gratuită.</p>
 <ul class="list">
-<li><strong>12 încercări pe minut, pentru toată lumea împreună</strong><span>Pe lângă: 30 de persoană pe zi, 100 de server pe zi, 200 în total pe zi, și 1.000 pe viața registrului actual.</span></li>
-<li><strong>trei răspunsuri IA odată</strong><span>Dacă o încercare pică sau o anulezi, tot se numără. Nu există retry plătit automat, și nu sare singur la alt provider pentru tine.</span></li>
-<li><strong>muzica rămâne mică</strong><span>Doar YouTube, videoclipuri până la 15 minute, descărcări până la 20 MiB, cel mult două sesiuni, și redarea se oprește după 15 minute. Redarea nativă are nevoie de Linux și FFmpeg.</span></li>
+<li><strong>opt încercări IA pe minut, per utilizator</strong><span>Contorul ăla trăiește în procesul care rulează și se resetează când repornește. Nu există vreo cotă separată persistată pe zi sau pe zece minute. Modul full împarte aceleași limite.</span></li>
+<li><strong>trei utilizatori IA odată</strong><span>Cel mult trei utilizatori pot ocupa un slot de răspuns IA în același timp. O comandă are un cooldown separat de 25 de secunde per utilizator.</span></li>
+<li><strong>muzica rămâne mică</strong><span>Linkurile YouTube sau Twitter/X suportate trebuie să ducă la o singură piesă sub 15 minute. Atașamentele audio și audio descărcat sunt plafonate la 20 MiB, cu cel mult două sesiuni obișnuite de muzică. Redarea nativă are nevoie de Linux și FFmpeg.</span></li>
 </ul>
 <p class="note">Poate greși stând sigur pe treabă. Verifică ce contează.</p>
 </section>
@@ -133,8 +135,8 @@ owaua
 <section class="section" id="data">
 <h2>ce păstrează</h2>
 <div class="body">
-<p>Ține un pic de chat recent ca următorul răspuns să nu vină de nicăieri. Stă într-un fișier SQLite local, cheie canal și persoană. Turele vechi cad singure. <code>!memory erase</code> șterge conversațiile salvate ale unui server. <code>!memory erase mine</code> le șterge pe ale tale.</p>
-<p>Cererile hangout pleacă la modelul configurat, cu storage-ul oprit. Cererile de muzică ajung într-un jurnal mic de audit pentru operator. Parolele, linkurile media semnate și textul de eroare al providerului nu se scriu.</p>
+<p>Ține firul tău cu el, și un jurnal scurt cu liniile recente din canalul respectiv, ca următorul răspuns să nu vină de nicăieri. Persona ta rămâne a ta. Toate stau într-un fișier SQLite local. Turele vechi cad singure. <code>!memory erase</code> șterge conversațiile salvate ale unui server și liniile alea. <code>!memory erase mine</code> le șterge pe ale tale.</p>
+<p>Cererile de hangout pleacă la modelul configurat, cu stocarea la provider oprită. Cererile de muzică ajung într-un jurnal mic de audit pentru operator; notează metadate operaționale și pune hash pe argumentul brut. Parolele, linkurile media semnate și textul de eroare al providerului nu se scriu.</p>
 <p>Versiunea lungă și atentă e <a href="/privacy">politica de confidențialitate</a>. Să-l inviți înseamnă și <a href="/terms">termenii</a>.</p>
 </div>
 </section>
@@ -144,23 +146,23 @@ owaua
 <div class="faq">
 <details>
 <summary>Răspunde la fiecare mesaj?</summary>
-<p>Nu. Menționează-l când îl vrei. Chatul obișnuit îl lasă în pace. DM-uri doar dacă operatorul le-a pornit. Alți boți nu primesc niciodată răspuns.</p>
+<p>Nu. Menționează-l când vrei un răspuns. Ține totuși o linie recentă scurtă din canal, ca să nu fie orb când o faci. DM-uri doar dacă operatorul le-a pornit. Alți boți nu primesc niciodată răspuns.</p>
 </details>
 <details>
 <summary>De ce n-a răspuns?</summary>
-<p>Verifică că l-ai ping-uit chiar. Dă-i o clipă — arată că scrie cât lucrează. Între comenzi sunt 25 de secunde, și mai sus sunt plafoanele zilei. Alți boți sunt ignorați dinadins.</p>
+<p>Verifică că l-ai ping-uit chiar. Dă-i o clipă — arată că scrie cât lucrează. Uită-te la limitele de rată și la cooldown-urile comenzilor de mai sus. Alți boți sunt ignorați dinadins.</p>
 </details>
 <details>
 <summary>Pot schimba cum sună?</summary>
-<p>Da. <code>!persona rudeish</code>, <code>!persona nerdish</code>, <code>!persona flirty</code> sau <code>!persona chaotic</code>.</p>
+<p>Da. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> sau <code>!persona normal</code>. Vocea de om în cameră e oprită implicit; <code>!human on</code> o readuce.</p>
 </details>
 <details>
 <summary>Muzica chiar cântă?</summary>
-<p>Da. Intră pe canalul tău vocal și streamează piesa. Fără playlisturi, fără coadă de încă zece. Trebuie să fii pe voice, și are nevoie de Connect și Speak acolo.</p>
+<p>Da. Intră pe canalul tău vocal și streamează piesa. Fără playlisturi, fără coadă cu următoarele zece piese. Trebuie să fii pe voice, și are nevoie de Connect și Speak acolo.</p>
 </details>
 <details>
 <summary>Mă pot baza pe fiecare răspuns?</summary>
-<p>Nu. Poate fi sigur și tot greșit. Dacă contează, verifică tu, sau întreabă un om.</p>
+<p>Nu. Poate fi sigur și tot greșit. Dacă ceva contează, verifică singur, sau întreabă un om.</p>
 </details>
 <details>
 <summary>Unde zic că ceva e stricat?</summary>
@@ -171,7 +173,7 @@ owaua
 
 <section class="section" id="setup">
 <h2>sau rulează-l tu</h2>
-<p>owaua e open source. Îți trebuie Python 3.11+, intentul Message Content de la Discord, cheile providerului, și Linux plus FFmpeg dacă vrei muzică. După aia e doar vorbit.</p>
+<p>owaua e open source. Îți trebuie Python 3.11+, intentul Message Content de la Discord, cheile providerului, și Linux plus FFmpeg dacă vrei muzică. După aia, e doar vorbit.</p>
 <div class="actions">
 <a class="button" href="https://github.com/zeousky/owaua">uită-te la sursă</a>
 <a class="button ghost contact-link" href="mailto:ckazros@owaua.com" data-contact-email="ckazros@owaua.com">scrie-i persoanei care l-a făcut</a>

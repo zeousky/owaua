@@ -67,7 +67,7 @@ owaua
 </div>
 </div>
 <h1>der Bot, der auf deinem Server rumhängt</h1>
-<p class="lede">Erwähne ihn, wenn du eine Antwort willst. Er merkt sich ein bisschen von dem, was ihr gerade gesagt habt — nicht den ganzen Raum — und er kann anders klingen oder ein Lied in Voice anmachen. Klein, mit Absicht.</p>
+<p class="lede">Erwähne ihn, wenn du eine Antwort willst. Er merkt sich ein bisschen von dem, was ihr gerade gesagt habt — nicht den ganzen Raum — und er kann anders klingen, in der Sprache des Servers antworten oder ein Lied in Voice anmachen. Klein, mit Absicht.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">komm auf den Discord</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">owaua einladen</a>
@@ -88,7 +88,7 @@ owaua
 
 <figure class="shot">
 <img src="/image.webp?v=20260919a" width="738" height="408" alt="owaua antwortet in einem Discord-Kanal" loading="lazy">
-<figcaption>Gib ihm eine Erwähnung, einen Gedanken oder ein Lied. Er ist zum Reden da, nicht zum Server-Leiten.</figcaption>
+<figcaption>mein Lieblings-Screenshot</figcaption>
 </figure>
 
 <section class="section" id="what">
@@ -96,25 +96,27 @@ owaua
 <p>Ping ihn, wenn du ihn in der Unterhaltung willst. Er antwortet mit der Stimme und Sprache, die der Server schon gewählt hat.</p>
 <ul class="list">
 <li><strong>er wartet, bis du fragst</strong><span>Ping ihn auf einem Server, und er antwortet. Ein einsames <code>@owaua</code> ohne Text bekommt ein kleines lokales „yeah?“ — ohne Modell-Aufruf. Andere Bots werden ignoriert. DMs gehen nur, wenn der Betreiber <code>BOT_ALLOW_DMS=1</code> einschaltet.</span></li>
-<li><strong>er merkt sich euren Thread, nicht den Raum</strong><span>Dein Verlauf mit ihm bist nur du, in diesem Kanal. Er behält bis zu 20 Turns, nach einer Woche verblassen sie, und die ganze Datei hört bei 10.000 Einträgen auf. Die Person neben dir hat ein eigenes Gedächtnis.</span></li>
-<li><strong>ein paar Stimmen, und ein paar Köpfe</strong><span>Wähle <code>rudeish</code>, <code>nerdish</code>, <code>flirty</code> oder <code>chaotic</code>. Standardmäßig redet er auch wie ein Mensch im Raum; <code>!human off</code> macht das aus.</span></li>
+<li><strong>er merkt sich deinen Thread, und ein bisschen vom Raum</strong><span>Dein Verlauf mit ihm bist weiter nur du, in diesem Kanal: bis zu 20 Turns, nach einer Woche verblassen sie, und die Datei hört bei 10.000 Einträgen auf. Er behält außerdem eine kurze aktuelle Zeile aus dem Kanal, damit ein Ping nicht blind ist. Die Person neben dir hat weiter ihren eigenen Thread und ihre eigene Persona.</span></li>
+<li><strong>ein paar Stimmen, und ein paar Köpfe</strong><span>Wähle <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> oder <code>normal</code> für dich. Die Stimme als Person im Raum ist standardmäßig aus; <code>!human on</code> schaltet sie dazu. Der Full-Modus ist ein separates Opt-in für freigegebene Leute.</span></li>
 <li><strong>er kann in deiner Sprache antworten</strong><span>Admins setzen einen vollen Sprachnamen, zum Beispiel <code>!language hungarian</code>. Wenn passende Bilder da sind, kann owaua Avatar und Banner des Bots auf dem Server auch anpassen, damit er dazugehört.</span></li>
-<li><strong>ein Lied in Voice, wenn du fragst</strong><span><code>!music</code> spielt einen Song, einen YouTube-Link oder eine Audiodatei, die du anhängst. Pause, Weiter, Neustart, Skip, Leave. Ein Track zur Zeit. Kein Playlist-Dump.</span></li>
-<li><strong>kurze Antworten, mit Absicht</strong><span>Der normale Hangout-Modus bleibt nur Text, mit einem kleinen 80-Token-Deckel, und er schaut sich keine Bilder an. Die Person, die ihn betreibt, kann <code>!full mode on</code> in einem privaten Kanal für Leute öffnen, denen sie vertraut.</span></li>
+<li><strong>ein Lied in Voice, wenn du fragst</strong><span><code>!music</code> spielt ein einzelnes YouTube-Video oder einen Twitter/X-Post mit Video, oder einen unterstützten Audio-Anhang. Pause, resume, restart, skip, stop, now und leave. Keine Namenssuchen und keine Playlists.</span></li>
+<li><strong>kurze Antworten, mit Absicht</strong><span>Normale Hangout-Antworten bleiben kurz und machen den Satz fertig. Der Gemini-Hangout kann sich ein Bild ansehen. Freigegebene Leute können <code>!full mode on</code> in den dafür vorgesehenen Kanälen aufmachen. Der Full-Modus teilt sich dieselben Limits.</span></li>
 </ul>
 </section>
 
 <section class="section" id="commands">
 <h2>so redest du mit ihm</h2>
-<p>Jeder Befehl wartet 25 Sekunden, bevor der nächste geht. Server-Einstellungen brauchen Server verwalten. Musik-Steuerung geht nur, wenn du im selben Sprachkanal bist wie der Bot.</p>
+<p>Jeder Befehl hat seinen eigenen 25-Sekunden-Cooldown pro Person. Server-Einstellungen ändern braucht „Server verwalten“. Musik-Steuerung geht nur, wenn du im selben Sprachkanal bist wie der Bot.</p>
 <div class="commands">
 <div class="command"><code>!help</code><p>Die Liste, wenn du sie vergessen hast.</p></div>
-<div class="command"><code>!persona rudeish|nerdish|flirty|chaotic</code><p>Eine Stimme für ein allgemeines Publikum hören oder ändern.</p></div>
-<div class="command"><code>!human on|off</code><p>Reden wie ein Mensch auf dem Server (standardmäßig an), oder zurück zur üblichen Hangout-Stimme.</p></div>
+<div class="command"><code>!persona rudeish low|medium|high</code><p>Hör dir deine Stimme für ein allgemeines Publikum an oder ändere sie. Auch <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> und <code>normal</code>.</p></div>
+<div class="command"><code>!human on|off</code><p>Schalte die Stimme als Person im Raum ein oder geh zurück zur üblichen Hangout-Bot-Stimme. Sie ist standardmäßig aus.</p></div>
 <div class="command"><code>!language &lt;voller Name&gt;|reset</code><p>Die Antwortsprache des Servers setzen oder löschen, und das passende Profilbild, wenn es existiert.</p></div>
-<div class="command"><code>!music &lt;Song, YouTube-URL oder Audio&gt;</code><p>Etwas anmachen. Oder <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code> und <code>leave</code>.</p></div>
+<div class="command"><code>!music &lt;YouTube/X-URL oder Anhang&gt;</code><p>Einen unterstützten Track anmachen. Oder <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code> und <code>leave</code>.</p></div>
 <div class="command"><code>!memory erase</code> / <code>!memory erase mine</code><p>Admins können die gespeicherten Chats des Servers löschen. Jeder kann die eigenen löschen, inklusive DMs, wenn die an sind.</p></div>
+<div class="command"><code>!reset all</code><p>Server verwalten. Löscht die gespeicherten Chats dieses Servers, die Kanal-Zeilen, die Antwortsprache und das Profilbild und stoppt seine Musik.</p></div>
 <div class="command"><code>!security status|pause|resume</code><p>Nur der Owner. Wie beschäftigt er ist, und eine Notpause, wenn etwas schiefläuft.</p></div>
+<div class="command"><code>!shutdown</code> / <code>!pricing</code><p>Nur der Owner. Den Bot stoppen oder aktuelle Modellpreise anzeigen.</p></div>
 <div class="command"><code>!owner's note</code><p>Eine kurze Notiz von der Person, die ihn gemacht hat.</p></div>
 </div>
 </section>
@@ -123,9 +125,9 @@ owaua
 <h2>die Grenzen, klar gesagt</h2>
 <p>Die gibt es, damit eine Person ihn nicht schmelzen kann, und damit er günstig genug bleibt, um weiterzulaufen. Das sind Anfrage-Deckel, kein Versprechen auf kostenlose Nutzung.</p>
 <ul class="list">
-<li><strong>12 Versuche pro Minute, für alle zusammen</strong><span>Dazu: 30 pro Person und Tag, 100 pro Server und Tag, 200 insgesamt am Tag und 1.000 über die Lebensdauer des aktuellen Ledgers.</span></li>
-<li><strong>drei KI-Antworten gleichzeitig</strong><span>Wenn ein Versuch fehlschlägt oder du ihn abbrichst, zählt er trotzdem. Es gibt keinen automatischen bezahlten Retry, und er springt nicht für dich zu einem anderen Anbieter.</span></li>
-<li><strong>Musik bleibt klein</strong><span>Nur YouTube, Videos bis 15 Minuten, Downloads bis 20 MiB, höchstens zwei Sitzungen, und die Wiedergabe endet nach 15 Minuten. Native Wiedergabe braucht Linux und FFmpeg.</span></li>
+<li><strong>acht KI-Versuche pro Minute, pro Person</strong><span>Dieser Zähler lebt im laufenden Prozess und wird beim Neustart zurückgesetzt. Es gibt kein separates gespeichertes Tages- oder Zehn-Minuten-Kontingent. Der Full-Modus teilt sich dieselben Limits.</span></li>
+<li><strong>drei KI-Nutzer gleichzeitig</strong><span>Höchstens drei Personen können gleichzeitig einen KI-Antwort-Slot belegen. Ein Befehl hat einen eigenen 25-Sekunden-Cooldown pro Person.</span></li>
+<li><strong>Musik bleibt klein</strong><span>Unterstützte YouTube- oder Twitter/X-Videolinks müssen sich zu einem einzelnen Track unter 15 Minuten auflösen. Audio-Anhänge und heruntergeladenes Audio sind auf 20 MiB begrenzt, mit höchstens zwei normalen Musik-Sitzungen. Native Wiedergabe braucht Linux und FFmpeg.</span></li>
 </ul>
 <p class="note">Er kann sich irren und dabei sicher klingen. Prüfe, was zählt.</p>
 </section>
@@ -133,8 +135,8 @@ owaua
 <section class="section" id="data">
 <h2>was er behält</h2>
 <div class="body">
-<p>Er hält ein bisschen aktuellen Chat, damit die nächste Antwort nicht aus dem Nichts kommt. Das liegt in einer lokalen SQLite-Datei, Schlüssel Kanal und Person. Alte Turns fallen von selbst runter. <code>!memory erase</code> löscht die gespeicherten Unterhaltungen eines Servers. <code>!memory erase mine</code> löscht deine.</p>
-<p>Hangout-Anfragen gehen an das eingestellte Modell, mit Storage aus. Musik-Anfragen landen in einem kleinen Audit-Log für den Betreiber. Passwörter, signierte Medienlinks und Fehlertext vom Anbieter werden nicht aufgeschrieben.</p>
+<p>Er hält deinen Thread mit ihm und ein kurzes Log der letzten Zeilen in diesem Kanal, damit die nächste Antwort nicht aus dem Nichts kommt. Deine Persona bleibt deine. Das liegt in einer lokalen SQLite-Datei. Alte Turns fallen von selbst runter. <code>!memory erase</code> löscht die gespeicherten Unterhaltungen eines Servers und diese Zeilen. <code>!memory erase mine</code> löscht deine.</p>
+<p>Hangout-Anfragen gehen an das eingestellte Modell, mit Storage auf der Anbieterseite aus. Musik-Anfragen landen in einem kleinen Audit-Log für den Betreiber; es hält operative Metadaten fest und hasht das rohe Argument. Passwörter, signierte Medienlinks und Fehlertext vom Anbieter werden nicht aufgeschrieben.</p>
 <p>Die längere, sorgfältige Version ist die <a href="/privacy">Datenschutzerklärung</a>. Einladen heißt auch den <a href="/terms">Nutzungsbedingungen</a> zustimmen.</p>
 </div>
 </section>
@@ -144,15 +146,15 @@ owaua
 <div class="faq">
 <details>
 <summary>Antwortet er auf jede Nachricht?</summary>
-<p>Nein. Erwähne ihn, wenn du ihn willst. Normalen Chat lässt er in Ruhe. DMs nur, wenn der Betreiber sie eingeschaltet hat. Andere Bots kriegen nie eine Antwort.</p>
+<p>Nein. Erwähne ihn, wenn du eine Antwort willst. Er behält eine kurze aktuelle Zeile aus dem Kanal, damit er nicht blind ist, wenn du es tust. DMs nur, wenn der Betreiber sie eingeschaltet hat. Andere Bots kriegen nie eine Antwort.</p>
 </details>
 <details>
 <summary>Warum hat er nicht geantwortet?</summary>
-<p>Schau, ob du ihn wirklich gepingt hast. Gib ihm einen Moment — er zeigt Typing, während er arbeitet. Zwischen Befehlen liegen 25 Sekunden, und oben stehen die Tagesgrenzen. Andere Bots werden absichtlich ignoriert.</p>
+<p>Schau, ob du ihn wirklich gepingt hast. Gib ihm einen Moment — er zeigt Tippen an, während er arbeitet. Schau dir die Rate-Limits und Befehls-Cooldowns oben an. Andere Bots werden absichtlich ignoriert.</p>
 </details>
 <details>
 <summary>Kann ich ändern, wie er klingt?</summary>
-<p>Ja. <code>!persona rudeish</code>, <code>!persona nerdish</code>, <code>!persona flirty</code> oder <code>!persona chaotic</code>.</p>
+<p>Ja. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> oder <code>!persona normal</code>. Die Stimme als Person im Raum ist standardmäßig aus; <code>!human on</code> holt sie zurück.</p>
 </details>
 <details>
 <summary>Spielt die Musik wirklich?</summary>
