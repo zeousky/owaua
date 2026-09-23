@@ -7,6 +7,7 @@ Static website for the Owaua Discord bot.
 - `index.html` — English homepage.
 - `french/`, `german/`, `greek/`, `hungarian/`, `italian/`, `polish/`, `romanian/`, and `ukrainian/` — localized homepages.
 - `privacy/`, `terms/`, and `partnerships/` — standalone content pages.
+- `partnerships/ergo.json` — data for the generated E.R.G.O partnership block; see `partnerships/README.md`.
 - `assets/` — shared CSS, JavaScript, fonts, editorial media, and profile images.
 - `assets/archive/` — unused legacy assets retained locally for reference; these are not linked by the site.
 - `404.html` — fallback page.

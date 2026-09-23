@@ -1,0 +1,132 @@
+{
+  "name": "E.R.G.O",
+  "meta": "the other bot · Discord",
+  "mark": "/assets/ergopfp.webp?v=20260915d",
+  "intro": "owaua hangs out. E.R.G.O does chores — a wallet, a shop, music, mods, fishing, news, and a little AI with its own memory. The letters are Executive Response & Governance Operator, if you needed that.",
+  "note": "Type `!menu` in Discord for the live list. Some of this is staff-only. It is not us, and it does not share a brain with owaua. Check anything that matters.",
+  "commands_summary": "commands, last we looked",
+  "commands_note": "Prefix is `!`, same as owaua. If this disagrees with the bot, believe the bot.",
+  "groups": [
+    {
+      "title": "getting around",
+      "commands": [
+        { "cmd": "!menu <page>", "desc": "the in-discord menu" },
+        { "cmd": "!help", "desc": "what went wrong, according to ERGO" },
+        { "cmd": "!register", "desc": "open a cER wallet" },
+        { "cmd": "!DelAcc", "desc": "delete that wallet" },
+        { "cmd": "!info", "desc": "what ERGO is, in its own words" }
+      ]
+    },
+    {
+      "title": "ask it something",
+      "commands": [
+        { "cmd": "!ERGO <question>", "desc": "its own AI. it remembers." },
+        { "cmd": "!news [keyword|source]", "desc": "headlines. `!news openai` works" },
+        { "cmd": "!patchnotes", "desc": "what changed" },
+        { "cmd": "!dailyhelp", "desc": "how `!daily` works" },
+        { "cmd": "!assistance", "desc": "an invite, if you need a ticket" }
+      ]
+    },
+    {
+      "title": "money",
+      "commands": [
+        { "cmd": "!shop", "desc": "browse the shop" },
+        { "cmd": "!buy <item> [amount]", "desc": "buy something" },
+        { "cmd": "!pay <@user> <amount>", "desc": "send cER. also `!gift` / `!give`" },
+        { "cmd": "!top", "desc": "who has the most" },
+        { "cmd": "!balance", "desc": "your cER" },
+        { "cmd": "!work", "desc": "earn a little, then wait" }
+      ]
+    },
+    {
+      "title": "gambling",
+      "commands": [
+        { "cmd": "!GambleTerms", "desc": "read this first" },
+        { "cmd": "!GambleTermsAccept", "desc": "agree, and get 1,000 cER" },
+        { "cmd": "!slots <bet>", "desc": "slots" },
+        { "cmd": "!blackjack <bet>", "desc": "blackjack" }
+      ]
+    },
+    {
+      "title": "fishing",
+      "commands": [
+        { "cmd": "!fish", "desc": "fish for items, then wait" },
+        { "cmd": "!inventory", "desc": "what you caught" },
+        { "cmd": "!sellinv", "desc": "sell the whole bag" }
+      ]
+    },
+    {
+      "title": "music",
+      "commands": [
+        { "cmd": "!play <song/url>", "desc": "queue and play. alias `!p`" },
+        { "cmd": "!pause / !resume", "desc": "hold / continue" },
+        { "cmd": "!skip", "desc": "next track" },
+        { "cmd": "!stop", "desc": "stop and leave the channel" },
+        { "cmd": "!queue", "desc": "the queue. alias `!q`" },
+        { "cmd": "!nowplaying", "desc": "this track. alias `!np`" },
+        { "cmd": "!volume <0-100>", "desc": "set or show volume. alias `!vol`" },
+        { "cmd": "!shuffle", "desc": "shuffle the queue" },
+        { "cmd": "!loop <off|queue|one>", "desc": "loop the queue, one track, or neither" }
+      ]
+    },
+    {
+      "title": "looking things up",
+      "commands": [
+        { "cmd": "!wiki <topic>", "desc": "Wikipedia, with a picture if it has one" },
+        { "cmd": "!define <word>", "desc": "Wiktionary" },
+        { "cmd": "!search <query>", "desc": "DuckDuckGo" },
+        { "cmd": "!img <query>", "desc": "a Pinterest image. alias `!pinterest`" }
+      ]
+    },
+    {
+      "title": "little extras",
+      "commands": [
+        { "cmd": "!remindme <dur> <text>", "desc": "a DM later. `1h30m` works" },
+        { "cmd": "!reminders", "desc": "your list" },
+        { "cmd": "!remindclear <id>", "desc": "cancel one" },
+        { "cmd": "!poll <Q | A | B …>", "desc": "a poll, up to 10 options" },
+        { "cmd": "!roast <@user>", "desc": "mean, on purpose" },
+        { "cmd": "!luck", "desc": "a luck roll" },
+        { "cmd": "!dice", "desc": "a die" },
+        { "cmd": "!feedback <text>", "desc": "bugs and wishes" },
+        { "cmd": "!term <cmd>", "desc": "a little linux-shaped shell" },
+        { "cmd": "!term help", "desc": "what it will actually run" }
+      ]
+    },
+    {
+      "title": "staff",
+      "commands": [
+        { "cmd": "!kick <@user> [reason]", "desc": "kick someone" },
+        { "cmd": "!ban <@user> [reason]", "desc": "ban someone" },
+        { "cmd": "!timeout <@user> <dur> [reason]", "desc": "timeout someone" },
+        { "cmd": "!purge <1-100>", "desc": "bulk delete" },
+        { "cmd": "!reason <case> <new reason>", "desc": "change a case reason" },
+        { "cmd": "!warnremove <@user> <number>", "desc": "take a warning off" },
+        { "cmd": "!modhistory <@user>", "desc": "their mod history" },
+        { "cmd": "!daily <text>", "desc": "post in #daily-ergo" },
+        { "cmd": "!broadcast <text>", "desc": "say it everywhere it is allowed to" }
+      ]
+    },
+    {
+      "title": "ERGO staff",
+      "commands": [
+        { "cmd": "!AceLock <@user> [reason]", "desc": "lock them out of the bot" },
+        { "cmd": "!AceUnlock <@user>", "desc": "let them back in" },
+        { "cmd": "!AceWarn <@user> [reason]", "desc": "warn them. three and they get timed out" },
+        { "cmd": "!AceUnwarn <@user> <number>", "desc": "take an AceWarn off" }
+      ]
+    },
+    {
+      "title": "ACE only",
+      "commands": [
+        { "cmd": "!maintenance on", "desc": "block every command except yours" },
+        { "cmd": "!maintenance off", "desc": "let people back in" },
+        { "cmd": "!maintenance add <cmd>", "desc": "block one command" },
+        { "cmd": "!maintenance remove <cmd>", "desc": "unblock it" },
+        { "cmd": "!set <text>", "desc": "custom status while you work" },
+        { "cmd": "!shutdown", "desc": "power ERGO off" },
+        { "cmd": "!restart", "desc": "bring it back" }
+      ]
+    }
+  ]
+}

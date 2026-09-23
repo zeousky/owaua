@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "owaua.com/**"
+      - "scripts/render-partnerships.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -27,6 +28,9 @@ jobs:
     steps:
       - name: Check out site
         uses: actions/checkout@v4
+
+      - name: Render partnerships from ergo.json
+        run: python3 scripts/render-partnerships.py
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

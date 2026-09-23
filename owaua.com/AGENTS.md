@@ -9,3 +9,10 @@ Static site for the official owaua Discord bot. Edit here, then deploy through G
 3. Confirm the live page on `https://owaua.com/` and any changed localized path after the workflow completes.
 
 Do not use the Daki deployment client for this website; Daki is for the bot runtime only.
+
+## Partnerships
+
+The E.R.G.O block in `partnerships/index.html` is generated from
+`partnerships/ergo.json` by `scripts/render-partnerships.py`, which the Pages
+workflow runs before upload. Edit the JSON, not the generated HTML. The
+partner-facing instructions live in `partnerships/README.md`.
