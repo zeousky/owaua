@@ -16,6 +16,8 @@
 <link rel="icon" href="/assets/pfp-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/assets/owaua.css?v=20260920c">
 <script src="/assets/owaua.js?v=20260920c" defer></script>
+<script>/* GitHub Pages serves only this root 404 for unmatched paths, and the app under /secret/ handles its own routing, so hand those back to it. */
+if(location.pathname.indexOf("/secret/")===0){location.replace("/secret/index.html"+location.search+location.hash);}</script>
 </head>
 <body>
 <noscript><img height="1" width="1" style="display:none;" alt="" src="https://ct.pinterest.com/v3/?event=init&amp;tid=2612904762430&amp;noscript=1"></noscript>
