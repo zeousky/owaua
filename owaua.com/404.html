@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="This page could not be found.">
 <meta name="theme-color" content="#1e1f22">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s.pinimg.com 'sha256-Z5kL06t+t0VVrPMBbxCHXXK3BzlI+8xwRgti5K2keZE='; style-src 'self'; img-src 'self' data: https://ct.pinterest.com; connect-src 'self' https://ct.pinterest.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s.pinimg.com 'sha256-SQuuRto+pegy0+0AAtDi5eteb9ZsmZMvMnzyX6wMG2U='; style-src 'self'; img-src 'self' data: https://ct.pinterest.com; connect-src 'self' https://ct.pinterest.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="/assets/pinterest.js" defer></script>
 <meta name="robots" content="noindex">
 <link rel="canonical" href="https://owaua.com/404.html">
@@ -16,9 +16,9 @@
 <link rel="icon" href="/assets/pfp-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/assets/owaua.css?v=20260920c">
 <script src="/assets/owaua.js?v=20260920c" defer></script>
-<script>/* GitHub Pages serves only this root 404 for unmatched paths, and the app under /secret/ handles its own routing, so hand those back to it. Hash-pinned in the Content-Security-Policy meta below; update the hash if this text changes. */
+<script>/* GitHub Pages serves only this root 404 for unmatched paths, and the app under /secret/ handles its own routing, so hand those back to it. The target is the directory (never index.html) so the prerendered state on the home page matches the path it is hydrated at. Hash-pinned below; update the hash if this text changes. */
 if (location.pathname.indexOf("/secret/") === 0) {
-  location.replace("/secret/index.html" + location.search + location.hash);
+  location.replace("/secret/" + location.search + location.hash);
 }</script>
 </head>
 <body>
