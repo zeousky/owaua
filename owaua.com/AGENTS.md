@@ -24,5 +24,5 @@ published at `https://owaua.com/secret/`. It is generated output: a single-page
 export with prerendered HTML per route, plus `404.html` (the app's own not-found
 page) for paths outside its three routes. Do not hand-edit it — rebuild it in
 the source workspace with `node scripts/build-static.mjs` and copy
-`dist/secret/public/` here.
+`dist/secret/public/` here
 
