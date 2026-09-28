@@ -2,8 +2,9 @@
 """Render the partnership page from its data file.
 
 The E.R.G.O partnership block in ``owaua.com/partnerships/index.html`` is
-generated from ``owaua.com/partnerships/ergo.json``. Editors change the JSON;
-this script turns it into the HTML that GitHub Pages deploys.
+generated from ``owaua.com/partnerships/ergo.json``. The same block is refreshed
+in ``owaua.com/kirk/partnerships/index.html`` when that page is present.
+Editors change the JSON; this script turns it into the HTML that GitHub Pages deploys.
 
 Usage:
     python3 scripts/render-partnerships.py          # write the page
@@ -22,6 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "owaua.com" / "partnerships"
 DATA_FILE = SITE / "ergo.json"
 PAGE_FILE = SITE / "index.html"
+PAGE_FILES = (
+    PAGE_FILE,
+    ROOT / "owaua.com" / "kirk" / "partnerships" / "index.html",
+)
 
 START = "<!-- ERGO:START generated from ergo.json -->"
 END = "<!-- ERGO:END -->"
@@ -112,7 +117,7 @@ def render(data: dict) -> str:
     return "\n".join(lines)
 
 
-def apply(page: str, block: str) -> str:
+def apply(page: str, block: str, page_file: Path) -> str:
     """Replace the marked region, or bootstrap it from the existing article."""
     marked = re.compile(
         re.escape(START) + r".*?" + re.escape(END), re.DOTALL
@@ -121,31 +126,40 @@ def apply(page: str, block: str) -> str:
     if marked.search(page):
         return marked.sub(lambda _match: replacement, page, count=1)
     if not _EXISTING_BLOCK.search(page):
-        raise SystemExit(f"error: no E.R.G.O block or markers found in {PAGE_FILE}")
+        raise SystemExit(f"error: no E.R.G.O block or markers found in {page_file}")
     return _EXISTING_BLOCK.sub(lambda _match: replacement, page, count=1)
 
 
 def main(argv: list[str]) -> int:
     data = load_data()
-    page = PAGE_FILE.read_text(encoding="utf-8")
-    updated = apply(page, render(data))
-
-    if "--check" in argv:
+    block = render(data)
+    stale: list[Path] = []
+    for page_file in PAGE_FILES:
+        if not page_file.exists():
+            continue
+        page = page_file.read_text(encoding="utf-8")
+        updated = apply(page, block, page_file)
         if updated != page:
-            print(
-                "partnerships/index.html is out of sync; "
-                "run python3 scripts/render-partnerships.py",
-                file=sys.stderr,
-            )
+            stale.append(page_file)
+            if "--check" not in argv:
+                page_file.write_text(updated, encoding="utf-8")
+                print(
+                    f"rendered {page_file.relative_to(ROOT)} "
+                    f"from {DATA_FILE.relative_to(ROOT)}"
+                )
+    if "--check" in argv:
+        if stale:
+            for page_file in stale:
+                print(
+                    f"{page_file.relative_to(ROOT)} is out of sync; "
+                    "run python3 scripts/render-partnerships.py",
+                    file=sys.stderr,
+                )
             return 1
-        print("partnerships/index.html is in sync with ergo.json")
+        print("partnership pages are in sync with ergo.json")
         return 0
-
-    if updated != page:
-        PAGE_FILE.write_text(updated, encoding="utf-8")
-        print(f"rendered {PAGE_FILE.relative_to(ROOT)} from {DATA_FILE.relative_to(ROOT)}")
-    else:
-        print("partnerships page already up to date")
+    if not stale:
+        print("partnership pages already up to date")
     return 0
 
 

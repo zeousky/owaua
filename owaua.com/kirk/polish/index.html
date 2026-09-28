@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="owaua to mały bot Discord, którego oznaczasz, kiedy chcesz towarzystwa. Pamięta trochę, ma kilka głosów i może puścić piosenkę na voice.">
+<meta name="theme-color" content="#12110f">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="canonical" href="https://owaua.com/kirk/polish">
+<link rel="alternate" hreflang="en" href="https://owaua.com/kirk/">
+<link rel="alternate" hreflang="fr" href="https://owaua.com/kirk/french">
+<link rel="alternate" hreflang="de" href="https://owaua.com/kirk/german">
+<link rel="alternate" hreflang="el" href="https://owaua.com/kirk/greek">
+<link rel="alternate" hreflang="hu" href="https://owaua.com/kirk/hungarian">
+<link rel="alternate" hreflang="it" href="https://owaua.com/kirk/italian">
+<link rel="alternate" hreflang="pl" href="https://owaua.com/kirk/polish">
+<link rel="alternate" hreflang="ro" href="https://owaua.com/kirk/romanian">
+<link rel="alternate" hreflang="uk" href="https://owaua.com/kirk/ukrainian">
+<link rel="alternate" hreflang="x-default" href="https://owaua.com/kirk/">
+<meta property="og:url" content="https://owaua.com/kirk/polish">
+<meta property="og:image" content="https://owaua.com/assets/pfp-polish.png">
+<meta property="og:title" content="owaua">
+<meta property="og:description" content="mały bot Discord, z którym naprawdę można pogadać">
+<title>owaua · mały discordowy bot do hangoutu</title>
+<link rel="icon" href="/assets/pfp-polish-96.webp?v=20260918a" type="image/webp">
+<link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
+</head>
+<body>
+<a class="skip" href="#main">Przejdź do treści</a>
+<div class="frame">
+<details id="drawer" class="drawer" open>
+<script src="/kirk/assets/kirk-boot.js?v=20260929a"></script>
+<script src="/kirk/assets/kirk.js?v=20260929a"></script>
+<summary>
+<span class="sum-brand"><img src="/assets/pfp-polish-96.webp?v=20260918a" width="32" height="32" alt=""><span class="word">owaua</span></span>
+<span class="sum-menu">menu</span>
+</summary>
+<div class="rail-inner">
+<a class="brand" href="/kirk/polish" aria-label="strona główna owaua"><img src="/assets/pfp-polish-96.webp?v=20260918a" width="42" height="42" alt=""><span><span class="word">owaua</span><span class="edition">kirk</span></span></a>
+<div class="rail-scroll">
+<nav class="toc" aria-label="Main">
+<a href="#what">co robi</a>
+<a href="#commands">komendy</a>
+<a href="#limits">limity</a>
+<a href="/kirk/privacy">prywatność</a>
+<a href="#data">co zatrzymuje</a>
+<a href="#faq">pytania, które ludzie naprawdę zadają</a>
+<a href="#setup">albo odpal sam</a>
+<a href="/kirk/terms">regulamin</a>
+<a href="/kirk/partnerships">partnerzy</a>
+</nav>
+<nav class="langs" aria-label="Języki">
+<p class="rail-label">Języki</p>
+<a href="/kirk/">english</a>
+<a href="/kirk/french">français</a>
+<a href="/kirk/german">deutsch</a>
+<a href="/kirk/greek">ελληνικά</a>
+<a href="/kirk/hungarian">magyar</a>
+<a href="/kirk/italian">italiano</a>
+<a href="/kirk/polish" aria-current="page">polski</a>
+<a href="/kirk/romanian">română</a>
+<a href="/kirk/ukrainian">українська</a>
+</nav>
+</div>
+<div class="rail-end">
+<a class="invite" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">zaproś</a>
+<a class="secret-button" href="/kirk/larpabdadelta" data-secret-button aria-label="hidden"></a>
+</div>
+</div>
+</details>
+<main id="main" class="stage">
+<header class="opener">
+<p class="kicker">the annoying discord bot</p>
+<p class="epigraph">Wokół bota na tej stronie nie ma dużo, specjalnie. Bot jest tym, o co chodzi. Mam nadzieję, że i tak wystarczy.</p>
+<h1>bot, który wisi na twoim serwerze</h1>
+<p class="lede">Oznacz go, kiedy chcesz odpowiedzi. Pamięta trochę tego, co właśnie sobie powiedzieliście — nie całego pokoju — a do tego może zmienić, jak brzmi, odpowiadać w języku serwera albo puścić piosenkę na voice. Mały, specjalnie.</p>
+<div class="actions">
+<a class="btn" href="https://discord.gg/CNbpwtE9HS">wpadnij na Discord</a>
+<a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">zaproś owaua</a>
+</div>
+<p class="note">Komendy zaczynają się od <code>!</code>. Nie ma komend slash. Na privie go nie ma, chyba że osoba, która go trzyma, to włączy.</p>
+<figure class="plate">
+<img src="/image.webp?v=20260919a" width="738" height="408" alt="owaua odpowiada na kanale Discord" loading="lazy">
+<figcaption>mój ulubiony zrzut ekranu</figcaption>
+</figure>
+</header>
+<section class="chapter" id="what">
+<header class="chapter-h"><span class="num">01</span><h2>co naprawdę robi</h2></header>
+<p>Pingnij, kiedy chcesz go w rozmowie. Odpowiada głosem i językiem, które serwer już wybrał.</p>
+<div class="piece"><h3>czeka, aż zapytasz</h3><p>Pingnij go na serwerze, a odpisze. Samotne <code>@owaua</code> bez niczego dostaje małe lokalne „yeah?” — bez wołania modelu. Inne boty są ignorowane. Privy działają tylko, gdy operator włączy <code>BOT_ALLOW_DMS=1</code>.</p></div>
+<div class="piece"><h3>pamięta wasz wątek i trochę pokoju</h3><p>Twoja historia z nim to nadal tylko ty, na tym kanale: do 20 tur, po tygodniu znikają, a plik kończy się na 10 000 rekordów. Trzyma też krótką, świeżą linijkę z tego kanału, żeby ping nie był ślepy. Osoba obok ma swój własny wątek i swoją personę.</p></div>
+<div class="piece"><h3>kilka głosów i kilka głów</h3><p>Wybierz dla siebie <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> albo <code>normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go dodaje. Tryb pełny to osobne włączenie dla zatwierdzonych osób.</p></div>
+<div class="piece"><h3>może odpowiadać w twoim języku</h3><p>Admini ustawiają pełną nazwę języka, na przykład <code>!language hungarian</code>. Gdy jest pasująca grafika, owaua może też zmienić avatar i banner bota na tym serwerze, żeby wyglądał jak u siebie.</p></div>
+<div class="piece"><h3>piosenka na voice, jeśli poprosisz</h3><p><code>!music</code> puszcza jeden film z YouTube albo post z Twittera/X z wideo, albo obsługiwany załącznik audio. Pauza, wznów, restart, skip, stop, teraz i wyjdź. Bez szukania po nazwie i bez playlist.</p></div>
+<div class="piece"><h3>krótkie odpowiedzi, specjalnie</h3><p>Zwykłe odpowiedzi w hangoucie zostają krótkie i kończą zdanie. Gemini w hangoucie może spojrzeć na jeden obrazek. Zatwierdzone osoby mogą włączyć <code>!full mode on</code> na wyznaczonych kanałach. Tryb pełny dzieli te same limity.</p></div>
+</section>
+<section class="chapter" id="commands">
+<header class="chapter-h"><span class="num">02</span><h2>jak z nim gadać</h2></header>
+<p>Każda komenda ma własny, 25-sekundowy cooldown na osobę. Zmiana ustawień serwera wymaga Zarządzania serwerem. Sterowanie muzyką działa tylko, gdy jesteś na tym samym kanale głosowym co bot.</p>
+<div class="ledger">
+<div class="row"><div class="cmd"><code>!help</code></div><p>Lista, kiedy zapomnisz.</p></div>
+<div class="row"><div class="cmd"><code>!persona rudeish low|medium|high</code></div><p>Posłuchać albo zmienić swój głos dla ogólnej publiczności. Też <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> i <code>normal</code>.</p></div>
+<div class="row"><div class="cmd"><code>!human on|off</code></div><p>Włączyć głos człowieka w pokoju albo wrócić do zwykłego głosu hangout bota. Jest domyślnie wyłączony.</p></div>
+<div class="row"><div class="cmd"><code>!language &lt;pełna nazwa&gt;|reset</code></div><p>Ustawić albo zdjąć język odpowiedzi serwera i pasującą grafikę profilu, gdy jest.</p></div>
+<div class="row"><div class="cmd"><code>!music &lt;URL YouTube/X albo załącznik&gt;</code></div><p>Puścić jeden obsługiwany utwór. Albo <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code> i <code>leave</code>.</p></div>
+<div class="row"><div class="cmd"><code>!memory erase</code> / <code>!memory erase mine</code></div><p>Admini mogą wyczyścić zapisane czaty serwera. Każdy może wyczyścić swoje, w tym privy, gdy są włączone.</p></div>
+<div class="row"><div class="cmd"><code>!reset all</code></div><p>Zarządzanie serwerem. Czyści zapisane czaty tego serwera, linijki z kanałów, język odpowiedzi i grafikę profilu, i zatrzymuje jego muzykę.</p></div>
+<div class="row"><div class="cmd"><code>!security status|pause|resume</code></div><p>Tylko właściciel. Jak bardzo jest zajęty i awaryjna pauza, gdy coś idzie nie tak.</p></div>
+<div class="row"><div class="cmd"><code>!shutdown</code> / <code>!pricing</code></div><p>Tylko właściciel. Zatrzymać bota albo pokazać aktualne ceny modeli.</p></div>
+<div class="row"><div class="cmd"><code>!owner's note</code></div><p>Krótka notka od osoby, która go zrobiła.</p></div>
+</div>
+</section>
+<section class="chapter" id="limits">
+<header class="chapter-h"><span class="num">03</span><h2>limity, powiedziane wprost</h2></header>
+<p>Są po to, żeby jedna osoba nie mogła go stopić, i żeby został na tyle tani, żeby go trzymać. To sufity zapytań, nie obietnica darmowego użytku.</p>
+<div class="limits">
+<article class="stat"><b>8</b><h3>osiem prób AI na minutę, na osobę</h3><p>Ten licznik siedzi w działającym procesie i zeruje się przy restarcie. Nie ma osobnego, zapisywanego limitu dziennego ani dziesięciominutowego. Tryb pełny dzieli te same limity.</p></article>
+<article class="stat"><b>3</b><h3>trzy osoby na AI naraz</h3><p>Najwyżej trzy osoby mogą naraz zajmować miejsce na odpowiedź AI. Komenda ma dodatkowo własny, 25-sekundowy cooldown na osobę.</p></article>
+<article class="stat"><b>15</b><h3>muzyka zostaje mała</h3><p>Obsługiwane linki do wideo z YouTube albo Twittera/X muszą wskazywać jeden utwór krótszy niż 15 minut. Załączniki audio i pobrane audio mają limit 20 MiB, a zwykłych sesji muzycznych są najwyżej dwie. Natywne odtwarzanie potrzebuje Linuksa i FFmpeg.</p></article>
+</div>
+<p class="note">Może się mylić i brzmieć pewnie. Sprawdzaj to, co się liczy.</p>
+</section>
+<section class="chapter" id="data">
+<header class="chapter-h"><span class="num">04</span><h2>co zatrzymuje</h2></header>
+<div class="prose"><p>Trzyma twój wątek z nim i krótki log świeżych linijek z tego kanału, żeby kolejna odpowiedź nie brała się znikąd. Twoja persona zostaje twoja. To siedzi w lokalnym pliku SQLite. Stare tury spadają same. <code>!memory erase</code> czyści zapisane rozmowy serwera i te linijki. <code>!memory erase mine</code> czyści twoje.</p>
+<p>Zapytania hangout idą do ustawionego modelu, z wyłączonym storage po stronie dostawcy. Zapytania muzyki lądują w małym logu audytu dla operatora; zapisuje metadane operacyjne i haszuje surowy argument. Haseł, podpisanych linków do mediów i tekstu błędu dostawcy nikt nie zapisuje.</p>
+<p>Dłuższa, ostrożna wersja to <a href="/kirk/privacy">polityka prywatności</a>. Zaproszenie oznacza też <a href="/kirk/terms">regulamin</a>.</p></div>
+</section>
+<section class="chapter" id="faq">
+<header class="chapter-h"><span class="num">05</span><h2>pytania, które ludzie naprawdę zadają</h2></header>
+<div class="faq">
+<details><summary>Odpowiada na każdą wiadomość?</summary><p>Nie. Oznacz go, kiedy chcesz odpowiedzi. Trzyma za to krótką, świeżą linijkę z kanału, żeby nie był ślepy, kiedy to zrobisz. Privy tylko, gdy operator je włączył. Inne boty nigdy nie dostają odpowiedzi.</p></details>
+<details><summary>Dlaczego nie odpisał?</summary><p>Sprawdź, czy naprawdę go pingnąłeś. Daj mu chwilę — pokazuje typing, jak pracuje. Zobacz limity i cooldowny komend wyżej. Inne boty są ignorowane specjalnie.</p></details>
+<details><summary>Mogę zmienić, jak brzmi?</summary><p>Tak. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> albo <code>!persona normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go przywraca.</p></details>
+<details><summary>Muzyka naprawdę gra?</summary><p>Tak. Wchodzi na twój kanał głosowy i streamuje utwór. Bez playlist, bez kolejki następnych dziesięciu. Musisz być na voice, a on potrzebuje tam Connect i Speak.</p></details>
+<details><summary>Mogę ufać każdej odpowiedzi?</summary><p>Nie. Może być pewny i i tak się mylić. Jeśli coś się liczy, sprawdź sam albo zapytaj człowieka.</p></details>
+<details><summary>Gdzie powiedzieć, że coś nie działa?</summary><p><a href="https://discord.gg/CNbpwtE9HS">Serwer Discord</a> albo osoba, która go zrobiła: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Powiedz, co próbowałeś i co się stało. Proszę nie wklejać tokenów ani prywatnych czatów na publiczny kanał.</p></details>
+</div>
+</section>
+<section class="chapter" id="setup">
+<header class="chapter-h"><span class="num">06</span><h2>albo odpal sam</h2></header>
+<p>owaua jest open source. Przyda się Python 3.11+, Message Content Intent Discorda, klucze dostawcy i Linux plus FFmpeg, jeśli chcesz muzykę. Potem to już tylko gadanie.</p>
+<div class="actions">
+<a class="btn" href="https://github.com/zeousky/owaua">zobacz źródło</a>
+<a class="btn ghost contact-link" href="mailto:ckazros@owaua.com" data-contact-email="ckazros@owaua.com">napisz do osoby, która go zrobiła</a>
+</div>
+</section>
+<footer class="colophon">
+<p>© 2026 owaua</p>
+<nav aria-label="Stopka">
+<a href="#what">co robi</a>
+<a href="#commands">komendy</a>
+<a href="/kirk/privacy">prywatność</a>
+<a href="/kirk/terms">regulamin</a>
+<a href="/kirk/partnerships">partnerzy</a>
+<a href="https://discord.gg/CNbpwtE9HS">Discord</a>
+<a href="https://github.com/zeousky/owaua">GitHub</a>
+<a href="https://github.com/zeousky/owaua/blob/main/LICENSE">MIT</a>
+<a href="mailto:ckazros@owaua.com">kontakt</a>
+</nav>
+</footer>
+</main>
+</div>
+</body>
+</html>

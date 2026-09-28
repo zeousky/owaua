@@ -12,10 +12,10 @@ Do not use the Daki deployment client for this website; Daki is for the bot runt
 
 ## Partnerships
 
-The E.R.G.O block in `partnerships/index.html` is generated from
-`partnerships/ergo.json` by `scripts/render-partnerships.py`, which the Pages
-workflow runs before upload. Edit the JSON, not the generated HTML. The
-partner-facing instructions live in `partnerships/README.md`.
+The E.R.G.O block in `partnerships/index.html` and `kirk/partnerships/index.html`
+is generated from `partnerships/ergo.json` by `scripts/render-partnerships.py`,
+which the Pages workflow runs before upload. Edit the JSON, not the generated
+HTML. The partner-facing instructions live in `partnerships/README.md`.
 
 ## secret/
 

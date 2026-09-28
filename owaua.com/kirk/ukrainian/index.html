@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="owaua — маленький Discord-бот, якого згадуєш, коли хочеться компанії. Трохи пам'ятає, має кілька голосів і може поставити трек у voice.">
+<meta name="theme-color" content="#12110f">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="canonical" href="https://owaua.com/kirk/ukrainian">
+<link rel="alternate" hreflang="en" href="https://owaua.com/kirk/">
+<link rel="alternate" hreflang="fr" href="https://owaua.com/kirk/french">
+<link rel="alternate" hreflang="de" href="https://owaua.com/kirk/german">
+<link rel="alternate" hreflang="el" href="https://owaua.com/kirk/greek">
+<link rel="alternate" hreflang="hu" href="https://owaua.com/kirk/hungarian">
+<link rel="alternate" hreflang="it" href="https://owaua.com/kirk/italian">
+<link rel="alternate" hreflang="pl" href="https://owaua.com/kirk/polish">
+<link rel="alternate" hreflang="ro" href="https://owaua.com/kirk/romanian">
+<link rel="alternate" hreflang="uk" href="https://owaua.com/kirk/ukrainian">
+<link rel="alternate" hreflang="x-default" href="https://owaua.com/kirk/">
+<meta property="og:url" content="https://owaua.com/kirk/ukrainian">
+<meta property="og:image" content="https://owaua.com/assets/pfp-ukrainian.png">
+<meta property="og:title" content="owaua">
+<meta property="og:description" content="маленький Discord-бот, з яким справді можна поговорити">
+<title>owaua · маленький Discord hangout-бот</title>
+<link rel="icon" href="/assets/pfp-ukrainian-96.webp?v=20260918a" type="image/webp">
+<link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
+</head>
+<body>
+<a class="skip" href="#main">Перейти до змісту</a>
+<div class="frame">
+<details id="drawer" class="drawer" open>
+<script src="/kirk/assets/kirk-boot.js?v=20260929a"></script>
+<script src="/kirk/assets/kirk.js?v=20260929a"></script>
+<summary>
+<span class="sum-brand"><img src="/assets/pfp-ukrainian-96.webp?v=20260918a" width="32" height="32" alt=""><span class="word">owaua</span></span>
+<span class="sum-menu">меню</span>
+</summary>
+<div class="rail-inner">
+<a class="brand" href="/kirk/ukrainian" aria-label="головна owaua"><img src="/assets/pfp-ukrainian-96.webp?v=20260918a" width="42" height="42" alt=""><span><span class="word">owaua</span><span class="edition">kirk</span></span></a>
+<div class="rail-scroll">
+<nav class="toc" aria-label="Main">
+<a href="#what">що вміє</a>
+<a href="#commands">команди</a>
+<a href="#limits">межі</a>
+<a href="/kirk/privacy">приватність</a>
+<a href="#data">що він тримає</a>
+<a href="#faq">те, що справді питають</a>
+<a href="#setup">або запусти сам</a>
+<a href="/kirk/terms">умови</a>
+<a href="/kirk/partnerships">партнери</a>
+</nav>
+<nav class="langs" aria-label="Мови">
+<p class="rail-label">Мови</p>
+<a href="/kirk/">english</a>
+<a href="/kirk/french">français</a>
+<a href="/kirk/german">deutsch</a>
+<a href="/kirk/greek">ελληνικά</a>
+<a href="/kirk/hungarian">magyar</a>
+<a href="/kirk/italian">italiano</a>
+<a href="/kirk/polish">polski</a>
+<a href="/kirk/romanian">română</a>
+<a href="/kirk/ukrainian" aria-current="page">українська</a>
+</nav>
+</div>
+<div class="rail-end">
+<a class="invite" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">запросити</a>
+
+</div>
+</div>
+</details>
+<main id="main" class="stage">
+<header class="opener">
+<p class="kicker">the annoying discord bot</p>
+<p class="epigraph">Навколо бота на цьому сайті навмисне небагато. Бот — головне. Сподіваюсь, і так вистачить.</p>
+<h1>бот, який тусується на твоєму сервері</h1>
+<p class="lede">Згадай його, коли хочеш відповідь. Він трохи пам'ятає, що ви щойно сказали одне одному — не всю кімнату — і може змінити те, як звучить, відповідати мовою сервера або поставити трек у voice. Маленький навмисне.</p>
+<div class="actions">
+<a class="btn" href="https://discord.gg/CNbpwtE9HS">заходь у Discord</a>
+<a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">запросити owaua</a>
+</div>
+<p class="note">Команди починаються з <code>!</code>. Слеш-команд немає. Він тримається осторонь особистих повідомлень, доки людина, яка його запускає, це не ввімкне.</p>
+<figure class="plate">
+<img src="/image.webp?v=20260919a" width="738" height="408" alt="owaua відповідає в каналі Discord" loading="lazy">
+<figcaption>Дай згадку, думку або пісню. Він тут, щоб говорити, не щоб вести сервер.</figcaption>
+</figure>
+</header>
+<section class="chapter" id="what">
+<header class="chapter-h"><span class="num">01</span><h2>що він насправді вміє</h2></header>
+<p>Згадай його, коли хочеш його в розмові. Відповідає голосом і мовою, які сервер уже обрав.</p>
+<div class="piece"><h3>чекає, доки запитаєш</h3><p>Згадай його на сервері — і він відповість. Самотнє <code>@owaua</code> без нічого отримує маленьке локальне «yeah?» — без виклику моделі. Інших ботів ігнорує. Особисті повідомлення працюють лише якщо оператор увімкне <code>BOT_ALLOW_DMS=1</code>.</p></div>
+<div class="piece"><h3>пам'ятає твою нитку, і трохи кімнати</h3><p>Твоя історія з ним — це все ще лише ти, у тому каналі: до 20 ходів, за тиждень вони згасають, а файл зупиняється на 10 000 записах. Він ще тримає короткий недавній рядок із того каналу, щоб згадка не була наосліп. У людини поруч усе ще своя нитка і своя персона.</p></div>
+<div class="piece"><h3>кілька голосів і кілька мізків</h3><p>Обери <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> або <code>normal</code> для себе. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> його додає. Повний режим — це окремий опт-ін для схвалених користувачів.</p></div>
+<div class="piece"><h3>може відповідати твоєю мовою</h3><p>Адміни ставлять повну назву мови, наприклад <code>!language hungarian</code>. Коли є відповідна картинка, owaua може ще змінити аватар і банер бота на тому сервері, щоб він виглядав своїм.</p></div>
+<div class="piece"><h3>трек у voice, якщо попросиш</h3><p><code>!music</code> грає одне відео з YouTube або допис Twitter/X із відео, або підтримуваний аудіофайл. Пауза, продовжити, перезапуск, пропустити, стоп, зараз і вийти. Без пошуку за назвою і без плейлистів.</p></div>
+<div class="piece"><h3>короткі відповіді, навмисне</h3><p>Звичайні hangout-відповіді лишаються короткими й договорюють речення. Gemini hangout може глянути на одне зображення. Схвалені люди можуть відкрити <code>!full mode on</code> у призначених каналах. Повний режим ділить ті самі ліміти.</p></div>
+</section>
+<section class="chapter" id="commands">
+<header class="chapter-h"><span class="num">02</span><h2>як із ним говорити</h2></header>
+<p>У кожної команди власне 25-секундне очікування на користувача. Зміна налаштувань сервера потребує Керування сервером. Керування музикою працює лише якщо ти в тому ж голосовому каналі, що й бот.</p>
+<div class="ledger">
+<div class="row"><div class="cmd"><code>!help</code></div><p>Список, коли забуваєш.</p></div>
+<div class="row"><div class="cmd"><code>!persona rudeish low|medium|high</code></div><p>Почути або змінити свій голос для загальної аудиторії. Також <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> і <code>normal</code>.</p></div>
+<div class="row"><div class="cmd"><code>!human on|off</code></div><p>Увімкнути голос «людини в кімнаті» або повернутись до звичайного hangout-голосу. За замовчуванням він вимкнений.</p></div>
+<div class="row"><div class="cmd"><code>!language &lt;повна назва&gt;|reset</code></div><p>Поставити або скинути мову відповіді сервера й відповідну картинку профілю, якщо вона є.</p></div>
+<div class="row"><div class="cmd"><code>!music &lt;YouTube/X URL або вкладення&gt;</code></div><p>Поставити один підтримуваний трек. Або <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code> і <code>leave</code>.</p></div>
+<div class="row"><div class="cmd"><code>!memory erase</code> / <code>!memory erase mine</code></div><p>Адміни можуть стерти збережені чати сервера. Будь-хто може стерти свої, разом з особистими, коли вони ввімкнені.</p></div>
+<div class="row"><div class="cmd"><code>!reset all</code></div><p>Керування сервером. Стирає збережені чати цього сервера, рядки каналів, мову відповіді й картинку профілю, а також зупиняє його музику.</p></div>
+<div class="row"><div class="cmd"><code>!security status|pause|resume</code></div><p>Лише власник. Наскільки він зайнятий, і аварійна пауза, якщо щось іде не так.</p></div>
+<div class="row"><div class="cmd"><code>!shutdown</code> / <code>!pricing</code></div><p>Лише власник. Зупинити бота або показати поточні ціни моделей.</p></div>
+<div class="row"><div class="cmd"><code>!owner's note</code></div><p>Коротка нотатка від людини, яка його зробила.</p></div>
+</div>
+</section>
+<section class="chapter" id="limits">
+<header class="chapter-h"><span class="num">03</span><h2>межі, сказані прямо</h2></header>
+<p>Вони існують, щоб одна людина не могла його розплавити, і щоб він лишався досить дешевим, щоб його тримати. Це стелі запитів, не обіцянка безкоштовного користування.</p>
+<div class="limits">
+<article class="stat"><b>8</b><h3>вісім спроб ШІ на хвилину, на користувача</h3><p>Цей лічильник живе в запущеному процесі й скидається при перезапуску. Окремої збереженої денної чи десятихвилинної квоти немає. Повний режим ділить ті самі ліміти.</p></article>
+<article class="stat"><b>3</b><h3>три користувачі ШІ одночасно</h3><p>Щонайбільше три користувачі можуть займати слот відповіді ШІ водночас. У команди окреме 25-секундне очікування на користувача.</p></article>
+<article class="stat"><b>15</b><h3>музика лишається маленькою</h3><p>Підтримувані посилання на відео YouTube або Twitter/X мають вести до одного треку до 15 хвилин. Аудіовкладення й завантажене аудіо обмежені 20 МіБ, і щонайбільше дві звичайні музичні сесії. Нативне відтворення потребує Linux і FFmpeg.</p></article>
+</div>
+<p class="note">Він може помилятись із прямим обличчям. Перевіряй те, що важливо.</p>
+</section>
+<section class="chapter" id="data">
+<header class="chapter-h"><span class="num">04</span><h2>що він тримає</h2></header>
+<div class="prose"><p>Він тримає твою нитку з ним і короткий журнал недавніх рядків у тому каналі, щоб наступна відповідь не приходила з нізвідки. Твоя персона лишається твоєю. Усе це живе в локальному файлі SQLite. Старі ходи самі відпадають. <code>!memory erase</code> стирає збережені розмови сервера і ті рядки. <code>!memory erase mine</code> стирає твої.</p>
+<p>Hangout-запити йдуть до налаштованої моделі зі вимкненим сховищем на боці провайдера. Музичні запити потрапляють у невеликий журнал аудиту для оператора; він записує операційні метадані й хешує сирий аргумент. Паролі, підписані медіапосилання й текст помилки провайдера не записуються.</p>
+<p>Довша, обережна версія — це <a href="/kirk/privacy">політика приватності</a>. Запросити його також означає <a href="/kirk/terms">умови</a>.</p></div>
+</section>
+<section class="chapter" id="faq">
+<header class="chapter-h"><span class="num">05</span><h2>те, що справді питають</h2></header>
+<div class="faq">
+<details><summary>Він відповідає на кожне повідомлення?</summary><p>Ні. Згадай його, коли хочеш відповідь. Він справді тримає короткий недавній рядок із каналу, щоб не бути наосліп, коли ти згадаєш. Особисті — лише якщо оператор їх увімкнув. Інші боти ніколи не отримують відповіді.</p></details>
+<details><summary>Чому не відповів?</summary><p>Перевір, що ти його справді згадав. Дай хвилину — він показує typing, поки працює. Глянь на ліміти й очікування команд вище. Інших ботів ігнорує навмисне.</p></details>
+<details><summary>Можна змінити, як він звучить?</summary><p>Так. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> або <code>!persona normal</code>. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> повертає його.</p></details>
+<details><summary>Музика справді грає?</summary><p>Так. Заходить у твій голосовий канал і стрімить трек. Без плейлистів, без черги наступних десяти пісень. Треба бути у voice, і йому потрібні Connect і Speak там.</p></details>
+<details><summary>Можна довіряти кожній відповіді?</summary><p>Ні. Може бути впевненим і все одно помилятись. Якщо щось важливе — перевір сам або запитай людину.</p></details>
+<details><summary>Де сказати, що щось зламалось?</summary><p><a href="https://discord.gg/CNbpwtE9HS">Discord-сервер</a> або людина, яка його зробила: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Скажи, що пробував і що сталось. Будь ласка, не кидай токени чи приватні чати в публічний канал.</p></details>
+</div>
+</section>
+<section class="chapter" id="setup">
+<header class="chapter-h"><span class="num">06</span><h2>або запусти сам</h2></header>
+<p>owaua з відкритим кодом. Потрібні Python 3.11+, Message Content Intent Discord, ключі провайдера, і Linux плюс FFmpeg, якщо хочеш музику. Далі — просто розмова.</p>
+<div class="actions">
+<a class="btn" href="https://github.com/zeousky/owaua">подивитись код</a>
+<a class="btn ghost contact-link" href="mailto:ckazros@owaua.com" data-contact-email="ckazros@owaua.com">написати тому, хто його зробив</a>
+</div>
+</section>
+<footer class="colophon">
+<p>© 2026 owaua</p>
+<nav aria-label="Підвал">
+<a href="#what">що вміє</a>
+<a href="#commands">команди</a>
+<a href="/kirk/privacy">приватність</a>
+<a href="/kirk/terms">умови</a>
+<a href="/kirk/partnerships">партнери</a>
+<a href="https://discord.gg/CNbpwtE9HS">Discord</a>
+<a href="https://github.com/zeousky/owaua">GitHub</a>
+<a href="https://github.com/zeousky/owaua/blob/main/LICENSE">MIT</a>
+<a href="mailto:ckazros@owaua.com">контакт</a>
+</nav>
+</footer>
+</main>
+</div>
+</body>
+</html>
