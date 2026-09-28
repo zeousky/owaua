@@ -21,7 +21,7 @@ if [[ ! -f "$OWAUA_DEPLOY_SCRIPT" ]]; then
   exit 1
 fi
 
-PERSONA_MODELS="${*:-rudeish nerdish flirty chaotic}"
+PERSONA_MODELS="${*:-rudeish nerdish flirty irritating}"
 
 ROOT_DIR="$ROOT_DIR" OWAUA_DEPLOY_SCRIPT="$OWAUA_DEPLOY_SCRIPT" PERSONA_MODELS="$PERSONA_MODELS" python3 - <<'PY'
 import hashlib
@@ -33,17 +33,27 @@ from pathlib import Path
 root = Path(os.environ["ROOT_DIR"])
 deploy_path = Path(os.environ["OWAUA_DEPLOY_SCRIPT"])
 model_files = {
-    "rudeish": "personas/rudeish.txt",
+    "rudeish-low": "personas/rudeish-low.txt",
+    "rudeish-medium": "personas/rudeish-medium.txt",
+    "rudeish-high": "personas/rudeish-high.txt",
     "nerdish": "personas/nerdish.txt",
     "flirty": "personas/flirty.txt",
-    "chaotic": "personas/chaotic.txt",
+    "irritating": "personas/irritating.txt",
     "cute": "personas/cute.txt",
+    "normal": "personas/normal.txt",
 }
+rudeish_level_models = ("rudeish-low", "rudeish-medium", "rudeish-high")
 requested = os.environ["PERSONA_MODELS"].replace(",", " ").replace("/", " ").split()
 models = []
 for model in requested:
     model = model.lower()
     if model == "and":
+        continue
+    if model == "rudeish":
+        # Bare "rudeish" keeps the old command working and updates every level.
+        for level_model in rudeish_level_models:
+            if level_model not in models:
+                models.append(level_model)
         continue
     if model not in model_files:
         valid = ", ".join(model_files)

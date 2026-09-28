@@ -43,7 +43,7 @@ runtime_package_files = {
     Path("src/owaua") / name
     for name in (
         "__init__.py", "ask.py", "bot.py", "cloudflare.py", "media_exec.py",
-        "memory.py", "music.py", "music_worker.py", "security.py",
+        "memory.py", "music.py", "music_worker.py", "security.py", "sefbot_host.py",
     )
 }
 runtime_script_files = {Path("scripts/check-runtime.py"), Path("scripts/run-bots.sh")}
@@ -51,11 +51,14 @@ required_runtime = {
     *runtime_root_files,
     *runtime_package_files,
     *runtime_script_files,
-    Path("personas/rudeish.txt"),
+    Path("personas/rudeish-low.txt"),
+    Path("personas/rudeish-medium.txt"),
+    Path("personas/rudeish-high.txt"),
     Path("personas/nerdish.txt"),
     Path("personas/flirty.txt"),
-    Path("personas/chaotic.txt"),
+    Path("personas/irritating.txt"),
     Path("personas/cute.txt"),
+    Path("personas/normal.txt"),
     Path("requirements.txt"),
     Path("scripts/run-bots.sh"),
     Path("scripts/check-runtime.py"),
@@ -82,10 +85,50 @@ if missing_runtime:
         + ", ".join(sorted(map(str, missing_runtime)))
     )
 
-print(f"Daki runtime manifest: {len(files)} files")
+sefbot_root = Path(
+    os.environ.get("SEFBOT_ROOT", Path.home() / "Downloads" / "opsef" / "ai-bot")
+)
+sefbot_uploads: list[tuple[Path, str]] = []
+if not (sefbot_root / "src" / "host-stdio.js").is_file():
+    raise RuntimeError(f"sefbot engine is missing: {sefbot_root}")
+for directory in ("src", "personas", "assets"):
+    base = sefbot_root / directory
+    if not base.is_dir():
+        continue
+    for path in sorted(base.rglob("*")):
+        if not path.is_file():
+            continue
+        if any(part.startswith(".") for part in path.relative_to(sefbot_root).parts):
+            continue
+        if path.stat().st_size > 5 * 1024 * 1024:
+            continue
+        sefbot_uploads.append((path, f"sefbot/{path.relative_to(sefbot_root).as_posix()}"))
+for name in ("package.json", "package-lock.json"):
+    path = sefbot_root / name
+    if not path.is_file():
+        raise RuntimeError(f"sefbot engine is missing {name}")
+    sefbot_uploads.append((path, f"sefbot/{name}"))
+required_sefbot = {
+    "sefbot/src/host-stdio.js",
+    "sefbot/src/host.js",
+    "sefbot/src/incoming.js",
+    "sefbot/package.json",
+    "sefbot/package-lock.json",
+}
+missing_sefbot = required_sefbot - {remote for _, remote in sefbot_uploads}
+if missing_sefbot:
+    raise RuntimeError(
+        "sefbot engine upload is incomplete; missing: "
+        + ", ".join(sorted(missing_sefbot))
+    )
+
+uploads = [(path, path.relative_to(root).as_posix()) for path in files]
+uploads.extend(sefbot_uploads)
+
+print(f"Daki runtime manifest: {len(uploads)} files")
 if os.getenv("OWAUA_DAKI_DRY_RUN", "0").strip().lower() in {"1", "true", "yes", "on"}:
-    for path in files:
-        print(f"  {path.relative_to(root)}")
+    for _, remote in uploads:
+        print(f"  {remote}")
     raise SystemExit(0)
 
 loader = importlib.machinery.SourceFileLoader("daki_deploy", str(deploy_path))
@@ -111,8 +154,7 @@ if state != "offline":
             raise RuntimeError("Bot did not stop; no runtime files were replaced")
         time.sleep(2)
 
-for local_path in files:
-    relative_path = local_path.relative_to(root).as_posix()
+for local_path, relative_path in uploads:
     remote_path = f"persona-test-bot/{relative_path}"
     payload = local_path.read_bytes()
     client.write_file(remote_path, payload)

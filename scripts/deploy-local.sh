@@ -29,7 +29,7 @@ echo "Verifying local runtime with $(basename "$ENV_FILE")..."
 OWAUA_ENV_FILE="$ENV_FILE" "$PYTHON" -m py_compile \
   src/owaua/ask.py src/owaua/bot.py src/owaua/cloudflare.py \
   src/owaua/memory.py src/owaua/music.py src/owaua/security.py \
-  src/owaua/music_worker.py src/owaua/media_exec.py
+  src/owaua/music_worker.py src/owaua/media_exec.py src/owaua/sefbot_host.py
 
 if [[ "${OWAUA_RUN_LOCAL_TESTS:-0}" == "1" ]]; then
   OWAUA_ENV_FILE="$ENV_FILE" OWAUA_LOCAL_ONLY=0 \

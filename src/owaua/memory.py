@@ -213,7 +213,7 @@ class MemoryStore:
         expected_generation: tuple[str, str] | None = None,
         server_id: str = "",
     ) -> None:
-        """Charge before sending against the user's rolling request budget."""
+        """Record an API request; rejects only on pause, erasure, or duplicate."""
         with self._lock, self._managed_connection() as db:
             db.execute("BEGIN IMMEDIATE")
             if expected_generation is not None and self._generation(db, user_id, server_id) != expected_generation:
@@ -223,20 +223,7 @@ class MemoryStore:
                 raise BudgetExceeded("AI requests are paused by the owner")
             if db.execute("SELECT 1 FROM api_usage WHERE event_id=?", (event_id,)).fetchone():
                 raise DuplicateRequest("Already charged this event")
-            latest = db.execute(
-                "SELECT max(created_at) AS last_time FROM api_usage WHERE user_id=?",
-                (user_id,),
-            ).fetchone()["last_time"]
-            current = max(time.time() if now is None else now, latest or 0)
-            used = db.execute(
-                "SELECT count(*) FROM api_usage WHERE user_id=? AND created_at>?",
-                (user_id, current - limits.window_seconds),
-            ).fetchone()[0]
-            if used >= limits.per_user:
-                raise BudgetExceeded(
-                    "AI request budget reached; try later or DM ckazros or email "
-                    "ckazros@owaua.com to request more usage"
-                )
+            current = time.time() if now is None else now
             db.execute("INSERT INTO api_usage VALUES (?, ?, ?, ?)", (event_id, user_id, guild_id, current))
 
     def ensure_active_turn(
@@ -485,6 +472,14 @@ class MemoryStore:
                 "DELETE FROM messages WHERE server_id = ?", (server_id,)
             )
             db.execute("DELETE FROM channel_lines WHERE server_id = ?", (server_id,))
+            return cursor.rowcount
+
+    def reset_guild_api_usage(self, guild_id: str) -> int:
+        """Delete all api_usage rows for a guild, resetting its rolling quota."""
+        with self._lock, self._managed_connection() as db:
+            cursor = db.execute(
+                "DELETE FROM api_usage WHERE guild_id = ?", (guild_id,)
+            )
             return cursor.rowcount
 
     def reset_server_data(self, server_id: str) -> int:

@@ -16,12 +16,14 @@ email `ckazros@owaua.com`. (This will give me more motivation)
 `!help` prints these. 25 second cooldown.
 
 - `!persona rudeish low|medium|high` (or `nerdish|flirty|irritating|cute|normal`)
+- `!persona random` — pick a hidden persona at random; the bot won't say which
 - `!human on|off` — the person-in-the-room voice (off by default), or the usual hangout-bot voice
 - `!language <full name>|reset` — this server's reply language (Manage Server)
 - `!music help`
 - `!memory erase` — erase server memory (Manage Server)
 - `!memory erase mine`
 - `!reset all` — reset this bot in this server (Manage Server)
+- `!switch bot` — run sefbot in this server only, or switch back (Manage Server)
 - `!owner's note`
 
 Please don't burn the API. Every reply costs real money. Looping it, farming
@@ -29,7 +31,7 @@ it, huge pastes, jailbreaks, and other token-wasting junk is abuse. We can
 ignore you, wipe memory, or pull the bot without warning. Blocked users only
 get Groq's GPT OSS 20B.
 
-MIT.
+MIT — see [LICENSE](LICENSE).
 
 Thanks [@Perplexity](https://github.com/perplexityai) for the Agent API
 

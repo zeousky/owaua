@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from ask import AssistantReply
+from ask import AssistantReply, RANDOM_PERSONA_CHOICES
 from bot import (
     DISCORD_MESSAGE_LIMIT,
     FULL_MODE_ALLOWED_USER_IDS,
@@ -133,7 +133,8 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, [HELP_TEXT])
         self.assertEqual(channel.send_kwargs[0].get("suppress_embeds"), True)
         self.assertNotIn("!active", channel.sent[0])
-        self.assertIn("!persona rudeish|nerdish|flirty|chaotic", channel.sent[0])
+        self.assertIn("!persona rudeish low|medium|high", channel.sent[0])
+        self.assertIn("nerdish|flirty|irritating|cute|normal", channel.sent[0])
         self.assertIn("!human on|off", channel.sent[0])
         self.assertNotIn("host default", channel.sent[0])
         self.assertIn("!owner's note", channel.sent[0])
@@ -827,6 +828,75 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, ["persona: nerdish"])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "nerdish")
 
+    async def test_rudeish_levels_can_be_selected(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("!persona rudeish high", 1, channel))
+
+        self.assertEqual(channel.sent, ["persona: rudeish high"])
+        self.assertEqual(
+            self.store.get_setting("persona:user:33", "rudeish"), "rudeish-high"
+        )
+
+        self.bot.command_used.clear()
+        await self.bot.on_message(make_message("!persona rudeish-low", 2, channel))
+
+        self.assertEqual(channel.sent[-1], "persona: rudeish low")
+        self.assertEqual(
+            self.store.get_setting("persona:user:33", "rudeish"), "rudeish-low"
+        )
+
+    async def test_bare_rudeish_defaults_to_the_medium_level(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("!persona rudeish", 1, channel))
+
+        self.assertEqual(channel.sent, ["persona: rudeish medium"])
+        self.assertEqual(
+            self.store.get_setting("persona:user:33", "rudeish"), "rudeish-medium"
+        )
+
+    async def test_persona_random_hides_the_persona_it_chooses(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("!persona random", 1, channel))
+
+        self.assertEqual(channel.sent, ["persona: random"])
+        self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "random")
+        chosen = self.store.get_setting("persona_random:user:33")
+        self.assertIn(chosen, RANDOM_PERSONA_CHOICES)
+
+        message = make_message("hi", 2, channel)
+        self.assertEqual(self.bot.persona_for(channel, message), chosen)
+        # The pick is locked in and stays the same across messages.
+        self.assertEqual(self.bot.persona_for(channel, message), chosen)
+
+        self.bot.command_used.clear()
+        await self.bot.on_message(make_message("!persona", 3, channel))
+        self.assertEqual(channel.sent[-1], "persona: random")
+
+    async def test_persona_random_reports_when_no_provider_is_configured(self) -> None:
+        channel = FakeChannel()
+
+        with (
+            patch("ask.LOCAL_AI_ONLY", False),
+            patch("ask.PERPLEXITY_API_KEY", ""),
+            patch("ask.GROQ_API_KEY", ""),
+        ):
+            await self.bot.on_message(make_message("!persona random", 1, channel))
+
+        self.assertEqual(channel.sent, ["perplexity is not configured"])
+        self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
+        self.assertEqual(self.store.get_setting("persona_random:user:33"), "")
+
+    async def test_unknown_rudeish_level_prints_usage(self) -> None:
+        channel = FakeChannel()
+
+        await self.bot.on_message(make_message("!persona rudeish louder", 1, channel))
+
+        self.assertIn("!persona rudeish low|medium|high", channel.sent[0])
+        self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
+
     async def test_host_default_persona_command_is_gone(self) -> None:
         channel = FakeChannel()
         await self.bot.on_message(make_message("!persona host default", 1, channel))
@@ -1434,7 +1504,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         await self.bot.on_message(make_message("!help", 1, channel))
         await self.bot.on_message(make_message("!persona", 2, channel))
 
-        self.assertEqual(channel.sent, [HELP_TEXT, "persona: rudeish"])
+        self.assertEqual(channel.sent, [HELP_TEXT, "persona: rudeish medium"])
 
     async def test_command_cooldown_is_per_user(self) -> None:
         channel = FakeChannel()

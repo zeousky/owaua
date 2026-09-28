@@ -26,13 +26,14 @@ else
   "$PYTHON" -m pip check
 fi
 chmod 600 "$ENV_FILE"
-if [[ "${OWAUA_LOCAL_ONLY:-$(grep -E '^OWAUA_LOCAL_ONLY=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)}" =~ ^(1|true|yes|on)$ ]]; then
+LOCAL_ONLY=$(grep -E '^OWAUA_LOCAL_ONLY=' "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)
+if [[ "$LOCAL_ONLY" =~ ^(1|true|yes|on)$ ]]; then
   OWAUA_ENV_FILE="$ENV_FILE" "$ROOT_DIR/scripts/start-local-ai.sh"
 fi
 if [[ "${OWAUA_VERIFY_DEPLOY:-0}" == "1" ]]; then
   "$PYTHON" scripts/check-runtime.py
   PYTHONPATH="$ROOT_DIR/src/owaua:$ROOT_DIR/tests" "$PYTHON" -m unittest -q \
-    test_ask test_bot_helpers test_channel_commands test_cloudflare \
+    test_ask test_bot_helpers test_channel_commands test_switch_bot test_cloudflare \
     test_memory test_music_attachments test_security
   echo "OWAUA_DEPLOY_TESTS_PASSED"
 fi

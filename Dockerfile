@@ -3,6 +3,7 @@ FROM python:3.12-slim
 LABEL org.opencontainers.image.title="Owaua Discord bot"
 LABEL org.opencontainers.image.description="Persona-driven Discord hangout bot"
 LABEL org.opencontainers.image.source="https://github.com/zeousky/owaua"
+LABEL org.opencontainers.image.licenses="MIT"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

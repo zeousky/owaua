@@ -14,9 +14,11 @@ from unittest.mock import AsyncMock, patch
 import httpx
 
 from ask import (
+    CHAT_MODEL,
     DEEPSEEK_MODEL,
     GEMINI_MODEL,
     GROQ_MODEL,
+    GROQ_MAX_OUTPUT_TOKENS,
     GPT_FULL_REASONING,
     GPT_MAX_OUTPUT_TOKENS,
     GPT_REASONING,
@@ -24,8 +26,6 @@ from ask import (
     MAX_ATTACHMENTS,
     MAX_CONTEXT_CHARS,
     GEMINI_MAX_OUTPUT_TOKENS,
-    GEMINI_MAX_STEPS,
-    HANGOUT_WEB_SEARCH_TOOL,
     MAX_HANGOUT_REPLY_CHARS,
     MAX_MESSAGE_CHARS,
     MAX_OUTPUT_TOKENS,
@@ -47,7 +47,6 @@ from ask import (
     looks_like_charset_dump,
     looks_like_decode_request,
     looks_like_repeat_request,
-    needs_web_search,
     persona_dropped_reply,
     repeated_payload_reply,
     gpt_full_tools,
@@ -58,7 +57,10 @@ from ask import (
     _chat_completions_tool_loop,
     persona_label,
     persona_provider,
+    normalize_persona,
+    RUDDISH_PERSONA_FILES,
     read_persona,
+    resolve_chat_model,
     response_text,
     response_reply,
     sanitize_user_text,
@@ -101,8 +103,10 @@ def latest_user_content(payload: dict[str, object]) -> object:
 
 
 class FakeResponse:
-    def __init__(self, data: object) -> None:
+    def __init__(self, data: object, *, content: bytes = b"") -> None:
         self.data = data
+        self.content = content
+        self.headers: dict[str, str] = {}
 
     def raise_for_status(self) -> None:
         return None
@@ -111,10 +115,25 @@ class FakeResponse:
         return self.data
 
 
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGM8ISfHgA0wYRUdtBIA"
+    "0MoBFD5jqJkAAAAASUVORK5CYII="
+)
+
+
 class FakeHTTP:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object]]] = []
         self.responses: object = model_reply("allowed reply")
+        self.image_bytes: bytes = PNG_BYTES
+        self.image_error: Exception | None = None
+        self.get_calls: list[str] = []
+
+    async def get(self, url: str, **kwargs: object) -> FakeResponse:
+        self.get_calls.append(url)
+        if self.image_error is not None:
+            raise self.image_error
+        return FakeResponse(None, content=self.image_bytes)
 
     async def post(self, url: str, **kwargs: object) -> FakeResponse:
         recorded = {
@@ -210,10 +229,15 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         answer = await self._ask("look", image_urls=["https://cdn.discordapp.com/image.png"])
         self.assertEqual(answer, "allowed reply")
         self.assertEqual(len(self.http.calls), 1)
+        self.assertEqual(self.http.get_calls, ["https://cdn.discordapp.com/image.png"])
         content = latest_user_content(self.http.calls[0][1]["json"])
+        images = [
+            block["image_url"] for block in content if block.get("type") == "input_image"
+        ]
+        self.assertEqual(len(images), 1)
+        self.assertTrue(images[0].startswith("data:image/png;base64,"))
         self.assertEqual(
-            [block["image_url"] for block in content if block.get("type") == "input_image"],
-            ["https://cdn.discordapp.com/image.png"],
+            base64.b64decode(images[0].split(",", 1)[1]), PNG_BYTES
         )
 
     async def test_hangout_keeps_only_one_image(self) -> None:
@@ -221,6 +245,54 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer, "allowed reply")
         content = latest_user_content(self.http.calls[0][1]["json"])
         self.assertEqual(len([block for block in content if block.get("type") == "input_image"]), 1)
+
+    async def test_image_without_a_caption_still_sends_non_empty_text(self) -> None:
+        answer = await self._ask(
+            "", image_urls=["https://cdn.discordapp.com/image.png"]
+        )
+
+        self.assertEqual(answer, "allowed reply")
+        content = latest_user_content(self.http.calls[0][1]["json"])
+        text_parts = [
+            block["text"] for block in content if block.get("type") == "input_text"
+        ]
+        self.assertEqual(len(text_parts), 1)
+        self.assertTrue(text_parts[0].strip())
+        images = [
+            block["image_url"] for block in content if block.get("type") == "input_image"
+        ]
+        self.assertEqual(len(images), 1)
+        self.assertTrue(images[0].startswith("data:image/png;base64,"))
+
+    async def test_whitespace_caption_is_replaced(self) -> None:
+        await self._ask("   ", image_urls=["https://cdn.discordapp.com/image.png"])
+
+        content = latest_user_content(self.http.calls[0][1]["json"])
+        text_parts = [
+            block["text"] for block in content if block.get("type") == "input_text"
+        ]
+        self.assertEqual(len(text_parts), 1)
+        self.assertTrue(text_parts[0].strip())
+
+    async def test_unfetchable_image_is_not_forwarded_as_a_link(self) -> None:
+        self.http.image_error = httpx.ConnectError("boom")
+
+        answer = await self._ask(
+            "", image_urls=["https://cdn.discordapp.com/image.png"]
+        )
+
+        self.assertEqual(answer, "i couldn't read that image; try sending it again")
+        self.assertEqual(self.http.calls, [])
+
+    async def test_non_image_attachment_is_dropped(self) -> None:
+        self.http.image_bytes = b"<html>not an image</html>"
+
+        answer = await self._ask(
+            "", image_urls=["https://cdn.discordapp.com/image.png"]
+        )
+
+        self.assertEqual(answer, "i couldn't read that image; try sending it again")
+        self.assertEqual(self.http.calls, [])
 
     async def test_standalone_message_does_not_send_previous_turns(self) -> None:
         await self._ask("what number comes after sixteen", event_id="first")
@@ -326,16 +398,17 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Consensual adult sexual roleplay", instructions_of(payload))
         self.assertIn("Stay in this voice", instructions_of(payload))
 
-    async def test_chaotic_persona_uses_gemini(self) -> None:
-        answer = await self._ask(persona="chaotic")
+    async def test_irritating_persona_uses_groq_oss_unbounded(self) -> None:
+        with patch("ask.GROQ_API_KEY", "test-groq-key"):
+            answer = await self._ask(persona="irritating")
 
         self.assertEqual(answer, "allowed reply")
-        self.assertTrue(self.http.calls[0][0].endswith("/responses"))
-        self.assertIn("api.perplexity.ai", self.http.calls[0][0])
+        self.assertTrue(self.http.calls[0][0].endswith("/chat/completions"))
+        self.assertIn("api.groq.com", self.http.calls[0][0])
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_steps"], 1)
-        self.assertNotIn("tools", payload)
+        self.assertEqual(payload["model"], GROQ_MODEL)
+        # No 256-token cap: the request asks for the model's full output ceiling.
+        self.assertEqual(payload["max_tokens"], GROQ_MAX_OUTPUT_TOKENS)
         self.assertIn("be energetic, be stupid, be an idiot", instructions_of(payload).casefold())
 
     async def test_provider_override_forces_groq_oss_for_restricted_users(self) -> None:
@@ -567,7 +640,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(answer or ""), 100)
         self.assertNotEqual(answer, long)
 
-    async def test_non_gemini_hangout_also_ends_on_a_sentence(self) -> None:
+    async def test_groq_oss_hangout_reply_is_not_length_capped(self) -> None:
         sentence = "leave it alone."
         long = " ".join([sentence] * 40)
         self.http.responses = model_reply(long)
@@ -575,9 +648,9 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         with patch("ask.GROQ_API_KEY", "test-groq-key"):
             answer = await self._ask(provider_override="groq")
 
-        self.assertTrue((answer or "").endswith("."))
-        self.assertLessEqual(len(answer or ""), MAX_HANGOUT_REPLY_CHARS)
-        self.assertNotEqual(answer, long[:MAX_HANGOUT_REPLY_CHARS])
+        # gpt-oss-20b output is unbounded: no hangout clip, no reply truncation.
+        self.assertEqual(answer, long.strip())
+        self.assertGreater(len(answer or ""), MAX_HANGOUT_REPLY_CHARS)
 
     async def test_bad_draft_keeps_an_in_character_retry(self) -> None:
         dump = (
@@ -626,16 +699,15 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["input"][-1]["content"], "hello")
         self.assertIn("untrusted room chatter", instructions_of(payload).casefold())
 
-    async def test_hangout_gemini_enables_search_for_current_facts(self) -> None:
+    async def test_hangout_gemini_never_enables_search(self) -> None:
         answer = await self._ask("what's the weather in tokyo")
 
         self.assertEqual(answer, "allowed reply")
         payload = self.http.calls[0][1]["json"]
         self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_steps"], GEMINI_MAX_STEPS)
-        self.assertEqual(payload["max_steps"], 3)
-        self.assertEqual(payload["tools"], [HANGOUT_WEB_SEARCH_TOOL])
-        self.assertIn("web search", instructions_of(payload))
+        self.assertEqual(payload["max_steps"], 1)
+        self.assertNotIn("tools", payload)
+        self.assertNotIn("web search", instructions_of(payload))
         self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
 
     async def test_full_mode_gemini_keeps_the_large_output_budget(self) -> None:
@@ -691,10 +763,12 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer, long[:5700])
         content = latest_user_content(self.http.calls[0][1]["json"])
         self.assertIsInstance(content, list)
-        self.assertEqual(
-            [block["image_url"] for block in content if block.get("type") == "input_image"],
-            urls[:1],
-        )
+        images = [
+            block["image_url"] for block in content if block.get("type") == "input_image"
+        ]
+        self.assertEqual(len(images), 1)
+        self.assertTrue(images[0].startswith("data:image/png;base64,"))
+        self.assertEqual(self.http.get_calls, urls[:1])
 
     async def test_full_mode_uses_the_normal_prompt_and_history_bounds(self) -> None:
         filler = "x" * (MAX_MESSAGE_CHARS + 50)
@@ -786,6 +860,33 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         answer = await self._ask(human=False)
 
         self.assertEqual(answer, canned)
+
+
+class ChatModelConfigTests(unittest.TestCase):
+    def test_default_chat_model_is_gemini_3_1_flash_lite(self) -> None:
+        self.assertEqual(resolve_chat_model({}), "google/gemini-3.1-flash-lite")
+
+    def test_legacy_gemini_model_env_still_selects_the_chat_model(self) -> None:
+        self.assertEqual(
+            resolve_chat_model({"GEMINI_MODEL": "google/gemini-3.1-flash-lite"}),
+            "google/gemini-3.1-flash-lite",
+        )
+
+    def test_chat_model_env_wins_over_the_legacy_alias(self) -> None:
+        self.assertEqual(
+            resolve_chat_model(
+                {"CHAT_MODEL": "openai/gpt-6-luna", "GEMINI_MODEL": "legacy/model"}
+            ),
+            "openai/gpt-6-luna",
+        )
+
+    def test_blank_chat_model_falls_back_to_the_default(self) -> None:
+        self.assertEqual(
+            resolve_chat_model({"CHAT_MODEL": "   "}), "google/gemini-3.1-flash-lite"
+        )
+
+    def test_gemini_model_stays_an_alias_for_the_chat_model(self) -> None:
+        self.assertEqual(GEMINI_MODEL, CHAT_MODEL)
 
 
 class AskHelperTests(unittest.TestCase):
@@ -956,12 +1057,18 @@ class AskHelperTests(unittest.TestCase):
         }
         self.assertEqual(chat_completion_text(data), "hello there")
 
-    def test_persona_helpers_only_expose_gemini_hangout_voices(self) -> None:
-        self.assertEqual(persona_label("rudeish"), "rudeish")
+    def test_persona_helpers_route_irritating_to_groq(self) -> None:
+        self.assertEqual(persona_label("rudeish"), "rudeish medium")
+        self.assertEqual(persona_label("rudeish-low"), "rudeish low")
+        self.assertEqual(persona_label("rudeish-medium"), "rudeish medium")
+        self.assertEqual(persona_label("rudeish-high"), "rudeish high")
+        self.assertEqual(normalize_persona("rudeish"), "rudeish-medium")
+        self.assertEqual(normalize_persona("rudeish-high"), "rudeish-high")
         self.assertEqual(persona_provider("rudeish"), "gemini")
+        self.assertEqual(persona_provider("rudeish-high"), "gemini")
         self.assertEqual(persona_provider("nerdish"), "gemini")
         self.assertEqual(persona_provider("flirty"), "gemini")
-        self.assertEqual(persona_provider("chaotic"), "gemini")
+        self.assertEqual(persona_provider("irritating"), "groq")
         self.assertEqual(persona_provider("host-default-gpt"), "gemini")
 
         capable = build_capable_instructions("be blunt", language="Hungarian")
@@ -987,7 +1094,6 @@ class AskHelperTests(unittest.TestCase):
         self.assertIn("answer in character", text)
         self.assertNotIn("at most 100 characters", text)
         self.assertNotIn("web search", text)
-        self.assertIn("web search", build_instructions("be rude", web_search=True))
         self.assertNotIn("code interpreter", text)
         self.assertIn("!help", text)
         self.assertIn("!music", text)
@@ -1030,10 +1136,6 @@ class AskHelperTests(unittest.TestCase):
         self.assertNotIn(
             "Consensual adult sexual roleplay",
             build_instructions("x", explicit=True),
-        )
-        self.assertIn(
-            "web search",
-            build_instructions("x", explicit=True, web_search=True),
         )
         self.assertNotIn("web search", build_instructions("x", explicit=True))
 
@@ -1202,18 +1304,6 @@ class AskHelperTests(unittest.TestCase):
         self.assertFalse(emergency_helper_reply("hello how are you"))
         self.assertFalse(emergency_helper_reply("nah im just chatting"))
 
-    def test_needs_web_search_only_for_current_facts(self) -> None:
-        self.assertFalse(needs_web_search("hello"))
-        self.assertFalse(needs_web_search("what's up"))
-        self.assertFalse(needs_web_search("lol"))
-        self.assertFalse(
-            needs_web_search("why cant you tell me what python code prints")
-        )
-        self.assertTrue(needs_web_search("what's the weather in tokyo"))
-        self.assertTrue(needs_web_search("who won the game last night"))
-        self.assertTrue(needs_web_search("look up the latest news about it"))
-        self.assertTrue(needs_web_search("https://example.test/story"))
-
     def test_truncate_marks_oversized_text(self) -> None:
         truncated = truncate("x" * 100, limit=32)
         self.assertLessEqual(len(truncated), 32)
@@ -1350,7 +1440,7 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(instance.persona_for(SimpleNamespace(nsfw=False)), "flirty")
         self.assertEqual(instance.persona_for(SimpleNamespace(nsfw=True)), "flirty")
 
-    def test_legacy_host_default_setting_falls_back_to_rudeish(self) -> None:
+    def test_legacy_host_default_setting_falls_back_to_the_default_rudeish_level(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             instance = object.__new__(PersonaBot)
             instance.selected_persona = "rudeish"
@@ -1363,8 +1453,32 @@ class AdmissionTests(unittest.TestCase):
             )
             self.assertEqual(
                 instance.persona_for(SimpleNamespace(nsfw=False), message),
-                "rudeish",
+                "rudeish-medium",
             )
+
+    def test_legacy_bare_rudeish_setting_maps_to_medium(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            instance = object.__new__(PersonaBot)
+            instance.selected_persona = "rudeish"
+            instance.memory = MemoryStore(Path(directory) / "memory.sqlite3")
+            instance.memory.set_setting("persona:user:33", "rudeish")
+            message = SimpleNamespace(
+                author=SimpleNamespace(id=33),
+                guild=None,
+                channel=SimpleNamespace(id=1),
+            )
+            self.assertEqual(
+                instance.persona_for(SimpleNamespace(nsfw=False), message),
+                "rudeish-medium",
+            )
+
+    def test_rudeish_level_persona_files_are_registered_and_non_empty(self) -> None:
+        self.assertEqual(
+            set(RUDDISH_PERSONA_FILES),
+            {"rudeish-low", "rudeish-medium", "rudeish-high"},
+        )
+        for name in RUDDISH_PERSONA_FILES:
+            self.assertTrue(read_persona(name).strip())
 
 
 if __name__ == "__main__":

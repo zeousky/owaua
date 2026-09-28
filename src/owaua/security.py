@@ -37,7 +37,7 @@ MAX_TRACKED_USERS = 4096
 
 @dataclass(frozen=True)
 class ApiLimits:
-    per_user: int = limit("API_REQUESTS_PER_USER", 30, 1000)
+    per_user: int = 0
     window_seconds: int = 600
 
 

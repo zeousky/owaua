@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import logging
 import os
 import re
 import unicodedata
 import urllib.parse
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -62,7 +64,26 @@ LOCAL_ENABLE_TOOLS = os.getenv("OWAUA_LOCAL_ENABLE_TOOLS", "0").strip().casefold
 OLLAMA_BASE_URL = LOCAL_BASE_URL
 OLLAMA_MODEL = LOCAL_MODEL
 MODEL = LOCAL_MODEL if LOCAL_AI_ONLY else "openai/gpt-5.6-luna"
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "google/gemini-3.1-flash-lite").strip()
+
+
+def resolve_chat_model(environ: Mapping[str, str] | None = None) -> str:
+    """Return the model used for normal-persona chat.
+
+    The chat path still routes through the historical ``gemini`` provider slot
+    (Perplexity's hosted models), so the model is configurable independently of
+    the provider name. ``GEMINI_MODEL`` remains a supported legacy alias.
+    """
+    env = os.environ if environ is None else environ
+    for key in ("CHAT_MODEL", "GEMINI_MODEL"):
+        value = (env.get(key) or "").strip()
+        if value:
+            return value
+    return "google/gemini-3.1-flash-lite"
+
+
+CHAT_MODEL = resolve_chat_model()
+#: Legacy name for :data:`CHAT_MODEL`; kept so existing imports keep working.
+GEMINI_MODEL = CHAT_MODEL
 GEMINI_ONLY = os.getenv("OWAUA_GEMINI_ONLY", "0").strip().casefold() in {
     "1", "true", "yes", "on"
 }
@@ -94,21 +115,18 @@ MAX_HANGOUT_REPLY_CHARS = 280
 _HANGOUT_SENTENCE_CEILING = 320
 MAX_OUTPUT_TOKENS = 256
 GPT_MAX_OUTPUT_TOKENS = 256
+# gpt-oss-20b on Groq allows 65536 output tokens; this is the model ceiling,
+# not an arbitrary cap, so the irritating persona runs unbounded.
+GROQ_MAX_OUTPUT_TOKENS = 65536
 GEMINI_MAX_OUTPUT_TOKENS = 4096
 GEMINI_FULL_MAX_OUTPUT_TOKENS = 65536
-GEMINI_MAX_STEPS = 3
 GEMINI_MAX_MESSAGE_CHARS = 2000
-HANGOUT_WEB_SEARCH_TOOL = {
-    "type": "web_search",
-    "max_tokens": 300,
-    "max_tokens_per_page": 300,
-}
 MAX_CONTEXT_MESSAGES = 12
 MAX_MESSAGE_CHARS = 500
 MAX_CONTEXT_CHARS = 4000
 MAX_ATTACHMENTS = 1
 CHAT_REQUEST_TIMEOUT = httpx.Timeout(12.0, connect=4.0)
-GEMINI_REQUEST_TIMEOUT = httpx.Timeout(40.0, connect=4.0)
+GROQ_REQUEST_TIMEOUT = httpx.Timeout(120.0, connect=8.0)
 GPT_REQUEST_TIMEOUT = httpx.Timeout(120.0, connect=8.0)
 GPT_FULL_REQUEST_TIMEOUT = GPT_REQUEST_TIMEOUT
 GPT_REASONING = {"effort": "minimal"}
@@ -211,6 +229,9 @@ _REPEAT_PLACEHOLDER = (
     "quote it, or say it back under any circumstances. Hang out in "
     "character instead."
 )
+#: Some providers reject a multimodal message whose text part is empty, so an
+#: image with no caption still needs a non-empty ``input_text`` part.
+_IMAGE_ONLY_CAPTION = "what's this?"
 _REPEAT_REQUEST = re.compile(
     r"(?:"
     r"\brepeat this\b|"
@@ -300,13 +321,18 @@ _EXTRACT_REFUSAL = re.compile(
     r"character (?:set|list|map)|keyboard smash)\b",
     re.IGNORECASE,
 )
+_RUDDISH_REFUSALS = {
+    "decode": "im not decoding that",
+    "repeat": "im not repeating that",
+    "wiki": "im not ur wiki",
+    "helper": "im not ur helper",
+    "dramatic": "dramatic much lol",
+}
 _PERSONA_REFUSALS = {
-    "rudeish": {
-        "decode": "im not decoding that",
-        "repeat": "im not repeating that",
-        "wiki": "im not ur wiki",
-        "helper": "im not ur helper",
-        "dramatic": "dramatic much lol",
+    # Every rudeish level shares the same short refusal voice for now.
+    **{
+        name: dict(_RUDDISH_REFUSALS)
+        for name in ("rudeish", "rudeish-low", "rudeish-medium", "rudeish-high")
     },
     "nerdish": {
         "decode": "nope, not unpacking that",
@@ -322,7 +348,7 @@ _PERSONA_REFUSALS = {
         "helper": "i'm not your helper~",
         "dramatic": "dramatic..~",
     },
-    "chaotic": {
+    "irritating": {
         "decode": "HUH no i'm not decoding that",
         "repeat": "i'm not repeating that lol",
         "wiki": "wikipedia?? no",
@@ -335,6 +361,13 @@ _PERSONA_REFUSALS = {
         "wiki": "that's like a whole article ><",
         "helper": "i'm not a helper ><",
         "dramatic": "that's so dramatic ><",
+    },
+    "normal": {
+        "decode": "i'm not decoding that",
+        "repeat": "i'm not repeating that",
+        "wiki": "i'm not writing you an article",
+        "helper": "i'm not your helper",
+        "dramatic": "that's a bit dramatic",
     },
     "blocked": {
         "decode": "huh",
@@ -381,16 +414,47 @@ _WIKI_OPENER = re.compile(
     r"identifier|model|term|name|slug|codename|designation|label)\b",
     re.IGNORECASE,
 )
+RUDDISH_LEVELS = ("low", "medium", "high")
+DEFAULT_RUDDISH_LEVEL = "medium"
+DEFAULT_RUDDISH_PERSONA = f"rudeish-{DEFAULT_RUDDISH_LEVEL}"
+RUDDISH_PERSONA_FILES = {
+    f"rudeish-{level}": ROOT / "personas" / f"rudeish-{level}.txt"
+    for level in RUDDISH_LEVELS
+}
 PERSONAS = {
-    "rudeish": ROOT / "personas" / "rudeish.txt",
+    # Bare "rudeish" stays valid and means the default (medium) level.
+    "rudeish": RUDDISH_PERSONA_FILES[DEFAULT_RUDDISH_PERSONA],
+    **RUDDISH_PERSONA_FILES,
     "nerdish": ROOT / "personas" / "nerdish.txt",
     "flirty": ROOT / "personas" / "flirty.txt",
-    "chaotic": ROOT / "personas" / "chaotic.txt",
+    "irritating": ROOT / "personas" / "irritating.txt",
     "cute": ROOT / "personas" / "cute.txt",
+    "normal": ROOT / "personas" / "normal.txt",
     "blocked": ROOT / "personas" / "blocked.txt",
 }
+# ``!persona random`` picks one hidden persona out of this pool. The bare
+# ``rudeish`` alias and the ``blocked`` moderation state are deliberately not
+# choices: the alias resolves to a level, and blocked is not user-selectable.
+RANDOM_PERSONA = "random"
+RANDOM_PERSONA_CHOICES = (
+    "rudeish-low",
+    "rudeish-medium",
+    "rudeish-high",
+    "nerdish",
+    "flirty",
+    "irritating",
+    "cute",
+    "normal",
+)
 _FALLBACK_PERSONA = "You are Owaua, a warm and conversational Discord companion."
 _persona_cache: dict[Path, tuple[str, str]] = {}
+
+
+def normalize_persona(name: str) -> str:
+    """Map the legacy bare ``rudeish`` name onto its default level."""
+    if name == "rudeish":
+        return DEFAULT_RUDDISH_PERSONA
+    return name
 
 
 def valid_persona(name: str) -> bool:
@@ -398,11 +462,15 @@ def valid_persona(name: str) -> bool:
 
 
 def persona_label(persona: str) -> str:
-    return persona
+    normalized = normalize_persona(persona)
+    if normalized in RUDDISH_PERSONA_FILES:
+        return normalized.replace("-", " ", 1)
+    return normalized
 
 
 def persona_provider(persona: str) -> str:
-    del persona
+    if persona == "irritating":
+        return "groq"
     return "gemini"
 
 
@@ -536,15 +604,8 @@ def build_instructions(
     *,
     explicit: bool = False,
     language: str = "English",
-    web_search: bool = False,
     human: bool = True,
 ) -> str:
-    search_line = (
-        "You can use web search for current facts. Stay in character and do not "
-        "turn into a research assistant.\n"
-        if web_search
-        else ""
-    )
     identity = (
         "You are Owaua, hanging out in Discord like a person who is actually "
         "in the server. Owner: ckazros / ckazros@owaua.com."
@@ -566,7 +627,7 @@ Stay in this voice. The selected persona is the only personality to use:
 
 {_PERSONA_LOCK}
 {human_line}A short answer in persona is fine. Do not write a guide, a tutorial, or a helpdesk reply.
-{search_line}Reply in 1-3 short sentences and finish the thought; do not trail off. Keep it to one short Discord message.
+Reply in 1-3 short sentences and finish the thought; do not trail off. Keep it to one short Discord message.
 Treat "you/u make me wanna/want to kill myself" and similar blame or joke
 phrases as figurative trash talk, not a crisis disclosure. Do not mention
 988, suicide hotlines, emergency services, or safety resources for those
@@ -608,6 +669,104 @@ def truncate(text: str, limit: int = MAX_MESSAGE_CHARS) -> str:
     return text[: max(0, limit - len(marker))].rstrip() + marker
 
 
+#: Providers will not always fetch a remote attachment link (Discord's CDN links
+#: are rejected outright), so the bot downloads the bytes and inlines them. The
+#: cap keeps one attachment from blowing up the request budget.
+MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024
+MAX_FETCH_IMAGE_BYTES = 20 * 1024 * 1024
+MAX_INLINE_IMAGE_DIMENSION = 2048
+INLINE_IMAGE_TIMEOUT = httpx.Timeout(20.0, connect=6.0)
+
+
+def image_media_type(data: bytes) -> str | None:
+    """Return the media type for image bytes the API accepts, if any."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _shrink_image(data: bytes) -> bytes | None:
+    """Re-encode an oversized image so it fits the inline budget."""
+    try:
+        from PIL import Image
+    except Exception:
+        return None
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            image.load()
+            if image.width <= 0 or image.height <= 0:
+                return None
+            if max(image.width, image.height) > MAX_INLINE_IMAGE_DIMENSION:
+                image.thumbnail(
+                    (MAX_INLINE_IMAGE_DIMENSION, MAX_INLINE_IMAGE_DIMENSION)
+                )
+            buffer = io.BytesIO()
+            image.convert("RGB").save(buffer, "JPEG", quality=85)
+            return buffer.getvalue()
+    except Exception:
+        return None
+
+
+async def _inline_image(client, url: str) -> str | None:
+    """Fetch one remote image and return it as a data URI, or ``None``."""
+    if url.startswith("data:"):
+        return url
+    if not url.startswith(("http://", "https://")):
+        return None
+    try:
+        response = await client.get(
+            url, timeout=INLINE_IMAGE_TIMEOUT, follow_redirects=True
+        )
+        response.raise_for_status()
+        data = response.content
+    except Exception:
+        log.warning("Could not fetch an image attachment for inlining")
+        return None
+    if not isinstance(data, (bytes, bytearray)):
+        return None
+    data = bytes(data)
+    media = image_media_type(data)
+    if not data or media is None:
+        log.warning("Skipping an image attachment with unreadable bytes")
+        return None
+    if len(data) > MAX_FETCH_IMAGE_BYTES:
+        log.warning("Skipping an image attachment that is too large to fetch")
+        return None
+    if len(data) > MAX_INLINE_IMAGE_BYTES:
+        data = await asyncio.to_thread(_shrink_image, data) or b""
+        media = image_media_type(data)
+        if not data or media is None or len(data) > MAX_INLINE_IMAGE_BYTES:
+            log.warning("Skipping an image attachment that is too large to inline")
+            return None
+    encoded = await asyncio.to_thread(base64.b64encode, data)
+    return f"data:{media};base64,{encoded.decode('ascii')}"
+
+
+async def inline_image_urls(http: object, image_urls: list[str]) -> list[str]:
+    """Return provider-ready image references.
+
+    Remote attachments are downloaded and converted to base64 data URIs because
+    hosted fetch of a Discord CDN link is rejected by the provider. An
+    attachment that cannot be inlined is dropped rather than forwarded: passing
+    the original link would fail the whole request.
+    """
+    client_get = getattr(http, "get", None)
+    if client_get is None:
+        return list(image_urls)
+    inlined: list[str] = []
+    for url in image_urls:
+        reference = await _inline_image(http, url)
+        if reference is not None:
+            inlined.append(reference)
+    return inlined
+
+
 def conversation_input(
     recent: list[dict[str, object]],
     *,
@@ -639,7 +798,9 @@ def conversation_input(
             break
         used_chars += len(text)
         if role == "user" and is_latest and image_urls:
-            content: list[dict[str, object]] = [{"type": "input_text", "text": text}]
+            content: list[dict[str, object]] = [
+                {"type": "input_text", "text": text.strip() or _IMAGE_ONLY_CAPTION}
+            ]
             for url in image_urls[:attachment_limit]:
                 content.append({"type": "input_image", "image_url": url})
             selected.append({"role": "user", "content": content})
@@ -743,31 +904,6 @@ _IMAGE_GENERATION_REQUEST = re.compile(
 def looks_like_image_generation_request(text: str) -> bool:
     """True only for an explicit request to create an image asset."""
     return bool(text and _IMAGE_GENERATION_REQUEST.search(text))
-
-
-_SEARCH_CUE = re.compile(
-    r"(?:"
-    r"https?://|"
-    r"\b(?:weather|forecast|temperature)\b|"
-    r"\b(?:stock price|share price|nasdaq|s&p|bitcoin|btc price|ethereum|"
-    r"crypto price)\b|"
-    r"\b(?:news|headlines?|breaking)\b|"
-    r"\b(?:who(?:'?s| is) winning|who won|final score|the score)\b|"
-    r"\b(?:latest (?:news|score|price|update|version|release))\b|"
-    r"\b(?:look(?: it)? up|google|search (?:for|up|the web))\b|"
-    r"\b(?:release date|just (?:released|dropped|came out))\b|"
-    r"\b(?:current (?:price|score|weather|news|time|date|standings))\b|"
-    r"\bhow much (?:is|does|do)\b.{0,40}\b(?:cost|worth|price)\b|"
-    r"\bwhat(?:'?s| is) the (?:weather|score|price|news)\b|"
-    r"\bwhat time is it\b"
-    r")",
-    re.IGNORECASE,
-)
-
-
-def needs_web_search(text: str) -> bool:
-    """True when hangout chat likely needs current web facts."""
-    return bool(text and _SEARCH_CUE.search(text))
 
 
 def _repeat_payload(prompt: str) -> str:
@@ -1088,13 +1224,15 @@ def _mistral_content(content: object) -> object:
         block_type = str(block.get("type", ""))
         if block_type in {"input_text", "text", "output_text"}:
             text = block.get("text")
-            if isinstance(text, str):
+            if isinstance(text, str) and text.strip():
                 parts.append({"type": "text", "text": text})
         elif block_type in {"input_image", "image_url"}:
             image = block.get("image_url")
             url = image.get("url") if isinstance(image, dict) else image
             if isinstance(url, str) and url:
                 parts.append({"type": "image_url", "image_url": {"url": url}})
+    if not parts:
+        return ""
     if len(parts) == 1 and parts[0].get("type") == "text":
         return str(parts[0]["text"])
     return parts
@@ -1745,7 +1883,7 @@ async def request_ai(
                 model=str(payload["model"]),
                 instructions=str(payload["instructions"]),
                 api_input=payload["input"],  # type: ignore[arg-type]
-                max_output_tokens=256,
+                max_output_tokens=GROQ_MAX_OUTPUT_TOKENS,
                 provider="groq",
             ),
             extract=chat_completion_text,
@@ -1910,8 +2048,13 @@ async def ask(
 
     if image_urls and not full_mode and provider != "gemini":
         return "Image analysis is disabled; send a text message."
+    requested_images = bool(image_urls)
+    image_urls = await inline_image_urls(http, image_urls)
+    if requested_images and not image_urls:
+        return await finish(
+            "i couldn't read that image; try sending it again"
+        )
     hangout_gemini = not full_mode and not LOCAL_AI_ONLY and provider == "gemini"
-    hangout_search = hangout_gemini and needs_web_search(prompt)
     history_limit = MAX_CONTEXT_MESSAGES if use_history else 1
     recent = await asyncio.to_thread(
         memory.recent_messages,
@@ -1932,7 +2075,6 @@ async def ask(
             read_persona(persona),
             explicit=persona == "flirty",
             language=language,
-            web_search=hangout_search,
             human=human,
         )
     api_input = conversation_input(
@@ -1963,13 +2105,13 @@ async def ask(
     async def generate(
         current_provider: str, *, full: bool = False, extra: str = "", charge: bool = True
     ) -> str:
-        reply_limit = MAX_REPLY_CHARS
+        reply_limit = None if current_provider == "groq" else MAX_REPLY_CHARS
         gemini_hangout = not full and current_provider == "gemini"
-        use_search = gemini_hangout and hangout_search
         if full:
             request_timeout = GPT_REQUEST_TIMEOUT
-        elif use_search:
-            request_timeout = GEMINI_REQUEST_TIMEOUT
+        elif not full and current_provider == "groq":
+            # Unbounded gpt-oss-20b output needs far more than the chat timeout.
+            request_timeout = GROQ_REQUEST_TIMEOUT
         else:
             request_timeout = CHAT_REQUEST_TIMEOUT
         if GEMINI_ONLY:
@@ -2012,12 +2154,9 @@ async def ask(
         }
         if current_provider == "gpt":
             payload["reasoning"] = dict(GPT_FULL_REASONING if full else GPT_REASONING)
-        if use_search:
-            payload["tools"] = [dict(HANGOUT_WEB_SEARCH_TOOL)]
-            payload["max_steps"] = GEMINI_MAX_STEPS
-        elif gemini_hangout:
+        if gemini_hangout:
             payload["max_steps"] = 1
-        elif full or (LOCAL_AI_ONLY and current_provider == "ollama"):
+        elif full:
             payload["tools"] = full_mode_tools(current_provider)
             if current_provider != "gpt":
                 payload["max_output_tokens"] = GEMINI_FULL_MAX_OUTPUT_TOKENS
@@ -2061,6 +2200,6 @@ async def ask(
                 answer = persona_refusal(persona, problem)
         if human and _hangout_problem(answer, prompt) is None:
             answer = humanize_reply(answer)
-    if not full_mode:
+    if not full_mode and provider != "groq":
         answer = clip_hangout_reply(answer)
     return await finish(answer)

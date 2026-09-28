@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import logging
 import os
+import random
 import re
 import time
 from collections import OrderedDict, defaultdict, deque
@@ -30,11 +32,15 @@ from ask import (
     DEEPSEEK_MODEL,
     MISTRAL_MODEL,
     PERSONAS,
+    RANDOM_PERSONA,
+    RANDOM_PERSONA_CHOICES,
+    RUDDISH_LEVELS,
     ask,
     host_model_error,
     full_mode_provider_error,
     looks_like_decode_request,
     looks_like_repeat_request,
+    normalize_persona,
     persona_label,
     persona_provider,
     sanitize_user_text,
@@ -53,6 +59,7 @@ from music import (
     stop_music,
     unrestricted_music_guild,
 )
+from sefbot_host import SefbotHost, SefbotUnavailable
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(os.getenv("OWAUA_ENV_FILE") or ROOT / ".env")
@@ -81,6 +88,7 @@ COMMANDS = frozenset(
         "!pricing",
         "!security",
         "!shutdown",
+        "!switch",
     }
 )
 DISCORD_MESSAGE_LIMIT = 1900
@@ -122,26 +130,28 @@ PROMOTED_FULL_MODE_PROMPT_LIMIT = 8
 HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
-`!persona rudeish|nerdish|flirty|chaotic|cute` — view or switch your persona
+`!persona rudeish low|medium|high` (or `nerdish|flirty|irritating|cute|normal|random`) — view or switch your persona
 `!human on|off` — talk like a person, or use the usual hangout-bot voice
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
 `!memory erase mine` — erase your own conversation history
 `!reset all` — fully reset this bot in this server (Manage Server required)
+`!switch bot` — run sefbot in this server, or switch back (Manage Server)
 
 Each command has a 25s cooldown."""
 
 OWNER_HELP_TEXT = """**Owaua commands**
 `!help` — show this command list
 `!owner's note` — a note from the bot's owner
-`!persona rudeish|nerdish|flirty|chaotic|cute` — view or switch your persona
+`!persona rudeish low|medium|high` (or `nerdish|flirty|irritating|cute|normal|random`) — view or switch your persona
 `!human on|off` — talk like a person, or use the usual hangout-bot voice
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
 `!memory erase mine` — erase your own conversation history
 `!reset all` — fully reset this bot in this server (Manage Server required)
+`!switch bot` — run sefbot in this server, or switch back (Manage Server)
 `!security status|pause|resume` — API usage and emergency pause (bot owner only)
 `!shutdown` — fully stop the bot (bot owner only)
 `!pricing` — show model pricing (bot owner only)
@@ -149,7 +159,7 @@ OWNER_HELP_TEXT = """**Owaua commands**
 Each command has a 25s cooldown."""
 
 MODEL_PRICING = {
-    "openai/gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
+    "openai/gpt-6-luna": (0.10, 0.50, "0.01 cached input"),
     "openai/gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
     "gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
     "anthropic/claude-haiku-4-5": (1.00, 5.00, "provider pricing"),
@@ -175,11 +185,11 @@ def pricing_text() -> str:
     lines = [
         "**Owaua model pricing**",
         "USD per 1M tokens (provider list prices; tools/search may cost extra).",
-        _pricing_line("normal personas / Gemini", GEMINI_MODEL),
+        _pricing_line("normal personas", GEMINI_MODEL),
         _pricing_line("host gpt", MODEL),
         _pricing_line("host deepseek", DEEPSEEK_MODEL),
         _pricing_line("host mistral alias", MISTRAL_MODEL),
-        _pricing_line("chaotic / Groq", GROQ_MODEL),
+        _pricing_line("irritating / Groq", GROQ_MODEL),
     ]
     lines.extend(
         _pricing_line(f"full {provider}", model)
@@ -208,6 +218,25 @@ def is_owner_note_command(content: str) -> bool:
         .split()
     )
     return normalized == "!owner's note"
+
+
+def switch_bot_request(text: str) -> str | None:
+    """How `!switch bot` should change this server, or None when it is not that command."""
+    parts = text.casefold().split()
+    if not parts or parts[0] != "!switch":
+        return None
+    if len(parts) < 2 or parts[1] != "bot":
+        return "usage"
+    if len(parts) == 2:
+        return "toggle"
+    if len(parts) != 3:
+        return "usage"
+    choice = parts[2]
+    if choice in {"sef", "sefbot", "on"}:
+        return "sef"
+    if choice in {"owaua", "off"}:
+        return "owaua"
+    return "usage"
 
 
 def matched_command(text: str) -> str | None:
@@ -290,8 +319,9 @@ def discordify_full_mode_setting_key(user_id: object) -> str:
 
 
 PERSONA_USAGE = (
-    "usage: !persona rudeish, !persona nerdish, !persona flirty, "
-    "!persona chaotic, or !persona cute"
+    "usage: !persona rudeish low|medium|high, !persona nerdish, "
+    "!persona flirty, !persona irritating, !persona cute, !persona normal, "
+    "or !persona random"
 )
 HUMAN_USAGE = "usage: !human on or !human off"
 
@@ -301,6 +331,16 @@ def parse_persona_argument(argument: str) -> tuple[str | None, str | None]:
     text = " ".join(argument.casefold().replace("-", " ").split())
     if not text:
         return None, None
+    if text == RANDOM_PERSONA:
+        return RANDOM_PERSONA, None
+    if text.startswith("rudeish"):
+        if text == "rudeish":
+            # Bare rudeish means the default (medium) level.
+            return normalize_persona(text), None
+        level = text.split(" ", 1)[1] if " " in text else ""
+        if level in RUDDISH_LEVELS:
+            return f"rudeish-{level}", None
+        return None, PERSONA_USAGE
     if text in PERSONAS:
         return text, None
     return None, PERSONA_USAGE
@@ -501,6 +541,15 @@ def persona_setting_key(message: object) -> str:
     return f"persona:user:{getattr(getattr(message, 'author', None), 'id', '')}"
 
 
+def random_persona_setting_key(message: object) -> str:
+    """Return the hidden ``!persona random`` pick for a user.
+
+    It is stored apart from the regular persona setting so that
+    ``!persona`` can never reveal which voice ``random`` chose.
+    """
+    return f"persona_random:user:{getattr(getattr(message, 'author', None), 'id', '')}"
+
+
 def human_setting_key(message: object) -> str:
     """Return the persistent human-voice key for the user issuing a message."""
     return f"human:user:{getattr(getattr(message, 'author', None), 'id', '')}"
@@ -649,23 +698,62 @@ class PersonaBot(discord.Client):
         self.response_languages[scope_key] = language
         self.memory.set_setting(f"response_language:{scope_key}", language)
 
+    def selected_persona_for(self, message: object) -> str:
+        """Return the stored persona choice, preserving the random sentinel."""
+        selected = normalize_persona(
+            self.memory.get_setting(persona_setting_key(message), "rudeish")
+        )
+        if selected == "explicit":
+            selected = "flirty"
+        if selected != RANDOM_PERSONA and not valid_persona(selected):
+            selected = normalize_persona("rudeish")
+        return selected
+
+    def available_random_personas(self) -> tuple[str, ...]:
+        """Return the ``!persona random`` pool whose provider is configured."""
+        available: list[str] = []
+        for name in RANDOM_PERSONA_CHOICES:
+            provider = persona_provider(name)
+            problem = (
+                full_mode_provider_error(provider)
+                if provider == "groq"
+                else host_model_error(provider)
+            )
+            if problem is None:
+                available.append(name)
+        return tuple(available)
+
+    def random_persona_for(self, message: object) -> str:
+        """Resolve the hidden persona locked in by ``!persona random``.
+
+        The pick is stored once and reused, so a random user keeps a stable
+        voice that is never shown back to them.
+        """
+        key = random_persona_setting_key(message)
+        choices = self.available_random_personas()
+        chosen = self.memory.get_setting(key, "")
+        if chosen not in choices:
+            if not choices:
+                return normalize_persona("rudeish")
+            chosen = random.choice(choices)
+            self.memory.set_setting(key, chosen)
+        return chosen
+
     def persona_for(self, channel: object, message: object | None = None) -> str:
-        selected = self.selected_persona
+        selected = normalize_persona(self.selected_persona)
         if selected == "explicit":
             selected = "flirty"
         if message is not None:
             if full_mode_blocked(getattr(getattr(message, "author", None), "id", None)):
                 return "blocked"
-            selected = self.memory.get_setting(persona_setting_key(message), "rudeish")
-            if selected == "explicit":
-                selected = "flirty"
-            if not valid_persona(selected):
-                selected = "rudeish"
+            selected = self.selected_persona_for(message)
+            if selected == RANDOM_PERSONA:
+                selected = self.random_persona_for(message)
         return selected
 
     def human_mode_for(self, message: object) -> bool:
-        """True unless this user has explicitly turned human voice off."""
-        return self.memory.get_setting(human_setting_key(message), "1") != "0"
+        """True only if this user has explicitly turned human voice on."""
+        return self.memory.get_setting(human_setting_key(message), "0") == "1"
 
     @staticmethod
     def can_manage_settings(message: object) -> bool:
@@ -673,6 +761,479 @@ class PersonaBot(discord.Client):
             return True
         permissions = getattr(message.author, "guild_permissions", None)
         return bool(getattr(permissions, "manage_guild", False))
+
+    def sefbot_enabled(self, guild_id: int) -> bool:
+        return self.memory.get_setting(f"bot_engine:{guild_id}", "") == "sef"
+
+    def _sefbot_host(self) -> SefbotHost:
+        host = getattr(self, "sefbot_host", None)
+        if host is None:
+            self.sefbot_host = host = SefbotHost(ROOT, ROOT / "data")
+        if getattr(host, "on_push", None) is None:
+            host.on_push = self._sefbot_push
+        return host
+
+    def _message_ref(self, message: object) -> dict[str, str] | None:
+        message_id = getattr(message, "id", None)
+        channel = getattr(message, "channel", None)
+        channel_id = getattr(channel, "id", None)
+        if message_id is None or channel_id is None:
+            return None
+        return {"messageId": str(message_id), "channelId": str(channel_id)}
+
+    async def _sefbot_push(self, action: dict[str, object]) -> None:
+        try:
+            channel_id = int(str(action.get("channelId") or ""))
+            message_id = int(str(action.get("messageId") or ""))
+        except ValueError:
+            return
+        channel = self.get_channel(channel_id)
+        if channel is None:
+            channel = await self.fetch_channel(channel_id)
+        message = await channel.fetch_message(message_id)
+        text = action.get("content")
+        body = text[:2000] if isinstance(text, str) and text else None
+        embeds = self._sefbot_embeds(action)
+        view = self._sefbot_view(action)
+        kwargs: dict[str, object] = {}
+        if body or not embeds:
+            kwargs["content"] = body or "\u200b"
+        if embeds:
+            kwargs["embeds"] = embeds
+        if view is not None:
+            kwargs["view"] = view
+        await message.edit(**kwargs)
+
+    def _can_switch_bot(self, message: discord.Message) -> bool:
+        if message.author.id in OWNER_IDS:
+            return True
+        return self.can_manage_settings(message)
+
+    async def _prepare_sefbot(self) -> None:
+        """Start the engine in the background so the first switch is not a cold boot."""
+        try:
+            await self._sefbot_host().ensure()
+            log.info("sefbot engine ready")
+        except SefbotUnavailable as exc:
+            log.warning("sefbot engine is not ready: %s", exc)
+        except Exception:
+            log.warning("sefbot engine is not ready", exc_info=True)
+
+    async def _sync_sefbot_commands(self, guild: discord.Guild | None, commands: list[dict[str, object]]) -> None:
+        user = self.user
+        http = getattr(self, "http", None)
+        upsert = getattr(http, "bulk_upsert_guild_commands", None)
+        if user is None or guild is None or not callable(upsert):
+            return
+        await upsert(user.id, guild.id, commands)
+
+    def _sefbot_files(self, action: dict[str, object]) -> list[discord.File]:
+        files: list[discord.File] = []
+        raw_files = action.get("files")
+        if not isinstance(raw_files, list):
+            return files
+        for item in raw_files[:10]:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "file").replace("/", "_").replace("\\", "_")[:80]
+            encoded = item.get("data")
+            if not isinstance(encoded, str) or not encoded:
+                continue
+            try:
+                raw = base64.b64decode(encoded, validate=False)
+            except (ValueError, TypeError):
+                continue
+            if not raw or len(raw) > 8 * 1024 * 1024:
+                continue
+            files.append(discord.File(io.BytesIO(raw), filename=name or "file"))
+        return files
+
+    async def _perform_sefbot_action(
+        self,
+        message: discord.Message,
+        action: dict[str, object],
+        state: dict[str, object],
+    ) -> None:
+        name = action.get("name")
+        if name == "typing":
+            trigger = getattr(message.channel, "trigger_typing", None)
+            if callable(trigger):
+                try:
+                    await trigger()
+                except (discord.HTTPException, discord.Forbidden):
+                    return
+            return
+        if name == "defer":
+            return
+        content = action.get("content")
+        text = content[:2000] if isinstance(content, str) else ""
+        files = self._sefbot_files(action)
+        embeds = self._sefbot_embeds(action)
+        view = self._sefbot_view(action)
+        posted = state.get("posted")
+        if name == "edit" and posted is not None:
+            kwargs: dict[str, object] = {}
+            if text or not embeds:
+                kwargs["content"] = text or "\u200b"
+            if files:
+                kwargs["attachments"] = files
+            if embeds:
+                kwargs["embeds"] = embeds
+            if view is not None:
+                kwargs["view"] = view
+            await posted.edit(**kwargs)  # type: ignore[union-attr]
+            return {"messageId": str(posted.id), "channelId": str(posted.channel.id)}
+        body = text if text or embeds else ("\u200b" if not files else "")
+        kwargs = {}
+        if files:
+            kwargs["files"] = files
+        if embeds:
+            kwargs["embeds"] = embeds
+        if view is not None:
+            kwargs["view"] = view
+        if name == "send":
+            sent = await message.channel.send(body, **kwargs)
+            return self._message_ref(sent)
+        reply = getattr(message, "reply", None)
+        if callable(reply):
+            sent = await reply(body, mention_author=False, **kwargs)
+        else:
+            sent = await message.channel.send(body, **kwargs)
+        if state.get("posted") is None:
+            state["posted"] = sent
+        return self._message_ref(sent)
+
+    def _sefbot_message_payload(self, message: discord.Message) -> dict[str, object]:
+        user = self.user
+        attachments = []
+        for attachment in list(message.attachments)[:4]:
+            url = getattr(attachment, "url", None)
+            if not isinstance(url, str) or not url:
+                continue
+            attachments.append(
+                {
+                    "id": str(getattr(attachment, "id", "")),
+                    "url": url,
+                    "name": getattr(attachment, "filename", None) or "file",
+                    "contentType": getattr(attachment, "content_type", None) or "",
+                }
+            )
+        guild = message.guild
+        return {
+            "id": str(message.id),
+            "guildId": "" if guild is None else str(guild.id),
+            "channelId": str(message.channel.id),
+            "userId": str(message.author.id),
+            "username": getattr(message.author, "name", None) or "user",
+            "displayName": self._speaker_name(message.author),
+            "content": message.content,
+            "mentioned": user is not None and user in message.mentions,
+            "botUserId": None if user is None else str(user.id),
+            "attachments": attachments,
+        }
+
+    async def _delegate_sefbot_message(self, message: discord.Message) -> None:
+        state: dict[str, object] = {}
+
+        async def actor(action: dict[str, object]) -> None:
+            await self._perform_sefbot_action(message, action, state)
+
+        try:
+            await self._sefbot_host().handle_message(self._sefbot_message_payload(message), actor)
+        except (SefbotUnavailable, Exception):
+            log.warning(
+                "sefbot message failed in guild %s",
+                getattr(message.guild, "id", ""),
+                exc_info=True,
+            )
+            if state.get("posted") is None:
+                await self._reply(message, "sefbot couldn't answer that just now.")
+
+    async def _run_sefbot_message(self, message: discord.Message) -> None:
+        if not self.message_events.claim(message.id):
+            return
+        count = getattr(self, "handler_count", 0)
+        if count >= MAX_HANDLERS:
+            return
+        self.handler_count = count + 1
+        current_task = asyncio.current_task()
+        active_handlers = getattr(self, "active_handlers", None)
+        if active_handlers is None:
+            self.active_handlers = active_handlers = set()
+        if current_task is not None:
+            active_handlers.add(current_task)
+        try:
+            await asyncio.wait_for(self._delegate_sefbot_message(message), timeout=HANDLER_TIMEOUT)
+        except asyncio.TimeoutError:
+            log.warning("sefbot handler exceeded deadline")
+        finally:
+            if current_task is not None:
+                active_handlers.discard(current_task)
+            self.handler_count -= 1
+
+    async def _switch_bot_command(self, message: discord.Message, text: str) -> str:
+        request = switch_bot_request(text)
+        if message.guild is None:
+            return "!switch bot only works in a server"
+        if request == "usage" or request is None:
+            return "usage: !switch bot [sef|owaua]"
+        if not self._can_switch_bot(message):
+            return "you need the Manage Server permission to switch this server"
+        enabled = self.sefbot_enabled(message.guild.id)
+        target = request
+        if target == "toggle":
+            target = "owaua" if enabled else "sef"
+        key = f"bot_engine:{message.guild.id}"
+        if target == "owaua":
+            if not enabled and request != "toggle":
+                return "this server is already running owaua"
+            self.memory.set_setting(key, "owaua")
+            try:
+                await self._sync_sefbot_commands(message.guild, [])
+            except (discord.HTTPException, discord.Forbidden):
+                log.warning("could not remove sefbot slash commands in guild %s", message.guild.id)
+            return "this server is back on owaua. mention me and I'll talk like usual."
+        if enabled:
+            return "this server is already running sefbot. `!switch bot` brings owaua back."
+        try:
+            host = self._sefbot_host()
+            await host.ensure()
+            commands = await host.slash_commands()
+            await self._sync_sefbot_commands(message.guild, commands)
+        except SefbotUnavailable as exc:
+            return f"{exc}. this server is still on owaua."
+        except Exception:
+            log.warning("could not register sefbot slash commands in guild %s", message.guild.id)
+            self.memory.set_setting(key, "sef")
+            return (
+                "this server is now running sefbot. mention me, or use comma commands like `,help`. "
+                "slash commands couldn't be registered. `!switch bot` brings owaua back."
+            )
+        self.memory.set_setting(key, "sef")
+        return (
+            "this server is now running sefbot. mention me, or use comma commands like `,help`. "
+            "`!switch bot` brings owaua back. other servers still run owaua."
+        )
+
+    def _sefbot_embeds(self, action: dict[str, object]) -> list[discord.Embed]:
+        embeds: list[discord.Embed] = []
+        raw = action.get("embeds")
+        if not isinstance(raw, list):
+            return embeds
+        for item in raw:
+            if isinstance(item, dict):
+                embeds.append(discord.Embed.from_dict(item))
+        return embeds
+
+    def _sefbot_view(self, action: dict[str, object]) -> discord.ui.View | None:
+        rows = action.get("components")
+        if not isinstance(rows, list) or not rows:
+            return None
+        view = discord.ui.View(timeout=None)
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            for component in row.get("components") or []:
+                if not isinstance(component, dict) or int(component.get("type") or 2) != 2:
+                    continue
+                view.add_item(
+                    discord.ui.Button(
+                        label=str(component.get("label") or "button")[:80],
+                        custom_id=str(component.get("custom_id") or "container")[:100],
+                        style=discord.ButtonStyle(int(component.get("style") or 2)),
+                        disabled=bool(component.get("disabled")),
+                    )
+                )
+        return view if view.children else None
+
+    async def _show_container_modal(self, interaction: discord.Interaction, action: dict[str, object]) -> None:
+        modal = discord.ui.Modal(
+            title=str(action.get("title") or "Run in the container")[:45],
+            custom_id=str(action.get("custom_id") or "container:modal")[:100],
+        )
+        for row in action.get("components") or []:
+            if not isinstance(row, dict):
+                continue
+            for field in row.get("components") or []:
+                if not isinstance(field, dict) or int(field.get("type") or 0) != 4:
+                    continue
+                modal.add_item(
+                    discord.ui.TextInput(
+                        label=str(field.get("label") or "Code")[:45],
+                        custom_id=str(field.get("custom_id") or "container:code")[:100],
+                        style=discord.TextStyle.paragraph if int(field.get("style") or 2) == 2 else discord.TextStyle.short,
+                        required=bool(field.get("required", True)),
+                        max_length=min(int(field.get("max_length") or 1500), 4000),
+                    )
+                )
+
+        async def on_submit(submitted: discord.Interaction) -> None:
+            await self._forward_sefbot_component(submitted)
+
+        modal.on_submit = on_submit  # type: ignore[method-assign]
+        await interaction.response.send_modal(modal)
+
+    async def _perform_interaction_action(self, interaction: discord.Interaction, action: dict[str, object]) -> None:
+        name = action.get("name")
+        if name == "modal":
+            await self._show_container_modal(interaction, action)
+            return
+        if name == "defer":
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            return
+        if name == "typing":
+            return
+        content = action.get("content")
+        text = content[:2000] if isinstance(content, str) else ""
+        files = self._sefbot_files(action)
+        embeds = self._sefbot_embeds(action)
+        view = self._sefbot_view(action)
+        body = text if text or embeds else "\u200b"
+        extra: dict[str, object] = {}
+        if files:
+            extra["files"] = files
+        if embeds:
+            extra["embeds"] = embeds
+        if view is not None:
+            extra["view"] = view
+        if name == "send" or (
+            name == "reply" and interaction.type is discord.InteractionType.modal_submit
+        ):
+            sent = await interaction.followup.send(content=body, **extra)
+            return self._message_ref(sent)
+        if interaction.response.is_done():
+            edit_extra = dict(extra)
+            if files:
+                edit_extra.pop("files", None)
+                edit_extra["attachments"] = files
+            await interaction.edit_original_response(content=body, **edit_extra)
+            return
+        await interaction.response.send_message(content=body, **extra)
+
+    async def _forward_sefbot_component(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        if guild is None or not self.sefbot_enabled(guild.id):
+            return
+        if not self.message_events.claim(interaction.id):
+            return
+        data = interaction.data if isinstance(interaction.data, dict) else {}
+        custom_id = str(data.get("custom_id") or "")
+        if interaction.type is discord.InteractionType.component and custom_id == "container:code":
+            await self._show_container_modal(
+                interaction,
+                {
+                    "title": "Run in the container",
+                    "custom_id": "container:modal",
+                    "components": [
+                        {
+                            "type": 1,
+                            "components": [
+                                {
+                                    "type": 4,
+                                    "custom_id": "container:code",
+                                    "label": "What Luna should do",
+                                    "style": 2,
+                                    "required": True,
+                                    "max_length": 1500,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+            return
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except (discord.HTTPException, discord.Forbidden):
+                return
+        kind = "modal" if interaction.type is discord.InteractionType.modal_submit else "component"
+        user = interaction.user
+        payload = {
+            "id": str(interaction.id),
+            "kind": kind,
+            "customId": custom_id,
+            "alreadyDeferred": True,
+            "data": data,
+            "guildId": str(guild.id),
+            "channelId": str(interaction.channel_id or ""),
+            "userId": str(user.id),
+            "username": getattr(user, "name", None) or "user",
+            "displayName": self._speaker_name(user),
+        }
+
+        async def actor(action: dict[str, object]) -> None:
+            await self._perform_interaction_action(interaction, action)
+
+        try:
+            await asyncio.wait_for(
+                self._sefbot_host().handle_interaction(payload, actor),
+                timeout=HANDLER_TIMEOUT,
+            )
+        except (SefbotUnavailable, Exception):
+            log.warning("sefbot container interaction failed in guild %s", guild.id, exc_info=True)
+
+    async def on_interaction(self, interaction: discord.Interaction) -> None:
+        if interaction.type is discord.InteractionType.component:
+            await self._forward_sefbot_component(interaction)
+            return
+        if interaction.type is discord.InteractionType.modal_submit:
+            return
+        if interaction.type is not discord.InteractionType.application_command:
+            return
+        guild = interaction.guild
+        if guild is None or not self.sefbot_enabled(guild.id):
+            if guild is not None and not interaction.response.is_done():
+                try:
+                    await interaction.response.send_message(
+                        "this server is running owaua. `!switch bot` turns on sefbot here.",
+                        ephemeral=True,
+                    )
+                except (discord.HTTPException, discord.Forbidden):
+                    return
+            return
+        if not self.message_events.claim(interaction.id):
+            return
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except (discord.HTTPException, discord.Forbidden):
+            return
+        data = interaction.data if isinstance(interaction.data, dict) else {}
+        resolved = data.get("resolved") if isinstance(data.get("resolved"), dict) else {}
+        attachments = resolved.get("attachments") if isinstance(resolved, dict) else {}
+        user = interaction.user
+        payload = {
+            "id": str(interaction.id),
+            "commandName": data.get("name") or "",
+            "guildId": str(guild.id),
+            "channelId": str(interaction.channel_id or ""),
+            "userId": str(user.id),
+            "username": getattr(user, "name", None) or "user",
+            "displayName": self._speaker_name(user),
+            "options": data.get("options") or [],
+            "resolvedAttachments": attachments if isinstance(attachments, dict) else {},
+            "alreadyDeferred": True,
+        }
+
+        async def actor(action: dict[str, object]) -> None:
+            await self._perform_interaction_action(interaction, action)
+
+        try:
+            await asyncio.wait_for(
+                self._sefbot_host().handle_interaction(payload, actor),
+                timeout=HANDLER_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            log.warning("sefbot interaction exceeded deadline")
+        except (SefbotUnavailable, Exception):
+            log.warning("sefbot interaction failed in guild %s", guild.id, exc_info=True)
+            try:
+                if interaction.response.is_done():
+                    await interaction.edit_original_response(content="sefbot couldn't answer that just now.")
+            except (discord.HTTPException, discord.Forbidden):
+                return
 
     def full_mode_enabled_for(self, user_id: object) -> bool:
         try:
@@ -771,6 +1332,20 @@ class PersonaBot(discord.Client):
 
     async def setup_hook(self) -> None:
         self.maintenance_task = asyncio.create_task(self._maintain_memory())
+        self.sefbot_prepare = asyncio.create_task(self._prepare_sefbot())
+        reset_ids_raw = os.getenv("BOT_RESET_GUILD_QUOTA_IDS", "").strip()
+        if reset_ids_raw:
+            for raw_id in reset_ids_raw.split(","):
+                raw_id = raw_id.strip()
+                if not raw_id:
+                    continue
+                try:
+                    guild_id = str(int(raw_id))
+                except ValueError:
+                    log.warning("BOT_RESET_GUILD_QUOTA_IDS: skipping invalid id %r", raw_id)
+                    continue
+                deleted = await asyncio.to_thread(self.memory.reset_guild_api_usage, guild_id)
+                log.info("Startup quota reset for guild %s: deleted %d api_usage row(s)", guild_id, deleted)
 
     async def _maintain_memory(self) -> None:
         while True:
@@ -868,6 +1443,13 @@ class PersonaBot(discord.Client):
             return
         if message.guild is not None and ALLOWED_GUILDS and message.guild.id not in ALLOWED_GUILDS and not unrestricted_music:
             audit_filtered("guild_not_allowlisted")
+            return
+        if (
+            message.guild is not None
+            and self.sefbot_enabled(message.guild.id)
+            and switch_bot_request(normalized) is None
+        ):
+            await self._run_sefbot_message(message)
             return
         if message.guild is not None:
             await self._remember_channel_line(message)
@@ -998,6 +1580,9 @@ class PersonaBot(discord.Client):
             return
         if name == "!reset":
             await self._reply(message, await self._reset_command(message, argument))
+            return
+        if name == "!switch":
+            await self._reply(message, await self._switch_bot_command(message, text))
             return
 
         is_dm = message.guild is None
@@ -1202,12 +1787,25 @@ class PersonaBot(discord.Client):
 
     def _persona_command(self, message: discord.Message, requested: str) -> str:
         if not requested.strip():
-            current = self.persona_for(message.channel, message)
-            return f"persona: {persona_label(current)}"
+            if full_mode_blocked(getattr(message.author, "id", None)):
+                return "persona: blocked"
+            selected = self.selected_persona_for(message)
+            return f"persona: {persona_label(selected)}"
         persona, error = parse_persona_argument(requested)
         if error is not None:
             return error
         assert persona is not None
+        if persona == RANDOM_PERSONA:
+            choices = self.available_random_personas()
+            if not choices:
+                return host_model_error("gemini") or "no personas are configured"
+            self.memory.set_setting(persona_setting_key(message), RANDOM_PERSONA)
+            self.memory.set_setting(
+                random_persona_setting_key(message), random.choice(choices)
+            )
+            self.memory.erase_user_memory(str(message.author.id))
+            # Never reveal which persona was chosen.
+            return "persona: random"
         provider = persona_provider(persona)
         problem = (
             full_mode_provider_error(provider)
@@ -1396,6 +1994,11 @@ class PersonaBot(discord.Client):
             self.memory.reset_server_data, server_id
         )
         self.response_languages.pop(f"guild:{server_id}", None)
+        self.memory.set_setting(f"bot_engine:{server_id}", "owaua")
+        try:
+            await self._sync_sefbot_commands(message.guild, [])
+        except (discord.HTTPException, discord.Forbidden):
+            log.warning("could not remove sefbot slash commands in guild %s", server_id)
         try:
             await asyncio.wait_for(
                 self._clear_guild_language_profile(message.guild),
@@ -1451,9 +2054,18 @@ class PersonaBot(discord.Client):
             if task is not current_task and not task.done():
                 task.cancel()
         task = getattr(self, "maintenance_task", None)
-        if task is not None:
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+        prepare = getattr(self, "sefbot_prepare", None)
+        for background in (task, prepare):
+            if background is not None and not background.done():
+                background.cancel()
+        if task is not None or prepare is not None:
+            await asyncio.gather(
+                *(item for item in (task, prepare) if item is not None),
+                return_exceptions=True,
+            )
+        host = getattr(self, "sefbot_host", None)
+        if host is not None:
+            await host.stop()
         for voice in self.voice_clients:
             voice.stop()
             await voice.disconnect(force=True)

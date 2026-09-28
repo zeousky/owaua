@@ -175,16 +175,16 @@ class BotSecurityTests(unittest.IsolatedAsyncioTestCase):
             self.bot.command_used.clear()
             await self.bot.on_message(make_message("!persona", 101, channel, author_id=101))
 
-        self.assertEqual(channel.sent, ["persona: nerdish", "persona: rudeish"])
+        self.assertEqual(channel.sent, ["persona: nerdish", "persona: rudeish medium"])
         self.assertEqual(self.bot.persona_for(channel, make_message("hi", 102, channel, author_id=100)), "nerdish")
-        self.assertEqual(self.bot.persona_for(channel, make_message("hi", 103, channel, author_id=101)), "rudeish")
+        self.assertEqual(self.bot.persona_for(channel, make_message("hi", 103, channel, author_id=101)), "rudeish-medium")
 
     async def test_persona_isolated_between_users(self):
         first = make_message("!persona nerdish", 100, FakeChannel(), guild_id=11)
         await self.bot.on_message(first)
         other = make_message("!persona", 101, FakeChannel(44), guild_id=12, author_id=44)
         await self.bot.on_message(other)
-        self.assertEqual(other.channel.sent, ["persona: rudeish"])
+        self.assertEqual(other.channel.sent, ["persona: rudeish medium"])
         private = make_message("!persona flirty", 102, FakeChannel(55, nsfw=True), guild_id=None, author_id=55)
         with patch("bot.host_model_error", return_value=None):
             await self.bot.on_message(private)

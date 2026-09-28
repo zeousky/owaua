@@ -15,7 +15,8 @@
 
 The Daki server keeps the bot under `persona-test-bot`. Deployments upload only
 the runtime manifest: bot modules, pinned dependencies, startup checks, persona
-files, profile pictures, and banners. Tests, website files, docs, and setup
+files, profile pictures, banners, and the sefbot engine used by `!switch bot`.
+Tests, website files, docs, and setup
 utilities stay local.
 
 Preview the exact upload without contacting Daki:
@@ -39,8 +40,9 @@ For local-only work, use `./scripts/deploy-local.sh`; it never contacts Daki.
 
 ## Persona updates
 
-`update persona [rudeish|nerdish|flirty|chaotic|cute]` (from `~/.local/bin/update`)
+`update persona [rudeish-low|rudeish-medium|rudeish-high|nerdish|flirty|irritating|cute|normal]` (from `~/.local/bin/update`)
 keeps the local `personas/*.txt` files live for the Mac bot and uploads the
-same files to Daki. `OWAUA_LOCAL_ONLY` does not skip the Daki upload. Preview
+same files to Daki. Bare `rudeish` updates all three rudeish levels.
+`OWAUA_LOCAL_ONLY` does not skip the Daki upload. Preview
 with `OWAUA_DAKI_DRY_RUN=1 update persona rudeish`. Neither side needs a
 restart; personas reload on the next reply.
