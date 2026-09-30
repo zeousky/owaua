@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua — маленький Discord-бот, якого згадуєш, коли хочеться компанії. Трохи пам'ятає, має кілька голосів і може поставити трек у voice.">
+<meta name="description" content="owaua це Discord-бот. Згадай його, коли хочеш відповідь. Трохи пам'ятає, має кілька голосів і може поставити трек у voice.">
 <meta name="theme-color" content="#0057b7">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s.pinimg.com; style-src 'self'; img-src 'self' data: https://ct.pinterest.com; connect-src 'self' https://ct.pinterest.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="/assets/pinterest.js" defer></script>
@@ -22,7 +22,7 @@
 <meta property="og:url" content="https://owaua.com/ukrainian">
 <meta property="og:image" content="https://owaua.com/assets/pfp-ukrainian.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="маленький Discord-бот, з яким справді можна поговорити">
+<meta property="og:description" content="Discord-бот, з яким можна поговорити">
 <title>owaua · маленький Discord hangout-бот</title>
 <link rel="icon" href="/assets/pfp-ukrainian-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/assets/owaua.css?v=20260920c">
@@ -56,7 +56,7 @@ owaua
 </div>
 </details>
 </nav>
-<aside class="corner-note">Навколо бота на цьому сайті навмисне небагато. Бот — головне. Сподіваюсь, і так вистачить.</aside>
+<aside class="corner-note">Сайт маленький. Важливий сам бот.</aside>
 <main id="main" class="wrap">
 <header class="hero">
 <div class="hero-id">
@@ -67,7 +67,7 @@ owaua
 </div>
 </div>
 <h1>бот, який тусується на твоєму сервері</h1>
-<p class="lede">Згадай його, коли хочеш відповідь. Він трохи пам'ятає, що ви щойно сказали одне одному — не всю кімнату — і може змінити те, як звучить, відповідати мовою сервера або поставити трек у voice. Маленький навмисне.</p>
+<p class="lede">Згадай його, коли хочеш відповідь. Він трохи пам'ятає, що ви щойно сказали одне одному, не всю кімнату. Може змінити те, як звучить, відповідати мовою сервера або поставити трек у voice.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">заходь у Discord</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">запросити owaua</a>
@@ -92,15 +92,15 @@ owaua
 </figure>
 
 <section class="section" id="what">
-<h2>що він насправді вміє</h2>
+<h2>що він вміє</h2>
 <p>Згадай його, коли хочеш його в розмові. Відповідає голосом і мовою, які сервер уже обрав.</p>
 <ul class="list">
-<li><strong>чекає, доки запитаєш</strong><span>Згадай його на сервері — і він відповість. Самотнє <code>@owaua</code> без нічого отримує маленьке локальне «yeah?» — без виклику моделі. Інших ботів ігнорує. Особисті повідомлення працюють лише якщо оператор увімкне <code>BOT_ALLOW_DMS=1</code>.</span></li>
+<li><strong>чекає, доки запитаєш</strong><span>Згадай його на сервері — і він відповість. Самотнє <code>@owaua</code> без нічого отримує маленьке локальне «yeah?». Без виклику моделі. Інших ботів ігнорує. Особисті повідомлення працюють лише якщо оператор увімкне <code>BOT_ALLOW_DMS=1</code>.</span></li>
 <li><strong>пам'ятає твою нитку, і трохи кімнати</strong><span>Твоя історія з ним — це все ще лише ти, у тому каналі: до 20 ходів, за тиждень вони згасають, а файл зупиняється на 10 000 записах. Він ще тримає короткий недавній рядок із того каналу, щоб згадка не була наосліп. У людини поруч усе ще своя нитка і своя персона.</span></li>
-<li><strong>кілька голосів і кілька мізків</strong><span>Обери <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> або <code>normal</code> для себе. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> його додає. Повний режим — це окремий опт-ін для схвалених користувачів.</span></li>
+<li><strong>кілька голосів</strong><span>Обери <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> або <code>normal</code> для себе. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> його додає. Повний режим — це окремий опт-ін для схвалених користувачів.</span></li>
 <li><strong>може відповідати твоєю мовою</strong><span>Адміни ставлять повну назву мови, наприклад <code>!language hungarian</code>. Коли є відповідна картинка, owaua може ще змінити аватар і банер бота на тому сервері, щоб він виглядав своїм.</span></li>
 <li><strong>трек у voice, якщо попросиш</strong><span><code>!music</code> грає одне відео з YouTube або допис Twitter/X із відео, або підтримуваний аудіофайл. Пауза, продовжити, перезапуск, пропустити, стоп, зараз і вийти. Без пошуку за назвою і без плейлистів.</span></li>
-<li><strong>короткі відповіді, навмисне</strong><span>Звичайні hangout-відповіді лишаються короткими й договорюють речення. Gemini hangout може глянути на одне зображення. Схвалені люди можуть відкрити <code>!full mode on</code> у призначених каналах. Повний режим ділить ті самі ліміти.</span></li>
+<li><strong>короткі відповіді</strong><span>Звичайні hangout-відповіді лишаються короткими й договорюють речення. Gemini hangout може глянути на одне зображення. Схвалені люди можуть відкрити <code>!full mode on</code> у призначених каналах. Повний режим ділить ті самі ліміти.</span></li>
 </ul>
 </section>
 
@@ -122,7 +122,7 @@ owaua
 </section>
 
 <section class="section" id="limits">
-<h2>межі, сказані прямо</h2>
+<h2>межі</h2>
 <p>Вони існують, щоб одна людина не могла його розплавити, і щоб він лишався досить дешевим, щоб його тримати. Це стелі запитів, не обіцянка безкоштовного користування.</p>
 <ul class="list">
 <li><strong>вісім спроб ШІ на хвилину, на користувача</strong><span>Цей лічильник живе в запущеному процесі й скидається при перезапуску. Окремої збереженої денної чи десятихвилинної квоти немає. Повний режим ділить ті самі ліміти.</span></li>
@@ -142,7 +142,7 @@ owaua
 </section>
 
 <section class="section" id="faq">
-<h2>те, що справді питають</h2>
+<h2>питання</h2>
 <div class="faq">
 <details>
 <summary>Він відповідає на кожне повідомлення?</summary>
@@ -150,14 +150,14 @@ owaua
 </details>
 <details>
 <summary>Чому не відповів?</summary>
-<p>Перевір, що ти його справді згадав. Дай хвилину — він показує typing, поки працює. Глянь на ліміти й очікування команд вище. Інших ботів ігнорує навмисне.</p>
+<p>Перевір, що ти його згадав. Дай секунду. Він показує typing, поки працює. Глянь на ліміти й очікування вище. Інших ботів він ігнорує.</p>
 </details>
 <details>
 <summary>Можна змінити, як він звучить?</summary>
 <p>Так. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> або <code>!persona normal</code>. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> повертає його.</p>
 </details>
 <details>
-<summary>Музика справді грає?</summary>
+<summary>Музика грає?</summary>
 <p>Так. Заходить у твій голосовий канал і стрімить трек. Без плейлистів, без черги наступних десяти пісень. Треба бути у voice, і йому потрібні Connect і Speak там.</p>
 </details>
 <details>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua est un petit bot Discord à mentionner quand tu veux de la compagnie. Il se souvient un peu, a quelques voix, et peut mettre un morceau en vocal.">
+<meta name="description" content="owaua est un bot Discord. Ping-le quand tu veux une réponse. Il se souvient un peu, a quelques voix, et peut mettre un morceau en vocal.">
 <meta name="theme-color" content="#12110f">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="canonical" href="https://owaua.com/kirk/french">
@@ -21,7 +21,7 @@
 <meta property="og:url" content="https://owaua.com/kirk/french">
 <meta property="og:image" content="https://owaua.com/assets/pfp-french.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="un petit bot Discord avec qui tu peux vraiment parler">
+<meta property="og:description" content="un bot Discord avec qui tu peux parler">
 <title>owaua · un petit bot Discord de hangout</title>
 <link rel="icon" href="/assets/pfp-french-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
@@ -45,7 +45,7 @@
 <a href="#limits">limites</a>
 <a href="/kirk/privacy">confidentialité</a>
 <a href="#data">ce qu'il garde</a>
-<a href="#faq">ce que les gens demandent vraiment</a>
+<a href="#faq">questions</a>
 <a href="#setup">ou lance-le toi-même</a>
 <a href="/kirk/terms">conditions</a>
 <a href="/kirk/partnerships">partenaires</a>
@@ -72,9 +72,9 @@
 <main id="main" class="stage">
 <header class="opener">
 <p class="kicker">le bot Discord pénible</p>
-<p class="epigraph">Il n'y a pas grand-chose autour du bot sur ce site, exprès. C'est le bot qui compte. J'espère que ça suffit quand même.</p>
+<p class="epigraph">Le site est petit. C'est le bot qui compte.</p>
 <h1>le bot qui traîne sur ton serveur</h1>
-<p class="lede">Mentionne-le quand tu veux une réponse. Il se souvient un peu de ce que vous venez de vous dire — pas de toute la salle — et il peut changer de voix, répondre dans la langue du serveur, ou mettre un morceau en vocal. Petit, exprès.</p>
+<p class="lede">Ping-le quand tu veux une réponse. Il se souvient un peu de ce que vous venez de vous dire, pas de tout le salon. Il peut changer de voix, répondre dans la langue du serveur, ou mettre un morceau en vocal.</p>
 <div class="actions">
 <a class="btn" href="https://discord.gg/CNbpwtE9HS">viens sur le Discord</a>
 <a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">inviter owaua</a>
@@ -86,14 +86,14 @@
 </figure>
 </header>
 <section class="chapter" id="what">
-<header class="chapter-h"><span class="num">01</span><h2>ce qu'il fait vraiment</h2></header>
+<header class="chapter-h"><span class="num">01</span><h2>ce qu'il fait</h2></header>
 <p>Ping-le quand tu le veux dans la conversation. Il répond avec la voix et la langue que le serveur a déjà choisies.</p>
-<div class="piece"><h3>il attend que tu demandes</h3><p>Ping-le sur un serveur et il répond. Un <code>@owaua</code> tout seul, sans rien d'autre, reçoit un petit « yeah ? » local — sans appel au modèle. Les autres bots sont ignorés. Les MP ne marchent que si l'opérateur active <code>BOT_ALLOW_DMS=1</code>.</p></div>
+<div class="piece"><h3>il attend que tu demandes</h3><p>Ping-le sur un serveur et il répond. Un <code>@owaua</code> tout seul, sans rien d'autre, reçoit un petit « yeah ? » local. Pas d'appel au modèle. Les autres bots sont ignorés. Les MP ne marchent que si l'opérateur active <code>BOT_ALLOW_DMS=1</code>.</p></div>
 <div class="piece"><h3>il se souvient de ton fil, et un peu de la salle</h3><p>Ton historique avec lui, c'est toujours juste toi, dans ce salon : jusqu'à 20 échanges, ils s'effacent au bout d'une semaine, et le fichier plafonne à 10 000 enregistrements. Il garde aussi une courte ligne récente de ce salon, pour qu'un ping ne soit pas à l'aveugle. La personne à côté a toujours son propre fil et sa propre persona.</p></div>
-<div class="piece"><h3>quelques voix, et quelques cerveaux</h3><p>Choisis <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> ou <code>normal</code> pour toi. La voix de personne dans le salon est coupée par défaut ; <code>!human on</code> l'ajoute. Le mode full est une option séparée pour les utilisateurs approuvés.</p></div>
+<div class="piece"><h3>quelques voix</h3><p>Choisis <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> ou <code>normal</code> pour toi. La voix de personne dans le salon est coupée par défaut ; <code>!human on</code> l'ajoute. Le mode full est une option séparée pour les utilisateurs approuvés.</p></div>
 <div class="piece"><h3>il peut répondre dans ta langue</h3><p>Les admins mettent un nom de langue complet, genre <code>!language hungarian</code>. Quand l'image existe, owaua peut aussi changer l'avatar et la bannière du bot sur ce serveur, pour qu'il ait l'air d'être chez lui.</p></div>
 <div class="piece"><h3>un morceau en vocal, si tu demandes</h3><p><code>!music</code> joue une seule vidéo YouTube ou un post Twitter/X avec vidéo, ou un fichier audio pris en charge. Pause, reprise, restart, skip, stop, now et leave. Pas de recherche par nom ni de playlists.</p></div>
-<div class="piece"><h3>des réponses courtes, exprès</h3><p>Les réponses hangout normales restent courtes et finissent leur phrase. Le hangout Gemini peut regarder une image. Les personnes approuvées peuvent ouvrir <code>!full mode on</code> dans les salons prévus. Le mode full partage les mêmes limites.</p></div>
+<div class="piece"><h3>des réponses courtes</h3><p>Les réponses hangout normales restent courtes et finissent leur phrase. Le hangout Gemini peut regarder une image. Les personnes approuvées peuvent ouvrir <code>!full mode on</code> dans les salons prévus. Le mode full partage les mêmes limites.</p></div>
 </section>
 <section class="chapter" id="commands">
 <header class="chapter-h"><span class="num">02</span><h2>comment tu lui parles</h2></header>
@@ -112,7 +112,7 @@
 </div>
 </section>
 <section class="chapter" id="limits">
-<header class="chapter-h"><span class="num">03</span><h2>les limites, dites simplement</h2></header>
+<header class="chapter-h"><span class="num">03</span><h2>les limites</h2></header>
 <p>Elles existent pour qu'une personne ne puisse pas le faire fondre, et pour qu'il reste assez peu cher à garder. Ce sont des plafonds de requêtes, pas une promesse d'usage gratuit.</p>
 <div class="limits">
 <article class="stat"><b>8</b><h3>huit essais IA par minute, par personne</h3><p>Ce compteur vit dans le processus en cours et repart à zéro quand il redémarre. Il n'y a pas de quota séparé et persistant par jour ou par dix minutes. Le mode full partage les mêmes limites.</p></article>
@@ -128,12 +128,12 @@
 <p>La version longue et soigneuse, c'est la <a href="/kirk/privacy">politique de confidentialité</a>. L'inviter, c'est aussi accepter les <a href="/kirk/terms">conditions</a>.</p></div>
 </section>
 <section class="chapter" id="faq">
-<header class="chapter-h"><span class="num">05</span><h2>ce que les gens demandent vraiment</h2></header>
+<header class="chapter-h"><span class="num">05</span><h2>questions</h2></header>
 <div class="faq">
 <details><summary>Il répond à chaque message ?</summary><p>Non. Mentionne-le quand tu veux une réponse. Il garde quand même une courte ligne récente du salon, pour ne pas être à l'aveugle quand tu le fais. Les MP seulement si l'opérateur les a activés. Les autres bots n'ont jamais de réponse.</p></details>
-<details><summary>Pourquoi il n'a pas répondu ?</summary><p>Vérifie que tu l'as vraiment ping. Laisse-lui un moment — il montre qu'il tape pendant qu'il travaille. Regarde les limites de débit et les délais de commande plus haut. Les autres bots sont ignorés exprès.</p></details>
+<details><summary>Pourquoi il n'a pas répondu ?</summary><p>Vérifie que tu l'as ping. Laisse-lui une seconde. Il montre qu'il tape pendant qu'il travaille. Regarde les limites et les délais plus haut. Il ignore les autres bots.</p></details>
 <details><summary>Je peux changer sa voix ?</summary><p>Oui. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> ou <code>!persona normal</code>. La voix de personne dans le salon est coupée par défaut ; <code>!human on</code> la remet.</p></details>
-<details><summary>La musique joue vraiment ?</summary><p>Oui. Il rejoint ton salon vocal et streame le morceau. Pas de playlists, pas de file des dix morceaux suivants. Il faut que tu sois en vocal, et il a besoin de Connect et Speak là-bas.</p></details>
+<details><summary>La musique joue ?</summary><p>Oui. Il rejoint ton salon vocal et streame le morceau. Pas de playlists, pas de file des dix morceaux suivants. Il faut que tu sois en vocal, et il a besoin de Connect et Speak là-bas.</p></details>
 <details><summary>Je peux faire confiance à chaque réponse ?</summary><p>Non. Il peut être sûr et se tromper quand même. Si ça compte, vérifie toi-même, ou demande à une personne.</p></details>
 <details><summary>Où je dis que quelque chose est cassé ?</summary><p>Le <a href="https://discord.gg/CNbpwtE9HS">serveur Discord</a>, ou la personne qui l'a fait : Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Dis ce que tu as essayé et ce qui s'est passé. Merci de ne pas coller de tokens ni de chats privés dans un salon public.</p></details>
 </div>

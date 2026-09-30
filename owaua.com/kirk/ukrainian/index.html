@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua — маленький Discord-бот, якого згадуєш, коли хочеться компанії. Трохи пам'ятає, має кілька голосів і може поставити трек у voice.">
+<meta name="description" content="owaua це Discord-бот. Згадай його, коли хочеш відповідь. Трохи пам'ятає, має кілька голосів і може поставити трек у voice.">
 <meta name="theme-color" content="#12110f">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="canonical" href="https://owaua.com/kirk/ukrainian">
@@ -21,7 +21,7 @@
 <meta property="og:url" content="https://owaua.com/kirk/ukrainian">
 <meta property="og:image" content="https://owaua.com/assets/pfp-ukrainian.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="маленький Discord-бот, з яким справді можна поговорити">
+<meta property="og:description" content="Discord-бот, з яким можна поговорити">
 <title>owaua · маленький Discord hangout-бот</title>
 <link rel="icon" href="/assets/pfp-ukrainian-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
@@ -45,7 +45,7 @@
 <a href="#limits">межі</a>
 <a href="/kirk/privacy">приватність</a>
 <a href="#data">що він тримає</a>
-<a href="#faq">те, що справді питають</a>
+<a href="#faq">питання</a>
 <a href="#setup">або запусти сам</a>
 <a href="/kirk/terms">умови</a>
 <a href="/kirk/partnerships">партнери</a>
@@ -72,9 +72,9 @@
 <main id="main" class="stage">
 <header class="opener">
 <p class="kicker">the annoying discord bot</p>
-<p class="epigraph">Навколо бота на цьому сайті навмисне небагато. Бот — головне. Сподіваюсь, і так вистачить.</p>
+<p class="epigraph">Сайт маленький. Важливий сам бот.</p>
 <h1>бот, який тусується на твоєму сервері</h1>
-<p class="lede">Згадай його, коли хочеш відповідь. Він трохи пам'ятає, що ви щойно сказали одне одному — не всю кімнату — і може змінити те, як звучить, відповідати мовою сервера або поставити трек у voice. Маленький навмисне.</p>
+<p class="lede">Згадай його, коли хочеш відповідь. Він трохи пам'ятає, що ви щойно сказали одне одному, не всю кімнату. Може змінити те, як звучить, відповідати мовою сервера або поставити трек у voice.</p>
 <div class="actions">
 <a class="btn" href="https://discord.gg/CNbpwtE9HS">заходь у Discord</a>
 <a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">запросити owaua</a>
@@ -86,14 +86,14 @@
 </figure>
 </header>
 <section class="chapter" id="what">
-<header class="chapter-h"><span class="num">01</span><h2>що він насправді вміє</h2></header>
+<header class="chapter-h"><span class="num">01</span><h2>що він вміє</h2></header>
 <p>Згадай його, коли хочеш його в розмові. Відповідає голосом і мовою, які сервер уже обрав.</p>
-<div class="piece"><h3>чекає, доки запитаєш</h3><p>Згадай його на сервері — і він відповість. Самотнє <code>@owaua</code> без нічого отримує маленьке локальне «yeah?» — без виклику моделі. Інших ботів ігнорує. Особисті повідомлення працюють лише якщо оператор увімкне <code>BOT_ALLOW_DMS=1</code>.</p></div>
+<div class="piece"><h3>чекає, доки запитаєш</h3><p>Згадай його на сервері — і він відповість. Самотнє <code>@owaua</code> без нічого отримує маленьке локальне «yeah?». Без виклику моделі. Інших ботів ігнорує. Особисті повідомлення працюють лише якщо оператор увімкне <code>BOT_ALLOW_DMS=1</code>.</p></div>
 <div class="piece"><h3>пам'ятає твою нитку, і трохи кімнати</h3><p>Твоя історія з ним — це все ще лише ти, у тому каналі: до 20 ходів, за тиждень вони згасають, а файл зупиняється на 10 000 записах. Він ще тримає короткий недавній рядок із того каналу, щоб згадка не була наосліп. У людини поруч усе ще своя нитка і своя персона.</p></div>
-<div class="piece"><h3>кілька голосів і кілька мізків</h3><p>Обери <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> або <code>normal</code> для себе. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> його додає. Повний режим — це окремий опт-ін для схвалених користувачів.</p></div>
+<div class="piece"><h3>кілька голосів</h3><p>Обери <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> або <code>normal</code> для себе. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> його додає. Повний режим — це окремий опт-ін для схвалених користувачів.</p></div>
 <div class="piece"><h3>може відповідати твоєю мовою</h3><p>Адміни ставлять повну назву мови, наприклад <code>!language hungarian</code>. Коли є відповідна картинка, owaua може ще змінити аватар і банер бота на тому сервері, щоб він виглядав своїм.</p></div>
 <div class="piece"><h3>трек у voice, якщо попросиш</h3><p><code>!music</code> грає одне відео з YouTube або допис Twitter/X із відео, або підтримуваний аудіофайл. Пауза, продовжити, перезапуск, пропустити, стоп, зараз і вийти. Без пошуку за назвою і без плейлистів.</p></div>
-<div class="piece"><h3>короткі відповіді, навмисне</h3><p>Звичайні hangout-відповіді лишаються короткими й договорюють речення. Gemini hangout може глянути на одне зображення. Схвалені люди можуть відкрити <code>!full mode on</code> у призначених каналах. Повний режим ділить ті самі ліміти.</p></div>
+<div class="piece"><h3>короткі відповіді</h3><p>Звичайні hangout-відповіді лишаються короткими й договорюють речення. Gemini hangout може глянути на одне зображення. Схвалені люди можуть відкрити <code>!full mode on</code> у призначених каналах. Повний режим ділить ті самі ліміти.</p></div>
 </section>
 <section class="chapter" id="commands">
 <header class="chapter-h"><span class="num">02</span><h2>як із ним говорити</h2></header>
@@ -112,7 +112,7 @@
 </div>
 </section>
 <section class="chapter" id="limits">
-<header class="chapter-h"><span class="num">03</span><h2>межі, сказані прямо</h2></header>
+<header class="chapter-h"><span class="num">03</span><h2>межі</h2></header>
 <p>Вони існують, щоб одна людина не могла його розплавити, і щоб він лишався досить дешевим, щоб його тримати. Це стелі запитів, не обіцянка безкоштовного користування.</p>
 <div class="limits">
 <article class="stat"><b>8</b><h3>вісім спроб ШІ на хвилину, на користувача</h3><p>Цей лічильник живе в запущеному процесі й скидається при перезапуску. Окремої збереженої денної чи десятихвилинної квоти немає. Повний режим ділить ті самі ліміти.</p></article>
@@ -128,12 +128,12 @@
 <p>Довша, обережна версія — це <a href="/kirk/privacy">політика приватності</a>. Запросити його також означає <a href="/kirk/terms">умови</a>.</p></div>
 </section>
 <section class="chapter" id="faq">
-<header class="chapter-h"><span class="num">05</span><h2>те, що справді питають</h2></header>
+<header class="chapter-h"><span class="num">05</span><h2>питання</h2></header>
 <div class="faq">
 <details><summary>Він відповідає на кожне повідомлення?</summary><p>Ні. Згадай його, коли хочеш відповідь. Він справді тримає короткий недавній рядок із каналу, щоб не бути наосліп, коли ти згадаєш. Особисті — лише якщо оператор їх увімкнув. Інші боти ніколи не отримують відповіді.</p></details>
-<details><summary>Чому не відповів?</summary><p>Перевір, що ти його справді згадав. Дай хвилину — він показує typing, поки працює. Глянь на ліміти й очікування команд вище. Інших ботів ігнорує навмисне.</p></details>
+<details><summary>Чому не відповів?</summary><p>Перевір, що ти його згадав. Дай секунду. Він показує typing, поки працює. Глянь на ліміти й очікування вище. Інших ботів він ігнорує.</p></details>
 <details><summary>Можна змінити, як він звучить?</summary><p>Так. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> або <code>!persona normal</code>. Голос «людини в кімнаті» вимкнений за замовчуванням; <code>!human on</code> повертає його.</p></details>
-<details><summary>Музика справді грає?</summary><p>Так. Заходить у твій голосовий канал і стрімить трек. Без плейлистів, без черги наступних десяти пісень. Треба бути у voice, і йому потрібні Connect і Speak там.</p></details>
+<details><summary>Музика грає?</summary><p>Так. Заходить у твій голосовий канал і стрімить трек. Без плейлистів, без черги наступних десяти пісень. Треба бути у voice, і йому потрібні Connect і Speak там.</p></details>
 <details><summary>Можна довіряти кожній відповіді?</summary><p>Ні. Може бути впевненим і все одно помилятись. Якщо щось важливе — перевір сам або запитай людину.</p></details>
 <details><summary>Де сказати, що щось зламалось?</summary><p><a href="https://discord.gg/CNbpwtE9HS">Discord-сервер</a> або людина, яка його зробила: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Скажи, що пробував і що сталось. Будь ласка, не кидай токени чи приватні чати в публічний канал.</p></details>
 </div>

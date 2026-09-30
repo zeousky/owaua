@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua ist ein kleiner Discord-Bot, den du erwähnst, wenn du Gesellschaft willst. Er merkt sich ein bisschen, hat ein paar Stimmen und kann ein Lied in Voice spielen.">
+<meta name="description" content="owaua ist ein Discord-Bot. Ping ihn, wenn du eine Antwort willst. Er merkt sich ein bisschen, hat ein paar Stimmen und kann ein Lied in Voice spielen.">
 <meta name="theme-color" content="#12110f">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="canonical" href="https://owaua.com/kirk/german">
@@ -21,7 +21,7 @@
 <meta property="og:url" content="https://owaua.com/kirk/german">
 <meta property="og:image" content="https://owaua.com/assets/pfp-german.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="ein kleiner Discord-Bot, mit dem du wirklich reden kannst">
+<meta property="og:description" content="ein Discord-Bot, mit dem du reden kannst">
 <title>owaua · ein kleiner Discord-Hangout-Bot</title>
 <link rel="icon" href="/assets/pfp-german-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
@@ -45,7 +45,7 @@
 <a href="#limits">Grenzen</a>
 <a href="/kirk/privacy">Datenschutz</a>
 <a href="#data">was er behält</a>
-<a href="#faq">was Leute wirklich fragen</a>
+<a href="#faq">fragen</a>
 <a href="#setup">oder selbst laufen lassen</a>
 <a href="/kirk/terms">Nutzungsbedingungen</a>
 <a href="/kirk/partnerships">Partner</a>
@@ -72,9 +72,9 @@
 <main id="main" class="stage">
 <header class="opener">
 <p class="kicker">the annoying discord bot</p>
-<p class="epigraph">Um den Bot herum gibt es absichtlich nicht viel Website. Der Bot ist die Sache. Ich hoffe, das reicht trotzdem.</p>
+<p class="epigraph">Die Seite ist klein. Der Bot ist die Hauptsache.</p>
 <h1>der Bot, der auf deinem Server rumhängt</h1>
-<p class="lede">Erwähne ihn, wenn du eine Antwort willst. Er merkt sich ein bisschen von dem, was ihr gerade gesagt habt — nicht den ganzen Raum — und er kann anders klingen, in der Sprache des Servers antworten oder ein Lied in Voice anmachen. Klein, mit Absicht.</p>
+<p class="lede">Ping ihn, wenn du eine Antwort willst. Er merkt sich ein bisschen von dem, was ihr gerade gesagt habt, nicht den ganzen Raum. Er kann anders klingen, in der Sprache des Servers antworten oder ein Lied in Voice anmachen.</p>
 <div class="actions">
 <a class="btn" href="https://discord.gg/CNbpwtE9HS">komm auf den Discord</a>
 <a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">owaua einladen</a>
@@ -86,14 +86,14 @@
 </figure>
 </header>
 <section class="chapter" id="what">
-<header class="chapter-h"><span class="num">01</span><h2>was er wirklich macht</h2></header>
+<header class="chapter-h"><span class="num">01</span><h2>was er macht</h2></header>
 <p>Ping ihn, wenn du ihn in der Unterhaltung willst. Er antwortet mit der Stimme und Sprache, die der Server schon gewählt hat.</p>
-<div class="piece"><h3>er wartet, bis du fragst</h3><p>Ping ihn auf einem Server, und er antwortet. Ein einsames <code>@owaua</code> ohne Text bekommt ein kleines lokales „yeah?“ — ohne Modell-Aufruf. Andere Bots werden ignoriert. DMs gehen nur, wenn der Betreiber <code>BOT_ALLOW_DMS=1</code> einschaltet.</p></div>
+<div class="piece"><h3>er wartet, bis du fragst</h3><p>Ping ihn auf einem Server, und er antwortet. Ein einsames <code>@owaua</code> ohne Text bekommt ein kleines lokales „yeah?“. Kein Modell-Aufruf. Andere Bots werden ignoriert. DMs gehen nur, wenn der Betreiber <code>BOT_ALLOW_DMS=1</code> einschaltet.</p></div>
 <div class="piece"><h3>er merkt sich deinen Thread, und ein bisschen vom Raum</h3><p>Dein Verlauf mit ihm bist weiter nur du, in diesem Kanal: bis zu 20 Turns, nach einer Woche verblassen sie, und die Datei hört bei 10.000 Einträgen auf. Er behält außerdem eine kurze aktuelle Zeile aus dem Kanal, damit ein Ping nicht blind ist. Die Person neben dir hat weiter ihren eigenen Thread und ihre eigene Persona.</p></div>
-<div class="piece"><h3>ein paar Stimmen, und ein paar Köpfe</h3><p>Wähle <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> oder <code>normal</code> für dich. Die Stimme als Person im Raum ist standardmäßig aus; <code>!human on</code> schaltet sie dazu. Der Full-Modus ist ein separates Opt-in für freigegebene Leute.</p></div>
+<div class="piece"><h3>ein paar Stimmen</h3><p>Wähle <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> oder <code>normal</code> für dich. Die Stimme als Person im Raum ist standardmäßig aus; <code>!human on</code> schaltet sie dazu. Der Full-Modus ist ein separates Opt-in für freigegebene Leute.</p></div>
 <div class="piece"><h3>er kann in deiner Sprache antworten</h3><p>Admins setzen einen vollen Sprachnamen, zum Beispiel <code>!language hungarian</code>. Wenn passende Bilder da sind, kann owaua Avatar und Banner des Bots auf dem Server auch anpassen, damit er dazugehört.</p></div>
 <div class="piece"><h3>ein Lied in Voice, wenn du fragst</h3><p><code>!music</code> spielt ein einzelnes YouTube-Video oder einen Twitter/X-Post mit Video, oder einen unterstützten Audio-Anhang. Pause, resume, restart, skip, stop, now und leave. Keine Namenssuchen und keine Playlists.</p></div>
-<div class="piece"><h3>kurze Antworten, mit Absicht</h3><p>Normale Hangout-Antworten bleiben kurz und machen den Satz fertig. Der Gemini-Hangout kann sich ein Bild ansehen. Freigegebene Leute können <code>!full mode on</code> in den dafür vorgesehenen Kanälen aufmachen. Der Full-Modus teilt sich dieselben Limits.</p></div>
+<div class="piece"><h3>kurze Antworten</h3><p>Normale Hangout-Antworten bleiben kurz und machen den Satz fertig. Der Gemini-Hangout kann sich ein Bild ansehen. Freigegebene Leute können <code>!full mode on</code> in den dafür vorgesehenen Kanälen aufmachen. Der Full-Modus teilt sich dieselben Limits.</p></div>
 </section>
 <section class="chapter" id="commands">
 <header class="chapter-h"><span class="num">02</span><h2>so redest du mit ihm</h2></header>
@@ -112,7 +112,7 @@
 </div>
 </section>
 <section class="chapter" id="limits">
-<header class="chapter-h"><span class="num">03</span><h2>die Grenzen, klar gesagt</h2></header>
+<header class="chapter-h"><span class="num">03</span><h2>die Grenzen</h2></header>
 <p>Die gibt es, damit eine Person ihn nicht schmelzen kann, und damit er günstig genug bleibt, um weiterzulaufen. Das sind Anfrage-Deckel, kein Versprechen auf kostenlose Nutzung.</p>
 <div class="limits">
 <article class="stat"><b>8</b><h3>acht KI-Versuche pro Minute, pro Person</h3><p>Dieser Zähler lebt im laufenden Prozess und wird beim Neustart zurückgesetzt. Es gibt kein separates gespeichertes Tages- oder Zehn-Minuten-Kontingent. Der Full-Modus teilt sich dieselben Limits.</p></article>
@@ -128,12 +128,12 @@
 <p>Die längere, sorgfältige Version ist die <a href="/kirk/privacy">Datenschutzerklärung</a>. Einladen heißt auch den <a href="/kirk/terms">Nutzungsbedingungen</a> zustimmen.</p></div>
 </section>
 <section class="chapter" id="faq">
-<header class="chapter-h"><span class="num">05</span><h2>was Leute wirklich fragen</h2></header>
+<header class="chapter-h"><span class="num">05</span><h2>fragen</h2></header>
 <div class="faq">
 <details><summary>Antwortet er auf jede Nachricht?</summary><p>Nein. Erwähne ihn, wenn du eine Antwort willst. Er behält eine kurze aktuelle Zeile aus dem Kanal, damit er nicht blind ist, wenn du es tust. DMs nur, wenn der Betreiber sie eingeschaltet hat. Andere Bots kriegen nie eine Antwort.</p></details>
-<details><summary>Warum hat er nicht geantwortet?</summary><p>Schau, ob du ihn wirklich gepingt hast. Gib ihm einen Moment — er zeigt Tippen an, während er arbeitet. Schau dir die Rate-Limits und Befehls-Cooldowns oben an. Andere Bots werden absichtlich ignoriert.</p></details>
+<details><summary>Warum hat er nicht geantwortet?</summary><p>Schau, ob du ihn gepingt hast. Gib ihm eine Sekunde. Er zeigt Tippen an, während er arbeitet. Schau dir die Limits und Cooldowns oben an. Andere Bots werden ignoriert.</p></details>
 <details><summary>Kann ich ändern, wie er klingt?</summary><p>Ja. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> oder <code>!persona normal</code>. Die Stimme als Person im Raum ist standardmäßig aus; <code>!human on</code> holt sie zurück.</p></details>
-<details><summary>Spielt die Musik wirklich?</summary><p>Ja. Er joint deinen Sprachkanal und streamt den Track. Keine Playlists, keine Warteschlange der nächsten zehn Songs. Du musst in Voice sein, und er braucht dort Connect und Speak.</p></details>
+<details><summary>Spielt die Musik?</summary><p>Ja. Er joint deinen Sprachkanal und streamt den Track. Keine Playlists, keine Warteschlange der nächsten zehn Songs. Du musst in Voice sein, und er braucht dort Connect und Speak.</p></details>
 <details><summary>Kann ich jeder Antwort trauen?</summary><p>Nein. Er kann sicher sein und trotzdem falsch. Wenn etwas zählt, prüf es selbst oder frag einen Menschen.</p></details>
 <details><summary>Wo sag ich, dass etwas kaputt ist?</summary><p>Der <a href="https://discord.gg/CNbpwtE9HS">Discord-Server</a>, oder die Person, die ihn gemacht hat: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Sag, was du versucht hast und was passiert ist. Bitte keine Tokens oder privaten Chats in einen öffentlichen Kanal.</p></details>
 </div>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua est un petit bot Discord à mentionner quand tu veux de la compagnie. Il se souvient un peu, a quelques voix, et peut mettre un morceau en vocal.">
+<meta name="description" content="owaua est un bot Discord. Ping-le quand tu veux une réponse. Il se souvient un peu, a quelques voix, et peut mettre un morceau en vocal.">
 <meta name="theme-color" content="#002395">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s.pinimg.com; style-src 'self'; img-src 'self' data: https://ct.pinterest.com; connect-src 'self' https://ct.pinterest.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="/assets/pinterest.js" defer></script>
@@ -22,7 +22,7 @@
 <meta property="og:url" content="https://owaua.com/french">
 <meta property="og:image" content="https://owaua.com/assets/pfp-french.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="un petit bot Discord avec qui tu peux vraiment parler">
+<meta property="og:description" content="un bot Discord avec qui tu peux parler">
 <title>owaua · un petit bot Discord de hangout</title>
 <link rel="icon" href="/assets/pfp-french-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/assets/owaua.css?v=20260920c">
@@ -56,7 +56,7 @@ owaua
 </div>
 </details>
 </nav>
-<aside class="corner-note">Il n'y a pas grand-chose autour du bot sur ce site, exprès. C'est le bot qui compte. J'espère que ça suffit quand même.</aside>
+<aside class="corner-note">Le site est petit. C'est le bot qui compte.</aside>
 <main id="main" class="wrap">
 <header class="hero">
 <div class="hero-id">
@@ -67,7 +67,7 @@ owaua
 </div>
 </div>
 <h1>le bot qui traîne sur ton serveur</h1>
-<p class="lede">Mentionne-le quand tu veux une réponse. Il se souvient un peu de ce que vous venez de vous dire — pas de toute la salle — et il peut changer de voix, répondre dans la langue du serveur, ou mettre un morceau en vocal. Petit, exprès.</p>
+<p class="lede">Ping-le quand tu veux une réponse. Il se souvient un peu de ce que vous venez de vous dire, pas de tout le salon. Il peut changer de voix, répondre dans la langue du serveur, ou mettre un morceau en vocal.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">viens sur le Discord</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">inviter owaua</a>
@@ -92,15 +92,15 @@ owaua
 </figure>
 
 <section class="section" id="what">
-<h2>ce qu'il fait vraiment</h2>
+<h2>ce qu'il fait</h2>
 <p>Ping-le quand tu le veux dans la conversation. Il répond avec la voix et la langue que le serveur a déjà choisies.</p>
 <ul class="list">
-<li><strong>il attend que tu demandes</strong><span>Ping-le sur un serveur et il répond. Un <code>@owaua</code> tout seul, sans rien d'autre, reçoit un petit « yeah ? » local — sans appel au modèle. Les autres bots sont ignorés. Les MP ne marchent que si l'opérateur active <code>BOT_ALLOW_DMS=1</code>.</span></li>
+<li><strong>il attend que tu demandes</strong><span>Ping-le sur un serveur et il répond. Un <code>@owaua</code> tout seul, sans rien d'autre, reçoit un petit « yeah ? » local. Pas d'appel au modèle. Les autres bots sont ignorés. Les MP ne marchent que si l'opérateur active <code>BOT_ALLOW_DMS=1</code>.</span></li>
 <li><strong>il se souvient de ton fil, et un peu de la salle</strong><span>Ton historique avec lui, c'est toujours juste toi, dans ce salon : jusqu'à 20 échanges, ils s'effacent au bout d'une semaine, et le fichier plafonne à 10 000 enregistrements. Il garde aussi une courte ligne récente de ce salon, pour qu'un ping ne soit pas à l'aveugle. La personne à côté a toujours son propre fil et sa propre persona.</span></li>
-<li><strong>quelques voix, et quelques cerveaux</strong><span>Choisis <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> ou <code>normal</code> pour toi. La voix de personne dans le salon est coupée par défaut ; <code>!human on</code> l'ajoute. Le mode full est une option séparée pour les utilisateurs approuvés.</span></li>
+<li><strong>quelques voix</strong><span>Choisis <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> ou <code>normal</code> pour toi. La voix de personne dans le salon est coupée par défaut ; <code>!human on</code> l'ajoute. Le mode full est une option séparée pour les utilisateurs approuvés.</span></li>
 <li><strong>il peut répondre dans ta langue</strong><span>Les admins mettent un nom de langue complet, genre <code>!language hungarian</code>. Quand l'image existe, owaua peut aussi changer l'avatar et la bannière du bot sur ce serveur, pour qu'il ait l'air d'être chez lui.</span></li>
 <li><strong>un morceau en vocal, si tu demandes</strong><span><code>!music</code> joue une seule vidéo YouTube ou un post Twitter/X avec vidéo, ou un fichier audio pris en charge. Pause, reprise, restart, skip, stop, now et leave. Pas de recherche par nom ni de playlists.</span></li>
-<li><strong>des réponses courtes, exprès</strong><span>Les réponses hangout normales restent courtes et finissent leur phrase. Le hangout Gemini peut regarder une image. Les personnes approuvées peuvent ouvrir <code>!full mode on</code> dans les salons prévus. Le mode full partage les mêmes limites.</span></li>
+<li><strong>des réponses courtes</strong><span>Les réponses hangout normales restent courtes et finissent leur phrase. Le hangout Gemini peut regarder une image. Les personnes approuvées peuvent ouvrir <code>!full mode on</code> dans les salons prévus. Le mode full partage les mêmes limites.</span></li>
 </ul>
 </section>
 
@@ -122,7 +122,7 @@ owaua
 </section>
 
 <section class="section" id="limits">
-<h2>les limites, dites simplement</h2>
+<h2>les limites</h2>
 <p>Elles existent pour qu'une personne ne puisse pas le faire fondre, et pour qu'il reste assez peu cher à garder. Ce sont des plafonds de requêtes, pas une promesse d'usage gratuit.</p>
 <ul class="list">
 <li><strong>huit essais IA par minute, par personne</strong><span>Ce compteur vit dans le processus en cours et repart à zéro quand il redémarre. Il n'y a pas de quota séparé et persistant par jour ou par dix minutes. Le mode full partage les mêmes limites.</span></li>
@@ -142,7 +142,7 @@ owaua
 </section>
 
 <section class="section" id="faq">
-<h2>ce que les gens demandent vraiment</h2>
+<h2>questions</h2>
 <div class="faq">
 <details>
 <summary>Il répond à chaque message ?</summary>
@@ -150,14 +150,14 @@ owaua
 </details>
 <details>
 <summary>Pourquoi il n'a pas répondu ?</summary>
-<p>Vérifie que tu l'as vraiment ping. Laisse-lui un moment — il montre qu'il tape pendant qu'il travaille. Regarde les limites de débit et les délais de commande plus haut. Les autres bots sont ignorés exprès.</p>
+<p>Vérifie que tu l'as ping. Laisse-lui une seconde. Il montre qu'il tape pendant qu'il travaille. Regarde les limites et les délais plus haut. Il ignore les autres bots.</p>
 </details>
 <details>
 <summary>Je peux changer sa voix ?</summary>
 <p>Oui. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> ou <code>!persona normal</code>. La voix de personne dans le salon est coupée par défaut ; <code>!human on</code> la remet.</p>
 </details>
 <details>
-<summary>La musique joue vraiment ?</summary>
+<summary>La musique joue ?</summary>
 <p>Oui. Il rejoint ton salon vocal et streame le morceau. Pas de playlists, pas de file des dix morceaux suivants. Il faut que tu sois en vocal, et il a besoin de Connect et Speak là-bas.</p>
 </details>
 <details>

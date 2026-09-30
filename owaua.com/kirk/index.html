@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua is a small Discord bot you mention when you want company. It remembers a little, has a few voices, and can play a song in voice.">
+<meta name="description" content="owaua is a Discord bot. Ping it when you want a reply. It remembers a little, has a few voices, and can play a song.">
 <meta name="theme-color" content="#12110f">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="canonical" href="https://owaua.com/kirk/">
@@ -21,7 +21,7 @@
 <meta property="og:url" content="https://owaua.com/kirk/">
 <meta property="og:image" content="https://owaua.com/image.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="a small Discord bot you can actually talk to">
+<meta property="og:description" content="a discord bot you can talk to">
 <title>owaua · a small Discord hangout bot</title>
 <link rel="icon" href="/assets/pfp-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
@@ -45,7 +45,7 @@
 <a href="#limits">limits</a>
 <a href="/kirk/privacy">privacy</a>
 <a href="#data">what it keeps</a>
-<a href="#faq">things people actually ask</a>
+<a href="#faq">questions</a>
 <a href="#setup">or run it yourself</a>
 <a href="/kirk/terms">terms</a>
 <a href="/kirk/partnerships">partners</a>
@@ -72,9 +72,9 @@
 <main id="main" class="stage">
 <header class="opener">
 <p class="kicker">the annoying discord bot</p>
-<p class="epigraph">There isn’t a lot of website around this, on purpose. The bot is the thing. Hope this is still enough.</p>
+<p class="epigraph">The site is small. The bot is the part that matters.</p>
 <h1>the bot that hangs out in your server</h1>
-<p class="lede">Mention it when you want a reply. It remembers a little of what you two just said — not the whole room — and it can change how it sounds, answer in the server’s language, or put a song on in voice. Small on purpose.</p>
+<p class="lede">Ping it when you want a reply. It remembers a bit of what you two just said, not the whole channel. It can change how it talks, answer in the server’s language, or play a song in voice.</p>
 <div class="actions">
 <a class="btn" href="https://discord.gg/CNbpwtE9HS">come sit in the Discord</a>
 <a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">invite owaua</a>
@@ -86,14 +86,14 @@
 </figure>
 </header>
 <section class="chapter" id="what">
-<header class="chapter-h"><span class="num">01</span><h2>what it actually does</h2></header>
+<header class="chapter-h"><span class="num">01</span><h2>what it does</h2></header>
 <p>Ping it when you want it in the conversation. It answers in the voice and language that server already chose.</p>
-<div class="piece"><h3>it waits until you ask</h3><p>Ping it in a server and it replies. A lonely <code>@owaua</code> with nothing else gets a tiny local “yeah?” — no model call. Other bots are ignored. DMs only work if the operator turns on <code>BOT_ALLOW_DMS=1</code>.</p></div>
-<div class="piece"><h3>it remembers your thread, and a little of the room</h3><p>Your history with it is still just you, in that channel: up to 20 turns, they fade after a week, and the file tops out at 10,000 records. It also keeps a short recent line from that channel so a ping is not blind. The person next to you still has their own thread and their own persona.</p></div>
-<div class="piece"><h3>a few voices, and a few brains</h3><p>Pick <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code>, or <code>normal</code> for yourself. The person-in-the-room voice is off by default; <code>!human on</code> adds it. Full mode is a separate opt-in for approved users.</p></div>
+<div class="piece"><h3>it waits until you ask</h3><p>Ping it in a server and it replies. A lonely <code>@owaua</code> with nothing else gets a small local “yeah?”. No model call. Other bots are ignored. DMs only work if the operator turns on <code>BOT_ALLOW_DMS=1</code>.</p></div>
+<div class="piece"><h3>it remembers your thread, and a little of the room</h3><p>Your history with it is still just you, in that channel: up to 20 turns, they fade after a week, and the file tops out at 10,000 records. It also keeps a short recent line from that channel so a ping has a little context. The person next to you still has their own thread and their own persona.</p></div>
+<div class="piece"><h3>a few voices</h3><p>Pick <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code>, or <code>normal</code> for yourself. <code>!human on</code> makes it sound more like a person in the room. That’s off unless you turn it on. Full mode is separate, and only for people who are allowed.</p></div>
 <div class="piece"><h3>it can answer in your language</h3><p>Admins set a full language name, like <code>!language hungarian</code>. When matching art exists, owaua can change that server’s bot avatar and banner too, so it looks like it belongs there.</p></div>
 <div class="piece"><h3>a song in voice, if you ask</h3><p><code>!music</code> plays a single YouTube video or Twitter/X post with video, or a supported audio attachment. Pause, resume, restart, skip, stop, now, and leave. No name searches or playlists.</p></div>
-<div class="piece"><h3>short answers, on purpose</h3><p>Normal hangout replies stay short and finish the sentence. Gemini hangout can look at one image. Approved people can open <code>!full mode on</code> in the designated channels. Full mode shares the same rate limits.</p></div>
+<div class="piece"><h3>short answers</h3><p>Normal hangout replies stay short and finish the sentence. Gemini hangout can look at one image. Approved people can open <code>!full mode on</code> in the designated channels. Full mode shares the same rate limits.</p></div>
 </section>
 <section class="chapter" id="commands">
 <header class="chapter-h"><span class="num">02</span><h2>how you talk to it</h2></header>
@@ -101,19 +101,19 @@
 <div class="ledger">
 <div class="row"><div class="cmd"><code>!help</code></div><p>The list, when you forget.</p></div>
 <div class="row"><div class="cmd"><code>!persona rudeish low|medium|high</code></div><p>Hear or change your general-audience voice. Also <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code>, and <code>normal</code>.</p></div>
-<div class="row"><div class="cmd"><code>!human on|off</code></div><p>Turn on the person-in-the-room voice, or go back to the usual hangout-bot voice. It is off by default.</p></div>
+<div class="row"><div class="cmd"><code>!human on|off</code></div><p>Sound more like a person in the room, or turn that off. It’s off unless you turn it on.</p></div>
 <div class="row"><div class="cmd"><code>!language &lt;full name&gt;|reset</code></div><p>Set or clear the server’s reply language, and the matching profile art when it exists.</p></div>
 <div class="row"><div class="cmd"><code>!music &lt;YouTube/X URL or attachment&gt;</code></div><p>Put one supported track on. Or <code>pause</code>, <code>resume</code>, <code>restart</code>, <code>skip</code>, <code>stop</code>, <code>now</code>, and <code>leave</code>.</p></div>
 <div class="row"><div class="cmd"><code>!memory erase</code> / <code>!memory erase mine</code></div><p>Admins can wipe the server’s stored chats. Anyone can wipe their own, including DMs when those are on.</p></div>
 <div class="row"><div class="cmd"><code>!reset all</code></div><p>Manage Server. Wipes this server’s stored chats, channel lines, reply language, and profile art, and stops its music.</p></div>
 <div class="row"><div class="cmd"><code>!security status|pause|resume</code></div><p>Owner-only. How busy it is, and an emergency pause if something is going wrong.</p></div>
 <div class="row"><div class="cmd"><code>!shutdown</code> / <code>!pricing</code></div><p>Owner-only. Stop the bot, or show current model pricing.</p></div>
-<div class="row"><div class="cmd"><code>!owner's note</code></div><p>A short note from the person who made it.</p></div>
+<div class="row"><div class="cmd"><code>!owner's note</code></div><p>A short note from me.</p></div>
 </div>
 </section>
 <section class="chapter" id="limits">
-<header class="chapter-h"><span class="num">03</span><h2>the limits, said plainly</h2></header>
-<p>These exist so one person cannot melt it, and so it can stay cheap enough to keep around. They are request ceilings, not a promise of free usage.</p>
+<header class="chapter-h"><span class="num">03</span><h2>the limits</h2></header>
+<p>So one person can’t melt it, and so it stays cheap enough to leave on. These are caps, not a promise that using it is free.</p>
 <div class="limits">
 <article class="stat"><b>8</b><h3>eight AI tries a minute, per user</h3><p>That counter lives in the running process and resets when it restarts. There is no separate persisted daily or ten-minute quota. Full mode shares the same limits.</p></article>
 <article class="stat"><b>3</b><h3>three AI users at once</h3><p>At most three users can occupy an AI reply slot at a time. A command has a separate 25-second per-user cooldown.</p></article>
@@ -123,19 +123,19 @@
 </section>
 <section class="chapter" id="data">
 <header class="chapter-h"><span class="num">04</span><h2>what it keeps</h2></header>
-<div class="prose"><p>It holds your thread with it, and a short log of recent lines in that channel, so the next reply is not from nowhere. Your persona stays yours. That lives in a local SQLite file. Old turns fall off on their own. <code>!memory erase</code> clears a server’s stored conversations and those lines. <code>!memory erase mine</code> clears yours.</p>
+<div class="prose"><p>It holds your thread with it, and a short log of recent lines in that channel, so the next reply has something to go on. Your persona stays yours. That lives in a local SQLite file. Old turns fall off on their own. <code>!memory erase</code> clears a server’s stored conversations and those lines. <code>!memory erase mine</code> clears yours.</p>
 <p>Hangout requests go to the configured model with provider-side storage turned off. Music requests land in a small audit log for the operator; it records operational metadata and hashes the raw argument. Passwords, signed media links, and provider error text are not written down.</p>
-<p>The longer, careful version is the <a href="/kirk/privacy">privacy policy</a>. Inviting it also means the <a href="/kirk/terms">terms</a>.</p></div>
+<p>The longer version is the <a href="/kirk/privacy">privacy policy</a>. Inviting it also means the <a href="/kirk/terms">terms</a>.</p></div>
 </section>
 <section class="chapter" id="faq">
-<header class="chapter-h"><span class="num">05</span><h2>things people actually ask</h2></header>
+<header class="chapter-h"><span class="num">05</span><h2>questions</h2></header>
 <div class="faq">
-<details><summary>Does it reply to every message?</summary><p>No. Mention it when you want a reply. It does keep a short recent line from the channel so it is not blind when you do. DMs only if the operator has turned those on. Other bots never get an answer.</p></details>
-<details><summary>Why didn’t it answer?</summary><p>Make sure you actually pinged it. Give it a moment — it shows typing while it works. Check the rate limits and command cooldowns above. Other bots are ignored on purpose.</p></details>
+<details><summary>Does it reply to every message?</summary><p>No. Mention it when you want a reply. It does keep a short recent line from the channel, so it has a little context when you do. DMs only if the operator has turned those on. Other bots never get an answer.</p></details>
+<details><summary>Why didn’t it answer?</summary><p>Make sure you pinged it. Give it a second. It shows typing while it works. Check the limits and cooldowns above. It ignores other bots.</p></details>
 <details><summary>Can I change how it sounds?</summary><p>Yes. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code>, or <code>!persona normal</code>. The person-in-the-room voice is off by default; <code>!human on</code> brings it back.</p></details>
-<details><summary>Does the music actually play?</summary><p>Yes. It joins your voice channel and streams the track. No playlists, no queue of the next ten songs. You need to be in voice, and it needs Connect and Speak there.</p></details>
+<details><summary>Does the music play?</summary><p>Yes. It joins your voice channel and streams the track. No playlists, no queue of the next ten songs. You need to be in voice, and it needs Connect and Speak there.</p></details>
 <details><summary>Can I trust every reply?</summary><p>No. It can be sure and still wrong. If something matters, check it yourself, or ask a person.</p></details>
-<details><summary>Where do I say something is broken?</summary><p>The <a href="https://discord.gg/CNbpwtE9HS">Discord server</a>, or the person who made it: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Say what you tried and what happened. Please don’t paste tokens or private chats into a public channel.</p></details>
+<details><summary>Where do I say something is broken?</summary><p>The <a href="https://discord.gg/CNbpwtE9HS">Discord server</a>, or me: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Say what you tried and what happened. Please don’t paste tokens or private chats into a public channel.</p></details>
 </div>
 </section>
 <section class="chapter" id="setup">
@@ -143,7 +143,7 @@
 <p>owaua is open source. You will want Python 3.11+, Discord’s Message Content Intent, the provider keys, and Linux plus FFmpeg if you want music. After that, it is just talking.</p>
 <div class="actions">
 <a class="btn" href="https://github.com/zeousky/owaua">look at the source</a>
-<a class="btn ghost contact-link" href="mailto:ckazros@owaua.com" data-contact-email="ckazros@owaua.com">write to the person who made it</a>
+<a class="btn ghost contact-link" href="mailto:ckazros@owaua.com" data-contact-email="ckazros@owaua.com">email me</a>
 </div>
 </section>
 <footer class="colophon">

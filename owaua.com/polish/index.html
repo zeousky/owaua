@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua to mały bot Discord, którego oznaczasz, kiedy chcesz towarzystwa. Pamięta trochę, ma kilka głosów i może puścić piosenkę na voice.">
+<meta name="description" content="owaua to bot Discord. Oznacz go, kiedy chcesz odpowiedzi. Pamięta trochę, ma kilka głosów i może puścić piosenkę na voice.">
 <meta name="theme-color" content="#dc143c">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s.pinimg.com; style-src 'self'; img-src 'self' data: https://ct.pinterest.com; connect-src 'self' https://ct.pinterest.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="/assets/pinterest.js" defer></script>
@@ -22,7 +22,7 @@
 <meta property="og:url" content="https://owaua.com/polish">
 <meta property="og:image" content="https://owaua.com/assets/pfp-polish.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="mały bot Discord, z którym naprawdę można pogadać">
+<meta property="og:description" content="bot Discord, z którym można pogadać">
 <title>owaua · mały discordowy bot do hangoutu</title>
 <link rel="icon" href="/assets/pfp-polish-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/assets/owaua.css?v=20260920c">
@@ -58,7 +58,7 @@ owaua
 </div>
 </details>
 </nav>
-<aside class="corner-note">Wokół bota na tej stronie nie ma dużo, specjalnie. Bot jest tym, o co chodzi. Mam nadzieję, że i tak wystarczy.</aside>
+<aside class="corner-note">Strona jest mała. Bot jest tym, o co chodzi.</aside>
 <main id="main" class="wrap">
 <header class="hero">
 <div class="hero-id">
@@ -69,7 +69,7 @@ owaua
 </div>
 </div>
 <h1>bot, który wisi na twoim serwerze</h1>
-<p class="lede">Oznacz go, kiedy chcesz odpowiedzi. Pamięta trochę tego, co właśnie sobie powiedzieliście — nie całego pokoju — a do tego może zmienić, jak brzmi, odpowiadać w języku serwera albo puścić piosenkę na voice. Mały, specjalnie.</p>
+<p class="lede">Oznacz go, kiedy chcesz odpowiedzi. Pamięta trochę tego, co właśnie sobie powiedzieliście, nie cały pokój. Może zmienić, jak brzmi, odpowiadać w języku serwera albo puścić piosenkę na voice.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">wpadnij na Discord</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">zaproś owaua</a>
@@ -94,15 +94,15 @@ owaua
 </figure>
 
 <section class="section" id="what">
-<h2>co naprawdę robi</h2>
+<h2>co robi</h2>
 <p>Pingnij, kiedy chcesz go w rozmowie. Odpowiada głosem i językiem, które serwer już wybrał.</p>
 <ul class="list">
-<li><strong>czeka, aż zapytasz</strong><span>Pingnij go na serwerze, a odpisze. Samotne <code>@owaua</code> bez niczego dostaje małe lokalne „yeah?” — bez wołania modelu. Inne boty są ignorowane. Privy działają tylko, gdy operator włączy <code>BOT_ALLOW_DMS=1</code>.</span></li>
+<li><strong>czeka, aż zapytasz</strong><span>Pingnij go na serwerze, a odpisze. Samotne <code>@owaua</code> bez niczego dostaje małe lokalne „yeah?”. Bez wołania modelu. Inne boty są ignorowane. Privy działają tylko, gdy operator włączy <code>BOT_ALLOW_DMS=1</code>.</span></li>
 <li><strong>pamięta wasz wątek i trochę pokoju</strong><span>Twoja historia z nim to nadal tylko ty, na tym kanale: do 20 tur, po tygodniu znikają, a plik kończy się na 10 000 rekordów. Trzyma też krótką, świeżą linijkę z tego kanału, żeby ping nie był ślepy. Osoba obok ma swój własny wątek i swoją personę.</span></li>
-<li><strong>kilka głosów i kilka głów</strong><span>Wybierz dla siebie <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> albo <code>normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go dodaje. Tryb pełny to osobne włączenie dla zatwierdzonych osób.</span></li>
+<li><strong>kilka głosów</strong><span>Wybierz dla siebie <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> albo <code>normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go dodaje. Tryb pełny to osobne włączenie dla zatwierdzonych osób.</span></li>
 <li><strong>może odpowiadać w twoim języku</strong><span>Admini ustawiają pełną nazwę języka, na przykład <code>!language hungarian</code>. Gdy jest pasująca grafika, owaua może też zmienić avatar i banner bota na tym serwerze, żeby wyglądał jak u siebie.</span></li>
 <li><strong>piosenka na voice, jeśli poprosisz</strong><span><code>!music</code> puszcza jeden film z YouTube albo post z Twittera/X z wideo, albo obsługiwany załącznik audio. Pauza, wznów, restart, skip, stop, teraz i wyjdź. Bez szukania po nazwie i bez playlist.</span></li>
-<li><strong>krótkie odpowiedzi, specjalnie</strong><span>Zwykłe odpowiedzi w hangoucie zostają krótkie i kończą zdanie. Gemini w hangoucie może spojrzeć na jeden obrazek. Zatwierdzone osoby mogą włączyć <code>!full mode on</code> na wyznaczonych kanałach. Tryb pełny dzieli te same limity.</span></li>
+<li><strong>krótkie odpowiedzi</strong><span>Zwykłe odpowiedzi w hangoucie zostają krótkie i kończą zdanie. Gemini w hangoucie może spojrzeć na jeden obrazek. Zatwierdzone osoby mogą włączyć <code>!full mode on</code> na wyznaczonych kanałach. Tryb pełny dzieli te same limity.</span></li>
 </ul>
 </section>
 
@@ -124,7 +124,7 @@ owaua
 </section>
 
 <section class="section" id="limits">
-<h2>limity, powiedziane wprost</h2>
+<h2>limity</h2>
 <p>Są po to, żeby jedna osoba nie mogła go stopić, i żeby został na tyle tani, żeby go trzymać. To sufity zapytań, nie obietnica darmowego użytku.</p>
 <ul class="list">
 <li><strong>osiem prób AI na minutę, na osobę</strong><span>Ten licznik siedzi w działającym procesie i zeruje się przy restarcie. Nie ma osobnego, zapisywanego limitu dziennego ani dziesięciominutowego. Tryb pełny dzieli te same limity.</span></li>
@@ -144,7 +144,7 @@ owaua
 </section>
 
 <section class="section" id="faq">
-<h2>pytania, które ludzie naprawdę zadają</h2>
+<h2>pytania</h2>
 <div class="faq">
 <details>
 <summary>Odpowiada na każdą wiadomość?</summary>
@@ -152,14 +152,14 @@ owaua
 </details>
 <details>
 <summary>Dlaczego nie odpisał?</summary>
-<p>Sprawdź, czy naprawdę go pingnąłeś. Daj mu chwilę — pokazuje typing, jak pracuje. Zobacz limity i cooldowny komend wyżej. Inne boty są ignorowane specjalnie.</p>
+<p>Sprawdź, czy go pingnąłeś. Daj mu sekundę. Pokazuje typing, jak pracuje. Zobacz limity i cooldowny wyżej. Inne boty są ignorowane.</p>
 </details>
 <details>
 <summary>Mogę zmienić, jak brzmi?</summary>
 <p>Tak. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> albo <code>!persona normal</code>. Głos człowieka w pokoju jest domyślnie wyłączony; <code>!human on</code> go przywraca.</p>
 </details>
 <details>
-<summary>Muzyka naprawdę gra?</summary>
+<summary>Muzyka gra?</summary>
 <p>Tak. Wchodzi na twój kanał głosowy i streamuje utwór. Bez playlist, bez kolejki następnych dziesięciu. Musisz być na voice, a on potrzebuje tam Connect i Speak.</p>
 </details>
 <details>

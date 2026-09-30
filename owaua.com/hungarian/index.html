@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="Az owaua egy kicsi Discord bot, akit akkor említesz, ha társaságra vágysz. Egy kicsit emlékszik, van néhány hangja, és tud egy számot lejátszani voice-on.">
+<meta name="description" content="Az owaua egy Discord bot. Pingeld, ha választ szeretnél. Egy kicsit emlékszik, van pár hangja, és tud egy számot lejátszani voice-on.">
 <meta name="theme-color" content="#ce2939">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s.pinimg.com; style-src 'self'; img-src 'self' data: https://ct.pinterest.com; connect-src 'self' https://ct.pinterest.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="/assets/pinterest.js" defer></script>
@@ -22,7 +22,7 @@
 <meta property="og:url" content="https://owaua.com/hungarian">
 <meta property="og:image" content="https://owaua.com/assets/pfp-hungarian.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="egy kicsi Discord bot, akivel tényleg lehet beszélgetni">
+<meta property="og:description" content="egy Discord bot, akivel lehet beszélgetni">
 <title>owaua · egy kicsi Discord hangout bot</title>
 <link rel="icon" href="/assets/pfp-hungarian-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/assets/owaua.css?v=20260920c">
@@ -58,7 +58,7 @@ owaua
 </div>
 </details>
 </nav>
-<aside class="corner-note">A bot köré szándékosan nem raktam sok weboldalt. A bot a lényeg. Remélem, így is elég.</aside>
+<aside class="corner-note">Az oldal kicsi. A bot a lényeg.</aside>
 <main id="main" class="wrap">
 <header class="hero">
 <div class="hero-id">
@@ -69,7 +69,7 @@ owaua
 </div>
 </div>
 <h1>a bot, aki a szerveren lóg veled</h1>
-<p class="lede">Említsd, ha választ szeretnél. Egy kicsit emlékszik arra, amit ti ketten most mondtatok — nem az egész szobára — és tud hangot váltani, a szerver nyelvén válaszolni, vagy egy számot elindítani voice-on. Kicsi, szándékosan.</p>
+<p class="lede">Pingeld, ha választ szeretnél. Egy kicsit emlékszik arra, amit ti ketten most mondtatok, nem az egész szobára. Tud hangot váltani, a szerver nyelvén válaszolni, vagy egy számot elindítani voice-on.</p>
 <div class="actions">
 <a class="button" href="https://discord.gg/CNbpwtE9HS">gyere a Discordra</a>
 <a class="button ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">owaua meghívása</a>
@@ -94,15 +94,15 @@ owaua
 </figure>
 
 <section class="section" id="what">
-<h2>mit csinál valójában</h2>
+<h2>mit csinál</h2>
 <p>Pingeld, ha bent akarod a beszélgetésben. Abban a hangban és nyelven válaszol, amit a szerver már választott.</p>
 <ul class="list">
-<li><strong>megvárja, amíg kéred</strong><span>Pingeld a szerveren, és válaszol. Egy magányos <code>@owaua</code> semmi mással egy kis helyi „yeah?”-t kap — modellhívás nélkül. A többi botot ignorálja. A DM csak akkor megy, ha az üzemeltető bekapcsolja a <code>BOT_ALLOW_DMS=1</code>-et.</span></li>
+<li><strong>megvárja, amíg kéred</strong><span>Pingeld a szerveren, és válaszol. Egy magányos <code>@owaua</code> semmi mással egy kis helyi „yeah?”-t kap. Modellhívás nélkül. A többi botot ignorálja. A DM csak akkor megy, ha az üzemeltető bekapcsolja a <code>BOT_ALLOW_DMS=1</code>-et.</span></li>
 <li><strong>a ti szálatokra emlékszik, és egy kicsit a szobára is</strong><span>A vele való előzményed csak te vagy, azon a csatornán: legfeljebb 20 kör, egy hét után elhalványulnak, és a fájl 10 000 rekordnál megáll. Emellett megtart egy rövid friss sort abból a csatornából, hogy egy ping ne legyen vak. A melletted lévőnek továbbra is saját szála és saját personája van.</span></li>
-<li><strong>pár hang, és pár agy</strong><span>Válassz magadnak <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> vagy <code>normal</code> hangot. A szobában lévő ember hangja alapból ki van kapcsolva; a <code>!human on</code> teszi be. A full mód külön opt-in az engedélyezett felhasználóknak.</span></li>
+<li><strong>pár hang</strong><span>Válassz magadnak <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> vagy <code>normal</code> hangot. A szobában lévő ember hangja alapból ki van kapcsolva; a <code>!human on</code> teszi be. A full mód külön opt-in az engedélyezett felhasználóknak.</span></li>
 <li><strong>tud a te nyelveden válaszolni</strong><span>Az adminok teljes nyelvnevet állítanak, például <code>!language hungarian</code>. Ha van hozzá illő kép, az owaua a bot avatarját és bannerjét is átállíthatja azon a szerveren, hogy odaillőnek tűnjön.</span></li>
 <li><strong>egy szám voice-on, ha kéred</strong><span>A <code>!music</code> lejátszik egy YouTube-videót vagy egy Twitter/X posztot videóval, vagy egy támogatott hangmellékletet. Szünet, folytatás, restart, skip, stop, now és leave. Nincs névkeresés és nincs lejátszási lista.</span></li>
-<li><strong>rövid válaszok, szándékosan</strong><span>A sima hangout válaszok rövidek maradnak, és befejezik a mondatot. A Gemini hangout egy képet meg tud nézni. Az engedélyezett emberek megnyithatják a <code>!full mode on</code>-t a kijelölt csatornákon. A full mód ugyanazokat a korlátokat használja.</span></li>
+<li><strong>rövid válaszok</strong><span>A sima hangout válaszok rövidek maradnak, és befejezik a mondatot. A Gemini hangout egy képet meg tud nézni. Az engedélyezett emberek megnyithatják a <code>!full mode on</code>-t a kijelölt csatornákon. A full mód ugyanazokat a korlátokat használja.</span></li>
 </ul>
 </section>
 
@@ -124,7 +124,7 @@ owaua
 </section>
 
 <section class="section" id="limits">
-<h2>a korlátok, simán elmondva</h2>
+<h2>a korlátok</h2>
 <p>Azért vannak, hogy egy ember ne tudja megolvasztani, és hogy elég olcsó maradjon ahhoz, hogy fent tartsuk. Ezek kérésplafonok, nem ingyenes használat ígérete.</p>
 <ul class="list">
 <li><strong>nyolc AI-próbálkozás percenként, felhasználónként</strong><span>Ez a számláló a futó folyamatban él, és újraindításkor nullázódik. Nincs külön tárolt napi vagy tízperces kvóta. A full mód ugyanazokat a korlátokat használja.</span></li>
@@ -144,7 +144,7 @@ owaua
 </section>
 
 <section class="section" id="faq">
-<h2>amit tényleg megkérdeznek</h2>
+<h2>kérdések</h2>
 <div class="faq">
 <details>
 <summary>Minden üzenetre válaszol?</summary>
@@ -152,14 +152,14 @@ owaua
 </details>
 <details>
 <summary>Miért nem válaszolt?</summary>
-<p>Nézd meg, hogy tényleg pingelted-e. Adj neki egy pillanatot — írás közben typinget mutat. Nézd meg a fenti gyakorisági korlátokat és a parancsok cooldownjait. A többi botot szándékosan ignorálja.</p>
+<p>Nézd meg, hogy pingelted-e. Adj neki egy másodpercet. Írás közben typinget mutat. Nézd meg a limiteket és a cooldownokat fent. A többi botot ignorálja.</p>
 </details>
 <details>
 <summary>Megváltoztathatom, hogyan hangzik?</summary>
 <p>Igen. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> vagy <code>!persona normal</code>. A szobában lévő ember hangja alapból ki van kapcsolva; a <code>!human on</code> hozza vissza.</p>
 </details>
 <details>
-<summary>A zene tényleg szól?</summary>
+<summary>A zene szól?</summary>
 <p>Igen. Belép a voice csatornádra, és streameli a számot. Nincs lejátszási lista, nincs a következő tíz száma. Voice-ban kell lenned, és ott kell neki Connect és Speak.</p>
 </details>
 <details>

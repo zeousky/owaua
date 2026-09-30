@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="owaua e un bot mic de Discord pe care îl menționezi când vrei companie. Ține minte un pic, are câteva voci și poate pune o piesă pe voice.">
+<meta name="description" content="owaua e un bot de Discord. Menționează-l când vrei un răspuns. Ține minte un pic, are câteva voci și poate pune o piesă pe voice.">
 <meta name="theme-color" content="#12110f">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="canonical" href="https://owaua.com/kirk/romanian">
@@ -21,7 +21,7 @@
 <meta property="og:url" content="https://owaua.com/kirk/romanian">
 <meta property="og:image" content="https://owaua.com/assets/pfp-romanian.png">
 <meta property="og:title" content="owaua">
-<meta property="og:description" content="un bot mic de Discord cu care poți chiar vorbi">
+<meta property="og:description" content="un bot de Discord cu care poți vorbi">
 <title>owaua · un bot mic de Discord de hangout</title>
 <link rel="icon" href="/assets/pfp-romanian-96.webp?v=20260918a" type="image/webp">
 <link rel="stylesheet" href="/kirk/assets/kirk.css?v=20260929a">
@@ -45,7 +45,7 @@
 <a href="#limits">limite</a>
 <a href="/kirk/privacy">confidențialitate</a>
 <a href="#data">ce păstrează</a>
-<a href="#faq">ce întreabă oamenii de-adevăratelea</a>
+<a href="#faq">întrebări</a>
 <a href="#setup">sau rulează-l tu</a>
 <a href="/kirk/terms">termeni</a>
 <a href="/kirk/partnerships">parteneri</a>
@@ -72,9 +72,9 @@
 <main id="main" class="stage">
 <header class="opener">
 <p class="kicker">the annoying discord bot</p>
-<p class="epigraph">În jurul botului, pe site, n-am pus grozav de multe, dinadins. Botul e treaba. Sper că ajunge și-așa.</p>
+<p class="epigraph">Site-ul e mic. Botul e treaba.</p>
 <h1>botul care stă de vorbă pe serverul tău</h1>
-<p class="lede">Menționează-l când vrei un răspuns. Ține minte un pic din ce ați zis voi doi tocmai — nu toată camera — și își poate schimba vocea, poate răspunde în limba serverului sau poate pune o piesă pe voice. Mic, dinadins.</p>
+<p class="lede">Menționează-l când vrei un răspuns. Ține minte un pic din ce ați zis voi doi tocmai, nu toată camera. Își poate schimba vocea, poate răspunde în limba serverului sau poate pune o piesă pe voice.</p>
 <div class="actions">
 <a class="btn" href="https://discord.gg/CNbpwtE9HS">vino pe Discord</a>
 <a class="btn ghost" href="https://discord.com/oauth2/authorize?client_id=1442127404607737999&amp;permissions=4503599630609408&amp;integration_type=0&amp;scope=bot">invită owaua</a>
@@ -86,14 +86,14 @@
 </figure>
 </header>
 <section class="chapter" id="what">
-<header class="chapter-h"><span class="num">01</span><h2>ce face de fapt</h2></header>
+<header class="chapter-h"><span class="num">01</span><h2>ce face</h2></header>
 <p>Ping-uiește-l când îl vrei în conversație. Răspunde cu vocea și limba pe care serverul le-a ales deja.</p>
-<div class="piece"><h3>așteaptă să-i ceri</h3><p>Ping-uiește-l pe un server și răspunde. Un <code>@owaua</code> singur, fără altceva, primește un mic „yeah?” local — fără să cheme modelul. Alți boți sunt ignorați. DM-urile merg doar dacă operatorul pornește <code>BOT_ALLOW_DMS=1</code>.</p></div>
+<div class="piece"><h3>așteaptă să-i ceri</h3><p>Ping-uiește-l pe un server și răspunde. Un <code>@owaua</code> singur, fără altceva, primește un mic „yeah?” local. Fără să cheme modelul. Alți boți sunt ignorați. DM-urile merg doar dacă operatorul pornește <code>BOT_ALLOW_DMS=1</code>.</p></div>
 <div class="piece"><h3>ține minte firul vostru, și un pic din cameră</h3><p>Istoricul tău cu el ești doar tu, pe canalul ăla: până la 20 de ture, se șterg după o săptămână, iar fișierul se oprește la 10.000 de înregistrări. Ține și o linie recentă scurtă din canalul respectiv, ca un ping să nu fie orb. Persoana de lângă tine are tot firul ei și persona ei.</p></div>
-<div class="piece"><h3>câteva voci, și câteva creiere</h3><p>Alege <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> sau <code>normal</code>, pentru tine. Vocea de om în cameră e oprită implicit; <code>!human on</code> o adaugă. Modul full e un opt-in separat pentru utilizatorii aprobați.</p></div>
+<div class="piece"><h3>câteva voci</h3><p>Alege <code>rudeish low</code>, <code>rudeish medium</code>, <code>rudeish high</code>, <code>nerdish</code>, <code>flirty</code>, <code>irritating</code>, <code>cute</code> sau <code>normal</code>, pentru tine. Vocea de om în cameră e oprită implicit; <code>!human on</code> o adaugă. Modul full e un opt-in separat pentru utilizatorii aprobați.</p></div>
 <div class="piece"><h3>poate răspunde în limba ta</h3><p>Adminii pun un nume de limbă întreg, gen <code>!language hungarian</code>. Când există arta potrivită, owaua poate schimba și avatarul și bannerul botului pe serverul ăla, ca să pară de-al locului.</p></div>
 <div class="piece"><h3>o piesă pe voice, dacă ceri</h3><p><code>!music</code> cântă un singur videoclip YouTube sau o postare Twitter/X cu video, sau un atașament audio suportat. Pauză, continuă, restart, skip, stop, now și leave. Fără căutări după nume sau playlisturi.</p></div>
-<div class="piece"><h3>răspunsuri scurte, dinadins</h3><p>Răspunsurile normale de hangout rămân scurte și încheie fraza. Gemini hangout se poate uita la o imagine. Oamenii aprobați pot deschide <code>!full mode on</code> pe canalele desemnate. Modul full împarte aceleași limite.</p></div>
+<div class="piece"><h3>răspunsuri scurte</h3><p>Răspunsurile normale de hangout rămân scurte și încheie fraza. Gemini hangout se poate uita la o imagine. Oamenii aprobați pot deschide <code>!full mode on</code> pe canalele desemnate. Modul full împarte aceleași limite.</p></div>
 </section>
 <section class="chapter" id="commands">
 <header class="chapter-h"><span class="num">02</span><h2>cum vorbești cu el</h2></header>
@@ -112,7 +112,7 @@
 </div>
 </section>
 <section class="chapter" id="limits">
-<header class="chapter-h"><span class="num">03</span><h2>limitele, spuse clar</h2></header>
+<header class="chapter-h"><span class="num">03</span><h2>limitele</h2></header>
 <p>Există ca o persoană să nu-l poată topi, și ca să rămână suficient de ieftin de ținut pornit. Sunt plafoane de cereri, nu o promisiune de folosire gratuită.</p>
 <div class="limits">
 <article class="stat"><b>8</b><h3>opt încercări IA pe minut, per utilizator</h3><p>Contorul ăla trăiește în procesul care rulează și se resetează când repornește. Nu există vreo cotă separată persistată pe zi sau pe zece minute. Modul full împarte aceleași limite.</p></article>
@@ -128,12 +128,12 @@
 <p>Versiunea lungă și atentă e <a href="/kirk/privacy">politica de confidențialitate</a>. Să-l inviți înseamnă și <a href="/kirk/terms">termenii</a>.</p></div>
 </section>
 <section class="chapter" id="faq">
-<header class="chapter-h"><span class="num">05</span><h2>ce întreabă oamenii de-adevăratelea</h2></header>
+<header class="chapter-h"><span class="num">05</span><h2>întrebări</h2></header>
 <div class="faq">
 <details><summary>Răspunde la fiecare mesaj?</summary><p>Nu. Menționează-l când vrei un răspuns. Ține totuși o linie recentă scurtă din canal, ca să nu fie orb când o faci. DM-uri doar dacă operatorul le-a pornit. Alți boți nu primesc niciodată răspuns.</p></details>
-<details><summary>De ce n-a răspuns?</summary><p>Verifică că l-ai ping-uit chiar. Dă-i o clipă — arată că scrie cât lucrează. Uită-te la limitele de rată și la cooldown-urile comenzilor de mai sus. Alți boți sunt ignorați dinadins.</p></details>
+<details><summary>De ce n-a răspuns?</summary><p>Verifică că l-ai ping-uit. Dă-i o secundă. Arată că scrie cât lucrează. Uită-te la limite și la cooldown-uri mai sus. Alți boți sunt ignorați.</p></details>
 <details><summary>Pot schimba cum sună?</summary><p>Da. <code>!persona rudeish low</code>, <code>!persona rudeish medium</code>, <code>!persona rudeish high</code>, <code>!persona nerdish</code>, <code>!persona flirty</code>, <code>!persona irritating</code>, <code>!persona cute</code> sau <code>!persona normal</code>. Vocea de om în cameră e oprită implicit; <code>!human on</code> o readuce.</p></details>
-<details><summary>Muzica chiar cântă?</summary><p>Da. Intră pe canalul tău vocal și streamează piesa. Fără playlisturi, fără coadă cu următoarele zece piese. Trebuie să fii pe voice, și are nevoie de Connect și Speak acolo.</p></details>
+<details><summary>Muzica cântă?</summary><p>Da. Intră pe canalul tău vocal și streamează piesa. Fără playlisturi, fără coadă cu următoarele zece piese. Trebuie să fii pe voice, și are nevoie de Connect și Speak acolo.</p></details>
 <details><summary>Mă pot baza pe fiecare răspuns?</summary><p>Nu. Poate fi sigur și tot greșit. Dacă ceva contează, verifică singur, sau întreabă un om.</p></details>
 <details><summary>Unde zic că ceva e stricat?</summary><p><a href="https://discord.gg/CNbpwtE9HS">Serverul Discord</a>, sau persoana care l-a făcut: Discord <code>ckazros</code> · <a href="mailto:ckazros@owaua.com">ckazros@owaua.com</a>. Zi ce-ai încercat și ce s-a întâmplat. Te rog nu lipi tokenuri sau chaturi private pe un canal public.</p></details>
 </div>
