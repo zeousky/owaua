@@ -23,14 +23,10 @@ from PIL import Image
 from ask import (
     FULL_MODE_PROVIDERS,
     GEMINI_ONLY,
-    FULL_MODE_MODELS,
     LOCAL_AI_ONLY,
     MAX_ATTACHMENTS,
-    MODEL,
-    GEMINI_MODEL,
-    GROQ_MODEL,
-    DEEPSEEK_MODEL,
-    MISTRAL_MODEL,
+    LUNA_MODEL,
+    OPENAI_API_KEY,
     PERSONAS,
     RANDOM_PERSONA,
     RANDOM_PERSONA_CHOICES,
@@ -69,7 +65,7 @@ log = logging.getLogger("owaua")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "").strip().replace("\\_", "_")
-PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "").strip()
+
 MEMORY_DB = ROOT / "data" / "memory.sqlite3"
 RATE_LIMIT_REQUESTS = 8
 RATE_LIMIT_WINDOW = 60.0
@@ -91,6 +87,11 @@ COMMANDS = frozenset(
         "!switch",
     }
 )
+AI_CREDITS_WARNING = (
+    "my owner has ran out of credits, If you'd like to keep using them, "
+    "you can donate at https://ko-fi.com/ckazros — the owner would appreciate it"
+)
+AI_CREDITS_EXHAUSTED = False
 DISCORD_MESSAGE_LIMIT = 1900
 ASK_TIMEOUT = 80.0
 HANDLER_TIMEOUT = 140.0
@@ -159,6 +160,7 @@ OWNER_HELP_TEXT = """**Owaua commands**
 Each command has a 25s cooldown."""
 
 MODEL_PRICING = {
+    "gpt-6-luna": (0.10, 0.50, "0.01 cached input"),
     "openai/gpt-6-luna": (0.10, 0.50, "0.01 cached input"),
     "openai/gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
     "gpt-5.6-luna": (0.20, 1.20, "0.02 cached input"),
@@ -181,23 +183,15 @@ def _pricing_line(label: str, model: str) -> str:
 
 
 def pricing_text() -> str:
-    """Build the owner-only model price card from the active configuration."""
-    lines = [
-        "**Owaua model pricing**",
-        "USD per 1M tokens (provider list prices; tools/search may cost extra).",
-        _pricing_line("normal personas", GEMINI_MODEL),
-        _pricing_line("host gpt", MODEL),
-        _pricing_line("host deepseek", DEEPSEEK_MODEL),
-        _pricing_line("host mistral alias", MISTRAL_MODEL),
-        _pricing_line("irritating / Groq", GROQ_MODEL),
-    ]
-    lines.extend(
-        _pricing_line(f"full {provider}", model)
-        for provider, model in FULL_MODE_MODELS.items()
+    """Owner-only price card. Every cloud reply is GPT-6 Luna."""
+    return "\n".join(
+        [
+            "**Owaua model pricing**",
+            "USD per 1M tokens under 272k. A web search is $0.01. A code session is $0.03.",
+            _pricing_line("every reply", LUNA_MODEL),
+            "Cached input is $0.01 per 1M. Hangout chat sends no tools.",
+        ]
     )
-    lines.append("DeepSeek direct: peak rates are shown; off-peak is 50%.")
-    lines.append("Prices can change—verify with each provider before billing decisions.")
-    return "\n".join(lines)
 
 OWNER_NOTE_TEXT = (
     "Hello, I hope you like my bot! I'm trying to keep it as simple as possible "
@@ -284,6 +278,32 @@ def full_mode_location(message: object) -> bool:
         getattr(guild, "id", None) == FULL_MODE_GUILD_ID
         and getattr(channel, "id", None) in FULL_MODE_CHANNEL_IDS
     )
+
+
+def should_warn_for_ai_credits(
+    message: object, normalized: str, bot_user: object | None
+) -> bool:
+    """Identify Owaua chat and AI-mode attempts before they can reach a provider."""
+    if is_full_mode_command(normalized) or is_topgg_full_mode_command(normalized):
+        return True
+
+    # These names are not Owaua commands, but users may still try the older
+    # chat-style spellings. Keep music, help, memory and other local commands
+    # working without sending a credits notice.
+    if re.match(
+        r"^(?:!(?:ask|chat|ai|search)|,(?:ask|chat|people_search|container))(?:\s|$)",
+        normalized,
+        re.IGNORECASE,
+    ):
+        return True
+    if matched_command(normalized) is not None:
+        return False
+
+    guild = getattr(message, "guild", None)
+    if guild is None:
+        return bool(normalized.strip() or getattr(message, "attachments", ()))
+    mentions = getattr(message, "mentions", ())
+    return bot_user is not None and bot_user in mentions
 
 
 def full_mode_blocked(user_id: object) -> bool:
@@ -1175,6 +1195,27 @@ class PersonaBot(discord.Client):
             log.warning("sefbot container interaction failed in guild %s", guild.id, exc_info=True)
 
     async def on_interaction(self, interaction: discord.Interaction) -> None:
+        data = interaction.data if isinstance(interaction.data, dict) else {}
+        name = str(data.get("name") or "").casefold()
+        custom_id = str(data.get("custom_id") or "")
+        is_credit_ai_interaction = (
+            interaction.type is discord.InteractionType.application_command
+            and name in {"people_search", "ask"}
+        ) or (
+            interaction.type in {
+                discord.InteractionType.component,
+                discord.InteractionType.modal_submit,
+            }
+            and custom_id.startswith("container:")
+        )
+        if AI_CREDITS_EXHAUSTED and is_credit_ai_interaction:
+            try:
+                await interaction.response.send_message(
+                    AI_CREDITS_WARNING, ephemeral=True
+                )
+            except (discord.HTTPException, discord.Forbidden):
+                return
+            return
         if interaction.type is discord.InteractionType.component:
             await self._forward_sefbot_component(interaction)
             return
@@ -1421,6 +1462,11 @@ class PersonaBot(discord.Client):
             return
         normalized = command_text(message.content, None if self.user is None else self.user.id)
         if self.shutdown_requested:
+            return
+        if AI_CREDITS_EXHAUSTED and should_warn_for_ai_credits(
+            message, normalized, self.user
+        ):
+            await self._reply(message, AI_CREDITS_WARNING)
             return
         if normalized.casefold() == "!shutdown":
             if message.author.id in OWNER_IDS and self.message_events.claim(message.id):
@@ -2150,9 +2196,9 @@ async def main() -> None:
         raise RuntimeError(
             "DISCORD_TOKEN is missing; copy .env.example to .env and fill it in"
         )
-    if not LOCAL_AI_ONLY and not PERPLEXITY_API_KEY:
+    if not LOCAL_AI_ONLY and not OPENAI_API_KEY:
         raise RuntimeError(
-            "PERPLEXITY_API_KEY is missing; copy .env.example to .env and fill it in"
+            "OPENAI_API_KEY is missing; copy .env.example to .env and fill it in"
         )
     await start_discord_with_retries(DISCORD_TOKEN)
 

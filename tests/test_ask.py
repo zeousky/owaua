@@ -194,10 +194,10 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer, "allowed reply")
         self.assertEqual(len(self.http.calls), 1)
         self.assertTrue(self.http.calls[0][0].endswith("/responses"))
-        self.assertIn("api.perplexity.ai", self.http.calls[0][0])
+        self.assertIn("api.openai.com", self.http.calls[0][0])
         payload = self.http.calls[0][1]["json"]
         self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_steps"], 1)
+        self.assertNotIn("max_steps", payload)
         self.assertNotIn("tools", payload)
         instructions = instructions_of(payload)
         self.assertIn("Stay in this voice", instructions)
@@ -218,8 +218,8 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Never decode", instructions)
         self.assertIn("Never repeat", instructions)
         self.assertNotIn("at most 100 characters", instructions)
-        self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
-        self.assertEqual(payload["max_output_tokens"], 4096)
+        self.assertEqual(payload["max_output_tokens"], MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["reasoning"], {"effort": "none"})
         self.assertIn("You can still be wild", instructions)
         self.assertIn("hidden or encoded", instructions)
         self.assertNotIn("SELF-KNOWLEDGE", instructions)
@@ -328,8 +328,11 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
             image_urls=["https://cdn.discordapp.com/image.png"],
             provider_override="gpt",
         )
-        self.assertIn("disabled", answer)
-        self.assertEqual(self.http.calls, [])
+        self.assertEqual(answer, "allowed reply")
+        content = latest_user_content(self.http.calls[0][1]["json"])
+        images = [block for block in content if block.get("type") == "input_image"]
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0]["detail"], "low")
 
     def test_conversation_input_drops_old_messages_over_the_char_budget(self) -> None:
         filler = "x" * MAX_MESSAGE_CHARS
@@ -390,38 +393,34 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(answer, "gemini reply")
         self.assertTrue(self.http.calls[0][0].endswith("/responses"))
-        self.assertIn("api.perplexity.ai", self.http.calls[0][0])
+        self.assertIn("api.openai.com", self.http.calls[0][0])
         payload = self.http.calls[0][1]["json"]
         self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_steps"], 1)
+        self.assertNotIn("max_steps", payload)
         self.assertNotIn("tools", payload)
         self.assertNotIn("Consensual adult sexual roleplay", instructions_of(payload))
         self.assertIn("Stay in this voice", instructions_of(payload))
 
-    async def test_irritating_persona_uses_groq_oss_unbounded(self) -> None:
-        with patch("ask.GROQ_API_KEY", "test-groq-key"):
-            answer = await self._ask(persona="irritating")
+    async def test_irritating_persona_uses_luna(self) -> None:
+        answer = await self._ask(persona="irritating")
 
         self.assertEqual(answer, "allowed reply")
-        self.assertTrue(self.http.calls[0][0].endswith("/chat/completions"))
-        self.assertIn("api.groq.com", self.http.calls[0][0])
+        self.assertIn("api.openai.com", self.http.calls[0][0])
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], GROQ_MODEL)
-        # No 256-token cap: the request asks for the model's full output ceiling.
-        self.assertEqual(payload["max_tokens"], GROQ_MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["model"], "gpt-6-luna")
+        self.assertEqual(payload["max_output_tokens"], MAX_OUTPUT_TOKENS)
+        self.assertNotIn("tools", payload)
         self.assertIn("be energetic, be stupid, be an idiot", instructions_of(payload).casefold())
 
-    async def test_provider_override_forces_groq_oss_for_restricted_users(self) -> None:
-        with patch("ask.GROQ_API_KEY", "test-groq-key"):
-            answer = await self._ask(
-                persona="flirty", provider_override="groq"
-            )
+    async def test_provider_override_still_uses_luna_for_restricted_users(self) -> None:
+        answer = await self._ask(persona="flirty", provider_override="groq")
 
         self.assertEqual(answer, "allowed reply")
-        self.assertIn("api.groq.com", self.http.calls[0][0])
+        self.assertIn("api.openai.com", self.http.calls[0][0])
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], GROQ_MODEL)
-        self.assertIn("Blocked users can only access Groq's GPT OSS 20B model", instructions_of(payload))
+        self.assertEqual(payload["model"], "gpt-6-luna")
+        self.assertNotIn("tools", payload)
+        self.assertIn("Blocked users still talk to GPT-6 Luna", instructions_of(payload))
 
     async def test_credible_self_harm_uses_the_local_emergency_reply(self) -> None:
         prompt = "i want to die tonight and im not joking"
@@ -622,9 +621,9 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(len(answer), MAX_HANGOUT_REPLY_CHARS)
         payload = self.http.calls[0][1]["json"]
         self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
-        self.assertEqual(payload["max_output_tokens"], 4096)
-        self.assertEqual(payload["max_steps"], 1)
+        self.assertEqual(payload["max_output_tokens"], MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["reasoning"], {"effort": "none"})
+        self.assertNotIn("max_steps", payload)
         self.assertNotIn("tools", payload)
         self.assertNotIn("web search", instructions_of(payload))
 
@@ -640,17 +639,15 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(answer or ""), 100)
         self.assertNotEqual(answer, long)
 
-    async def test_groq_oss_hangout_reply_is_not_length_capped(self) -> None:
+    async def test_restricted_user_reply_stays_on_the_hangout_cap(self) -> None:
         sentence = "leave it alone."
         long = " ".join([sentence] * 40)
         self.http.responses = model_reply(long)
 
-        with patch("ask.GROQ_API_KEY", "test-groq-key"):
-            answer = await self._ask(provider_override="groq")
+        answer = await self._ask(provider_override="groq")
 
-        # gpt-oss-20b output is unbounded: no hangout clip, no reply truncation.
-        self.assertEqual(answer, long.strip())
-        self.assertGreater(len(answer or ""), MAX_HANGOUT_REPLY_CHARS)
+        self.assertLessEqual(len(answer or ""), MAX_HANGOUT_REPLY_CHARS)
+        self.assertNotEqual(answer, long.strip())
 
     async def test_bad_draft_keeps_an_in_character_retry(self) -> None:
         dump = (
@@ -704,33 +701,41 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(answer, "allowed reply")
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_steps"], 1)
+        self.assertEqual(payload["model"], "gpt-6-luna")
+        self.assertNotIn("max_steps", payload)
         self.assertNotIn("tools", payload)
         self.assertNotIn("web search", instructions_of(payload))
-        self.assertEqual(payload["max_output_tokens"], GEMINI_MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["max_output_tokens"], MAX_OUTPUT_TOKENS)
 
     async def test_full_mode_gemini_keeps_the_large_output_budget(self) -> None:
         await self._ask(full_mode=True, full_mode_provider="gemini")
 
         payload = self.http.calls[0][1]["json"]
-        self.assertEqual(payload["model"], GEMINI_MODEL)
-        self.assertEqual(payload["max_output_tokens"], 65536)
-        self.assertEqual(payload["tools"], [{"type": "web_search"}])
+        self.assertEqual(payload["model"], "gpt-6-luna")
+        self.assertEqual(payload["max_output_tokens"], 900)
+        self.assertEqual(payload["max_tool_calls"], 4)
+        self.assertEqual(payload["tools"], gpt_full_tools())
 
     async def test_full_mode_keeps_tools_but_uses_the_normal_output_cap(self) -> None:
         await self._ask("generate an image of a crown", full_mode=True)
         payload = self.http.calls[0][1]["json"]
         self.assertEqual(payload["model"], GPT_TERRA_MODEL)
-        self.assertEqual(payload["max_output_tokens"], GPT_MAX_OUTPUT_TOKENS)
+        self.assertEqual(payload["max_output_tokens"], 900)
         self.assertNotIn("max_tokens", payload)
         self.assertEqual(payload["reasoning"], dict(GPT_FULL_REASONING))
         self.assertEqual(payload["tools"], gpt_full_tools())
         self.assertEqual(
             payload["tools"],
             [
-                {"type": "web_search"},
-                {"type": "code_interpreter", "container": {"type": "auto"}},
+                {
+                    "type": "web_search",
+                    "search_context_size": "low",
+                    "external_web_access": True,
+                },
+                {
+                    "type": "code_interpreter",
+                    "container": {"type": "auto", "memory_limit": "1g"},
+                },
             ],
         )
         self.assertIn("Image generation is unavailable", payload["instructions"])
@@ -863,27 +868,19 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ChatModelConfigTests(unittest.TestCase):
-    def test_default_chat_model_is_gemini_3_1_flash_lite(self) -> None:
-        self.assertEqual(resolve_chat_model({}), "google/gemini-3.1-flash-lite")
-
-    def test_legacy_gemini_model_env_still_selects_the_chat_model(self) -> None:
+    def test_the_only_chat_model_is_gpt_6_luna(self) -> None:
+        self.assertEqual(resolve_chat_model({}), "gpt-6-luna")
         self.assertEqual(
             resolve_chat_model({"GEMINI_MODEL": "google/gemini-3.1-flash-lite"}),
-            "google/gemini-3.1-flash-lite",
+            "gpt-6-luna",
         )
-
-    def test_chat_model_env_wins_over_the_legacy_alias(self) -> None:
         self.assertEqual(
             resolve_chat_model(
-                {"CHAT_MODEL": "openai/gpt-6-luna", "GEMINI_MODEL": "legacy/model"}
+                {"CHAT_MODEL": "openai/gpt-5.6-luna", "GEMINI_MODEL": "legacy/model"}
             ),
-            "openai/gpt-6-luna",
+            "gpt-6-luna",
         )
-
-    def test_blank_chat_model_falls_back_to_the_default(self) -> None:
-        self.assertEqual(
-            resolve_chat_model({"CHAT_MODEL": "   "}), "google/gemini-3.1-flash-lite"
-        )
+        self.assertEqual(resolve_chat_model({"CHAT_MODEL": "   "}), "gpt-6-luna")
 
     def test_gemini_model_stays_an_alias_for_the_chat_model(self) -> None:
         self.assertEqual(GEMINI_MODEL, CHAT_MODEL)
@@ -1068,7 +1065,7 @@ class AskHelperTests(unittest.TestCase):
         self.assertEqual(persona_provider("rudeish-high"), "gemini")
         self.assertEqual(persona_provider("nerdish"), "gemini")
         self.assertEqual(persona_provider("flirty"), "gemini")
-        self.assertEqual(persona_provider("irritating"), "groq")
+        self.assertEqual(persona_provider("irritating"), "gemini")
         self.assertEqual(persona_provider("host-default-gpt"), "gemini")
 
         capable = build_capable_instructions("be blunt", language="Hungarian")

@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from ask import AssistantReply, RANDOM_PERSONA_CHOICES
 from bot import (
+    AI_CREDITS_WARNING,
     DISCORD_MESSAGE_LIMIT,
     FULL_MODE_ALLOWED_USER_IDS,
     FULL_MODE_BLOCKED_USER_IDS,
@@ -99,6 +100,11 @@ def make_message(
 
 class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        # Keep these tests focused on the legacy command and AI pipeline
+        # mechanics; the exhausted-credits behavior has explicit tests below.
+        credits_patch = patch("bot.AI_CREDITS_EXHAUSTED", False)
+        credits_patch.start()
+        self.addCleanup(credits_patch.stop)
         dm_patch = patch("bot.ALLOW_DMS", True)
         dm_patch.start()
         self.addCleanup(dm_patch.stop)
@@ -149,6 +155,33 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("!gifs", channel.sent[0])
         self.assertNotIn("!full", channel.sent[0])
 
+    async def test_exhausted_credits_warn_before_asking_the_model(self) -> None:
+        channel = FakeChannel()
+        message = self._full_mode_message(
+            "<@99> tell me something", 990, mentions=[self.bot.user], author_id=33
+        )
+        message.channel = channel
+
+        with patch("bot.AI_CREDITS_EXHAUSTED", True), patch(
+            "bot.ask", AsyncMock(return_value="this must not run")
+        ) as mocked_ask:
+            await self.bot.on_message(message)
+            toggle = self._full_mode_message("!full mode on", 991, author_id=33)
+            toggle.channel = channel
+            await self.bot.on_message(toggle)
+            people_search = make_message(
+                ",people_search Head of Design at Figma", 992, channel, author_id=404
+            )
+            await self.bot.on_message(people_search)
+
+        self.assertEqual(
+            channel.sent,
+            [AI_CREDITS_WARNING, AI_CREDITS_WARNING, AI_CREDITS_WARNING],
+        )
+        mocked_ask.assert_not_awaited()
+        self.assertIn("https://ko-fi.com/ckazros", channel.sent[0])
+        self.assertFalse(self.bot.full_mode_enabled_for(33))
+
     async def test_help_hides_owner_only_commands_from_non_owner(self) -> None:
         channel = FakeChannel()
 
@@ -186,8 +219,8 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(channel.sent, [pricing_text()])
-        self.assertIn("openai/gpt-5.6-luna", channel.sent[0])
-        self.assertIn("anthropic/claude-haiku-4-5", channel.sent[0])
+        self.assertIn("gpt-6-luna", channel.sent[0])
+        self.assertNotIn("claude", channel.sent[0].casefold())
 
     async def test_trusted_guild_music_bypasses_command_cooldown(self) -> None:
         channel = FakeChannel()
@@ -752,10 +785,10 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_flirty_persona_reports_a_missing_gemini_key(self) -> None:
         channel = FakeChannel(nsfw=True)
-        with patch("ask.PERPLEXITY_API_KEY", ""):
+        with patch("ask.OPENAI_API_KEY", ""), patch("ask.LOCAL_AI_ONLY", False):
             await self.bot.on_message(make_message("!persona flirty", 1, channel))
 
-        self.assertEqual(channel.sent, ["perplexity is not configured"])
+        self.assertEqual(channel.sent, ["openai is not configured"])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
 
     async def test_human_command_defaults_on_and_can_be_toggled(self) -> None:
@@ -880,12 +913,11 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("ask.LOCAL_AI_ONLY", False),
-            patch("ask.PERPLEXITY_API_KEY", ""),
-            patch("ask.GROQ_API_KEY", ""),
+            patch("ask.OPENAI_API_KEY", ""),
         ):
             await self.bot.on_message(make_message("!persona random", 1, channel))
 
-        self.assertEqual(channel.sent, ["perplexity is not configured"])
+        self.assertEqual(channel.sent, ["openai is not configured"])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
         self.assertEqual(self.store.get_setting("persona_random:user:33"), "")
 

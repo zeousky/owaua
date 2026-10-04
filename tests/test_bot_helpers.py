@@ -15,6 +15,8 @@ from unittest.mock import AsyncMock, Mock, patch
 from PIL import Image
 
 from bot import (
+    AI_CREDITS_EXHAUSTED,
+    AI_CREDITS_WARNING,
     BANNER_SIZE,
     DISCORD_MESSAGE_LIMIT,
     FULL_MODE_ALLOWED_USER_IDS,
@@ -70,6 +72,10 @@ from music import (
 
 
 class BotHelperTests(unittest.TestCase):
+    def test_ai_credit_pause_is_off(self) -> None:
+        self.assertFalse(AI_CREDITS_EXHAUSTED)
+        self.assertIn("https://ko-fi.com/ckazros", AI_CREDITS_WARNING)
+
     def test_discord_retry_delay_is_exponential_and_capped(self) -> None:
         self.assertEqual(discord_retry_delay(0), 0.0)
         self.assertEqual(discord_retry_delay(1), 5.0)

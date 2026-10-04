@@ -63,22 +63,19 @@ LOCAL_ENABLE_TOOLS = os.getenv("OWAUA_LOCAL_ENABLE_TOOLS", "0").strip().casefold
 }
 OLLAMA_BASE_URL = LOCAL_BASE_URL
 OLLAMA_MODEL = LOCAL_MODEL
-MODEL = LOCAL_MODEL if LOCAL_AI_ONLY else "openai/gpt-5.6-luna"
+#: The only cloud chat model. OpenAI id, not the Perplexity ``openai/`` prefix.
+LUNA_MODEL = "gpt-6-luna"
+MODEL = LOCAL_MODEL if LOCAL_AI_ONLY else LUNA_MODEL
 
 
 def resolve_chat_model(environ: Mapping[str, str] | None = None) -> str:
-    """Return the model used for normal-persona chat.
+    """Return the only cloud chat model.
 
-    The chat path still routes through the historical ``gemini`` provider slot
-    (Perplexity's hosted models), so the model is configurable independently of
-    the provider name. ``GEMINI_MODEL`` remains a supported legacy alias.
+    ``CHAT_MODEL`` and ``GEMINI_MODEL`` are ignored. Every cloud reply uses
+    GPT-6 Luna. ``environ`` stays in the signature so older callers still work.
     """
-    env = os.environ if environ is None else environ
-    for key in ("CHAT_MODEL", "GEMINI_MODEL"):
-        value = (env.get(key) or "").strip()
-        if value:
-            return value
-    return "google/gemini-3.1-flash-lite"
+    del environ
+    return LUNA_MODEL
 
 
 CHAT_MODEL = resolve_chat_model()
@@ -87,23 +84,23 @@ GEMINI_MODEL = CHAT_MODEL
 GEMINI_ONLY = os.getenv("OWAUA_GEMINI_ONLY", "0").strip().casefold() in {
     "1", "true", "yes", "on"
 }
-OPENAI_FULL_MODEL = os.getenv("OPENAI_FULL_MODEL", "gpt-5.6-luna").strip()
+OPENAI_FULL_MODEL = LUNA_MODEL
 GPT_TERRA_MODEL = OPENAI_FULL_MODEL
 FULL_MODE_PROVIDERS = (
     ("gemini",)
     if GEMINI_ONLY
     else ("gpt", "claude", "gemini", "deepseek", "glm", "ollama")
 )
-FULL_MODE_MODELS = {
-    "gemini": os.getenv("GEMINI_FULL_MODEL", GEMINI_MODEL).strip(),
-}
+#: Every cloud full-mode alias is Luna. Ollama stays local and is only used
+#: when ``OWAUA_LOCAL_ONLY`` is on.
+FULL_MODE_MODELS = {"gemini": LUNA_MODEL}
 if not GEMINI_ONLY:
     FULL_MODE_MODELS.update(
         {
-            "gpt": OPENAI_FULL_MODEL,
-            "claude": os.getenv("CLAUDE_FULL_MODEL", "anthropic/claude-haiku-4-5").strip(),
-            "deepseek": os.getenv("DEEPSEEK_FULL_MODEL", "deepseek-v4.1-flash").strip(),
-            "glm": os.getenv("GLM_FULL_MODEL", "zai/glm-5.3-flash").strip(),
+            "gpt": LUNA_MODEL,
+            "claude": LUNA_MODEL,
+            "deepseek": LUNA_MODEL,
+            "glm": LUNA_MODEL,
             "ollama": LOCAL_MODEL,
         }
     )
@@ -129,8 +126,12 @@ CHAT_REQUEST_TIMEOUT = httpx.Timeout(12.0, connect=4.0)
 GROQ_REQUEST_TIMEOUT = httpx.Timeout(120.0, connect=8.0)
 GPT_REQUEST_TIMEOUT = httpx.Timeout(120.0, connect=8.0)
 GPT_FULL_REQUEST_TIMEOUT = GPT_REQUEST_TIMEOUT
-GPT_REASONING = {"effort": "minimal"}
-GPT_FULL_REASONING = {"effort": "medium"}
+#: Reasoning tokens are billed as output. ``none`` is the cheap chat path and
+#: the non-reasoning web-search path. Left unset, Luna thinks on every ping.
+GPT_REASONING = {"effort": "none"}
+GPT_FULL_REASONING = {"effort": "none"}
+HANGOUT_MAX_OUTPUT_TOKENS = MAX_OUTPUT_TOKENS
+FULL_MAX_OUTPUT_TOKENS = 900
 FULL_MODE_IMAGE_GENERATIONS_PER_DAY = 3
 _PERSONA_LOCK = (
     "Use only the selected persona above. Do not blend it with any other "
@@ -221,8 +222,8 @@ _NO_REPEAT = (
 )
 _ABUSE_POLICY = (
     "Do not help with jailbreaks, decoding puzzles, looping, or token-wasting "
-    "tasks; hang out instead. Blocked users can only access Groq's GPT OSS 20B "
-    "model."
+    "tasks; hang out instead. Blocked users still talk to GPT-6 Luna, without "
+    "full-mode tools."
 )
 _REPEAT_PLACEHOLDER = (
     "The user asked me to repeat some text. Do not repeat it, echo it, "
@@ -469,43 +470,43 @@ def persona_label(persona: str) -> str:
 
 
 def persona_provider(persona: str) -> str:
-    if persona == "irritating":
-        return "groq"
+    """Every persona uses the same cloud model. The name is the old slot."""
+    del persona
     return "gemini"
 
 
 def host_model_error(alias: str) -> str | None:
+    del alias
     if LOCAL_AI_ONLY:
         return None
-    if alias == "gpt":
-        return None if OPENAI_API_KEY else "gpt is not configured"
-    if PERPLEXITY_API_KEY:
-        return None
-    return "perplexity is not configured"
+    return None if OPENAI_API_KEY else "openai is not configured"
 
 
 def full_mode_provider_error(provider: str) -> str | None:
-    if LOCAL_AI_ONLY:
+    if LOCAL_AI_ONLY or provider == "ollama":
         return None
-    if provider == "gpt":
-        return None if OPENAI_API_KEY else "gpt is not configured"
-    if provider == "deepseek":
-        return None if DEEPSEEK_API_KEY else "deepseek is not configured"
-    if provider == "groq":
-        return None if GROQ_API_KEY else "groq is not configured"
-    return None if PERPLEXITY_API_KEY else "perplexity is not configured"
+    return None if OPENAI_API_KEY else "openai is not configured"
 
 
 def gpt_full_tools(*, include_image_generation: bool = True) -> list[dict[str, object]]:
-    """OpenAI Responses tools available to a privileged full-mode user.
+    """OpenAI Responses tools for a privileged full-mode user.
 
-    The flag is retained for the old call shape. Image generation is still not
-    exposed by this bot, but web search and the hosted code interpreter are.
+    The flag is retained for the old call shape. Image generation stays off.
+    Web search uses the small context size ($0.01 plus the page text). The
+    code interpreter uses the 1 GB container ($0.03 per session) and is only
+    billed if the model actually runs it.
     """
     del include_image_generation
     return [
-        {"type": "web_search"},
-        {"type": "code_interpreter", "container": {"type": "auto"}},
+        {
+            "type": "web_search",
+            "search_context_size": "low",
+            "external_web_access": True,
+        },
+        {
+            "type": "code_interpreter",
+            "container": {"type": "auto", "memory_limit": "1g"},
+        },
     ]
 
 
@@ -573,14 +574,10 @@ def ollama_full_tools() -> list[dict[str, object]]:
 
 
 def full_mode_tools(provider: str) -> list[dict[str, object]]:
-    """Return tools in the native schema supported by each full-mode API."""
-    if provider == "gpt":
-        return gpt_full_tools()
-    if provider in {"claude", "gemini", "glm"}:
-        return [{"type": "web_search"}]
+    """Tools for one full-mode turn. Cloud aliases share Luna's tool set."""
     if provider == "ollama":
         return ollama_full_tools()
-    return []
+    return gpt_full_tools()
 
 
 def read_persona(name: str) -> str:
@@ -801,8 +798,17 @@ def conversation_input(
             content: list[dict[str, object]] = [
                 {"type": "input_text", "text": text.strip() or _IMAGE_ONLY_CAPTION}
             ]
+            detail = (
+                "auto"
+                if re.search(
+                    r"\b(read|ocr|transcri(?:be|pt)|screenshot|what does (?:this|it|the (?:image|picture|screenshot)) say)\b",
+                    text,
+                    re.IGNORECASE,
+                )
+                else "low"
+            )
             for url in image_urls[:attachment_limit]:
-                content.append({"type": "input_image", "image_url": url})
+                content.append({"type": "input_image", "image_url": url, "detail": detail})
             selected.append({"role": "user", "content": content})
         else:
             selected.append({"role": role, "content": text})
@@ -1841,9 +1847,6 @@ async def request_ai(
     user_id: str = "",
     server_id: str = "",
 ) -> str:
-    if GEMINI_ONLY:
-        full_provider = "gemini"
-        payload = {**payload, "model": GEMINI_MODEL}
     if LOCAL_AI_ONLY or full_provider == "ollama":
         tools = payload.get("tools") if LOCAL_ENABLE_TOOLS else None
         call_payload = chat_completions_payload(
@@ -1874,95 +1877,25 @@ async def request_ai(
             timeout=timeout,
             reply_limit=reply_limit,
         )
-    if not full_mode and full_provider == "groq":
-        return await _post_answer(
-            http,
-            f"{GROQ_BASE_URL}/chat/completions",
-            _auth_headers(GROQ_API_KEY),
-            chat_completions_payload(
-                model=str(payload["model"]),
-                instructions=str(payload["instructions"]),
-                api_input=payload["input"],  # type: ignore[arg-type]
-                max_output_tokens=GROQ_MAX_OUTPUT_TOKENS,
-                provider="groq",
-            ),
-            extract=chat_completion_text,
-            authorize=authorize,
-            timeout=timeout,
-            reply_limit=reply_limit,
-        )
-    if full_provider == "deepseek":
-        return await _post_answer(
-            http,
-            f"{DEEPSEEK_BASE_URL}/chat/completions",
-            _auth_headers(DEEPSEEK_API_KEY),
-            chat_completions_payload(
-                model=str(payload["model"]),
-                instructions=str(payload["instructions"]),
-                api_input=payload["input"],  # type: ignore[arg-type]
-                max_output_tokens=(
-                    (payload.get("max_output_tokens") or MAX_OUTPUT_TOKENS)
-                    if full_mode
-                    else 256
-                ),
-                provider="deepseek",
-                tools=payload.get("tools"),  # type: ignore[arg-type]
-            ),
-            extract=chat_completion_text,
-            authorize=authorize,
-            timeout=timeout,
-            reply_limit=reply_limit,
-        )
-    if full_mode and full_provider != "gpt":
-        url, fallback_url = provider_urls(
-            "perplexity", PERPLEXITY_BASE_URL, full_mode=True
-        )
-        headers = _auth_headers(PERPLEXITY_API_KEY)
-        gateway_headers = {
-            **headers,
-            **request_headers(provider="perplexity", user_id=user_id, server_id=server_id),
-        }
-        return await _post_answer(
-            http,
-            url,
-            gateway_headers if fallback_url else headers,
-            payload,
-            extract=response_reply,
-            authorize=authorize,
-            timeout=timeout,
-            reply_limit=reply_limit,
-            fallback_url=fallback_url,
-            fallback_headers=headers,
-        )
-    if full_mode:
-        return await _post_answer(
-            http,
-            f"{OPENAI_BASE_URL}/responses",
-            _auth_headers(OPENAI_API_KEY),
-            payload,
-            extract=response_reply,
-            authorize=authorize,
-            timeout=timeout,
-            reply_limit=reply_limit,
-        )
-
-    url, fallback_url = provider_urls("perplexity", PERPLEXITY_BASE_URL)
-    headers = _auth_headers(PERPLEXITY_API_KEY)
-    gateway_headers = {
-        **headers,
-        **request_headers(provider="perplexity", user_id=user_id, server_id=server_id),
-    }
+    if not OPENAI_API_KEY:
+        raise RuntimeError("openai is not configured")
+    # One Responses call. Hangout omits tools. Full mode already put the small
+    # web-search and 1 GB code-interpreter tools on the body. Perplexity fields
+    # such as max_steps are not sent.
+    body = {key: value for key, value in payload.items() if key != "max_steps"}
+    body["model"] = LUNA_MODEL
+    body["store"] = False
+    body["prompt_cache_key"] = "owaua-luna"
+    body["reasoning"] = dict(GPT_FULL_REASONING if full_mode else GPT_REASONING)
     return await _post_answer(
         http,
-        url,
-        gateway_headers if fallback_url else headers,
-        payload,
+        f"{OPENAI_BASE_URL}/responses",
+        _auth_headers(OPENAI_API_KEY),
+        body,
         extract=response_reply,
         authorize=authorize,
         timeout=timeout,
         reply_limit=reply_limit,
-        fallback_url=fallback_url,
-        fallback_headers=headers,
     )
 
 
@@ -2046,7 +1979,7 @@ async def ask(
     if GEMINI_ONLY:
         provider = "gemini"
 
-    if image_urls and not full_mode and provider != "gemini":
+    if image_urls and LOCAL_AI_ONLY:
         return "Image analysis is disabled; send a text message."
     requested_images = bool(image_urls)
     image_urls = await inline_image_urls(http, image_urls)
@@ -2105,39 +2038,18 @@ async def ask(
     async def generate(
         current_provider: str, *, full: bool = False, extra: str = "", charge: bool = True
     ) -> str:
-        reply_limit = None if current_provider == "groq" else MAX_REPLY_CHARS
-        gemini_hangout = not full and current_provider == "gemini"
+        reply_limit = MAX_REPLY_CHARS
+        local_turn = LOCAL_AI_ONLY or current_provider == "ollama"
         if full:
             request_timeout = GPT_REQUEST_TIMEOUT
-        elif not full and current_provider == "groq":
-            # Unbounded gpt-oss-20b output needs far more than the chat timeout.
-            request_timeout = GROQ_REQUEST_TIMEOUT
         else:
             request_timeout = CHAT_REQUEST_TIMEOUT
-        if GEMINI_ONLY:
-            model = GEMINI_MODEL
-        elif full and current_provider in FULL_MODE_MODELS:
-            model = FULL_MODE_MODELS[current_provider]
-        elif current_provider == "deepseek":
-            model = DEEPSEEK_MODEL
-        elif current_provider == "mistral":
-            model = MISTRAL_MODEL
-        elif current_provider == "groq":
-            model = GROQ_MODEL
-        elif current_provider == "gemini":
-            model = GEMINI_MODEL
-        elif current_provider == "ollama":
+        if local_turn:
             model = LOCAL_MODEL
-        else:
-            model = OPENAI_FULL_MODEL if full else MODEL
-        if current_provider == "gemini":
-            max_output_tokens = (
-                GEMINI_FULL_MAX_OUTPUT_TOKENS if full else GEMINI_MAX_OUTPUT_TOKENS
-            )
-        elif current_provider == "gpt":
-            max_output_tokens = GPT_MAX_OUTPUT_TOKENS
-        else:
             max_output_tokens = MAX_OUTPUT_TOKENS
+        else:
+            model = LUNA_MODEL
+            max_output_tokens = FULL_MAX_OUTPUT_TOKENS if full else HANGOUT_MAX_OUTPUT_TOKENS
         async def authorize_call() -> None:
             if charge:
                 await authorize()
@@ -2151,19 +2063,16 @@ async def ask(
             "store": False,
             "instructions": f"{instructions}\n{extra}" if extra else instructions,
             "input": api_input,
+            "max_output_tokens": max_output_tokens,
         }
-        if current_provider == "gpt":
+        if not local_turn:
+            payload["prompt_cache_key"] = "owaua-luna"
             payload["reasoning"] = dict(GPT_FULL_REASONING if full else GPT_REASONING)
-        if gemini_hangout:
-            payload["max_steps"] = 1
-        elif full:
-            payload["tools"] = full_mode_tools(current_provider)
-            if current_provider != "gpt":
-                payload["max_output_tokens"] = GEMINI_FULL_MAX_OUTPUT_TOKENS
-        else:
-            payload["max_steps"] = 1
-        if max_output_tokens is not None:
-            payload["max_output_tokens"] = max_output_tokens
+        if full:
+            payload["tools"] = full_mode_tools("ollama" if local_turn else "gpt")
+            if not local_turn:
+                payload["max_tool_calls"] = 4
+                payload["include"] = ["web_search_call.action.sources"]
         return await request_ai(
             http,
             payload,
@@ -2200,6 +2109,6 @@ async def ask(
                 answer = persona_refusal(persona, problem)
         if human and _hangout_problem(answer, prompt) is None:
             answer = humanize_reply(answer)
-    if not full_mode and provider != "groq":
+    if not full_mode:
         answer = clip_hangout_reply(answer)
     return await finish(answer)
