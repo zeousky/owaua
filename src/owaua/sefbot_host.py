@@ -38,6 +38,7 @@ def resolve_sefbot_root(project_root: Path) -> Path | None:
     if override:
         candidates.append(Path(override))
     candidates.append(project_root / "sefbot")
+    candidates.append(project_root.parent / "opsef" / "ai-bot")
     candidates.append(Path.home() / "Downloads" / "opsef" / "ai-bot")
     for path in candidates:
         if (path / "src" / "host-stdio.js").is_file():

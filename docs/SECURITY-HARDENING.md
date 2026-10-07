@@ -19,11 +19,32 @@ The initial independent source audit recorded eight findings. Existing uncommitt
 | Permanent conversation storage | 20 records per conversation, 10,000 total, bounded content, seven-day retention with hourly maintenance; private directory/database modes | Retention, legacy startup pruning, user isolation, erasure generation fences |
 | Voice control by outsiders | Ordinary guilds require same-channel controls and do not move automatically; trusted music behavior remains separate from AI/API budgets | Voice-control denial and departure tests |
 
-Normal hangout chat never attaches web-search or other capability tools, regardless of prompt, and uses a 4,096-token Gemini 3.1 Flash Lite hangout output budget. Normal hangout requests may include one image attachment; other hangout providers stay text-only with a 100-character cap. Approved full-mode users can select a different provider and use its capability tools in designated channels, but output, history, input, concurrency, timeout, rate, and shared API-attempt limits remain the same. Image generation is not available. Provider errors and signed CDN request URLs are not logged. Native media subprocesses do not inherit bot/provider credentials.
+Ordinary chat uses GPT-6 Luna, or Mercury 2.5 for selected text requests.
+It can answer substantive questions and read bounded documents/images. Research
+attaches web search with a two-call cap; privileged code tools remain restricted
+to approved full-mode users. Local Python execution is denied at the shared
+executor, including unsolicited tool calls. Full mode keeps a four-tool-call cap.
+Every model round trip and repair uses the same atomic per-user reservation.
 
-See [README](../README.md) and [.env.example](../.env.example) for configuration. The default API budget is 30 requests per user in a rolling 10-minute window, shared by normal and full mode. `!security pause` stops future reservations, including full mode; it cannot cancel work already sent to a provider. `resume` does not reset quotas.
+Durable facts come only from direct user statements. Recognizable credential
+patterns are excluded; model extraction is still fallible. Quotes, documents and
+notes are untrusted context. Corrections preserve IDs, users cannot edit other
+users' notes, and erasure generations fence asynchronous writes. Conversation
+summaries are per user/channel/server and are cleared with memory controls.
+Background failures persist with two transient retries and visible quarantine.
 
-## Verification performed
+The default budget is 30 provider attempts per user per rolling 10-minute window.
+Owner API pause blocks future reservations and local tool dispatch after a
+cancellation recheck. Requests already sent cannot be recalled. DMs remain off
+by default. Media restrictions and trusted-guild exceptions remain unchanged.
+
+## Historical verification
+
+The following verification and dated deployment notes describe earlier releases.
+Current validation must be rerun; startup now records fresh native-decoder and
+Discord-login evidence for the uploaded source digest.
+
+### Earlier verification performed
 
 - Current source including bounded full mode, Python 3.12.14: `python -m unittest discover -s tests -q` — verification history from the prior release; rerun after deployment.
 - The local skipped case is `NativeAudioTests.test_valid_wave_decodes_with_pipe_only_protocols`, requiring Linux RLIMIT support. It **passed on the production Linux server during deployment**. The production suite also ran 185 tests: 184 passed, with only the non-Linux refusal test skipped. Ubuntu CI now installs FFmpeg; CI itself has not been run from this session.

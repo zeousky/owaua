@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import offline_test_config
+
 import asyncio
 import shutil
 import tempfile
@@ -133,7 +135,7 @@ class SwitchBotTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(replies)
         self.assertIn("Sefbot", replies[0])
-        self.assertIn(",ask", replies[0])
+        self.assertIn(",memory", replies[0])
 
 
 class FakeSefbot:

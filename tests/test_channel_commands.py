@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import offline_test_config
+
 import asyncio
 import tempfile
 import unittest
@@ -682,7 +684,7 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(mocked_ask.await_count, 0)
         self.assertEqual(self.bot.inflight_users, {1, 2, 3})
-        self.assertEqual(first.channel.sent, [])
+        self.assertEqual(first.channel.sent, ["I'm busy just now; try again in a moment."])
         self.assertEqual(second.channel.sent, ["slow down try again in 60s"])
 
     async def test_full_mode_ignores_unaddressed_channel_messages(self) -> None:
@@ -791,11 +793,11 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, ["openai is not configured"])
         self.assertEqual(self.store.get_setting("persona:user:33", "rudeish"), "rudeish")
 
-    async def test_human_command_defaults_on_and_can_be_toggled(self) -> None:
+    async def test_human_command_defaults_off_and_can_be_toggled(self) -> None:
         channel = FakeChannel()
 
         await self.bot.on_message(make_message("!human", 1, channel))
-        self.assertEqual(channel.sent, ["human: on"])
+        self.assertEqual(channel.sent, ["human: off"])
         self.assertEqual(self.store.get_setting("human:user:33", "1"), "1")
 
         self.bot.command_used.clear()
@@ -828,14 +830,14 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, ["usage: !human on or !human off"])
         self.assertEqual(self.store.get_setting("human:user:33", "1"), "1")
 
-    async def test_hangout_passes_human_on_by_default(self) -> None:
+    async def test_hangout_passes_human_off_by_default(self) -> None:
         channel = FakeChannel()
         with patch("bot.ask", AsyncMock(return_value="hey")) as mocked_ask:
             await self.bot.on_message(
                 make_message("<@99> hi", 1, channel, mentions=[self.bot.user])
             )
 
-        self.assertTrue(mocked_ask.await_args.kwargs["human"])
+        self.assertFalse(mocked_ask.await_args.kwargs["human"])
 
     async def test_full_mode_does_not_use_human_voice(self) -> None:
         allowed_user = next(iter(FULL_MODE_ALLOWED_USER_IDS))
@@ -975,8 +977,8 @@ class ChannelCommandTests(unittest.IsolatedAsyncioTestCase):
 
         mocked_ask.assert_awaited_once()
         prompt = mocked_ask.await_args.kwargs["prompt"]
-        self.assertIn("replying to you:", prompt)
-        self.assertIn("Charlie Kirk died on September 10, 2025", prompt)
+        self.assertIn("replying to you:", mocked_ask.await_args.kwargs["quoted_context"])
+        self.assertIn("Charlie Kirk died on September 10, 2025", mocked_ask.await_args.kwargs["quoted_context"])
         self.assertIn("he died young", prompt)
         self.assertTrue(mocked_ask.await_args.kwargs["use_history"])
         self.assertEqual(channel.sent, ["yeah"])

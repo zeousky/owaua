@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import offline_test_config
+
 import re
 import json
 import sys

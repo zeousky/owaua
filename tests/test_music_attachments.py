@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import offline_test_config
+
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch

@@ -21,6 +21,7 @@ def main() -> None:
         except ImportError:
             raise RuntimeError("Media processing requires a Unix host")
     import yt_dlp
+    import deno
     lookup = sys.argv[1]
     parsed = urlparse(lookup)
     twitter_status = re.fullmatch(r"/(?:[A-Za-z0-9_]{1,15}|i)/status/[0-9]{1,30}", parsed.path)
@@ -38,11 +39,12 @@ def main() -> None:
         "noplaylist": not unrestricted, "playlistend": 1,
         "quiet": True, "no_warnings": True, "cachedir": False,
         "retries": 0, "fragment_retries": 0, "socket_timeout": 8,
+        "js_runtimes": {"deno": {"path": deno.find_deno_bin()}},
     }
     if unrestricted:
         options["default_search"] = "ytsearch1"
         options["js_runtimes"] = {
-            "deno": {}, "node": {}, "quickjs": {}, "bun": {},
+            "deno": {"path": deno.find_deno_bin()}, "node": {}, "quickjs": {}, "bun": {},
         }
     else:
         options["allowed_extractors"] = ["youtube", "twitter"]

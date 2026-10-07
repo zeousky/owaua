@@ -28,13 +28,41 @@ OWAUA_DAKI_DRY_RUN=1 ./scripts/deploy-daki.sh
 Deploy the cloud profile:
 
 ```sh
-OWAUA_DAKI_ENV_FILE=.env.cloud ./scripts/deploy-daki.sh
+SEFBOT_ROOT="/Users/ckazro/Downloads/my projects/opsef/ai-bot" OWAUA_DAKI_ENV_FILE=.env.cloud ./scripts/deploy-daki.sh
 ```
 
-The deploy script stops the bot before replacement, byte-verifies every upload,
-keeps `.env` separate from the runtime manifest, and restarts the existing
-server command. The remote `data/` directory and its SQLite database are not
-replaced.
+The deploy script snapshots previous runtime files privately under local
+`data/improvement-backups/`, stops the bot, byte-verifies each upload, and
+restarts the cloud command. Existing credentials stay outside the source
+snapshot. On upload/startup failure it restores previous files and startup
+variables, then requests a restart. Remote databases are never replaced.
+
+Cloud startup runs `scripts/check-runtime.py`: Linux, unprivileged execution,
+FFmpeg pipe decoding, Deno, effective quotas, and SQLite migration version.
+Deployment requires fresh `data/runtime-check.json` and `data/readiness.json`
+with the exact source digest and Discord login identity. Container `running`
+alone is insufficient. The readiness record is startup evidence, not an ongoing
+health monitor or proof of paid AI/voice behavior.
+
+SQLite schema migration is additive and transactional. Existing databases get a
+private `memory.sqlite3.pre-v1.backup` before migration; runtime rollback keeps the
+compatible migrated database. Backups can retain erased information and should
+be handled as private operational artifacts. User erasure affects live memory,
+not Discord, external providers or private backups.
+
+Run `PYTHONPATH=src/owaua:tests .venv/bin/python -m unittest discover -s tests -q`
+before deployment. Tests use a separate offline profile with dummy keys and mocked
+AI requests; production credentials and local-only settings are not loaded.
+Local macOS skips Linux decoder checks; cloud startup must pass them.
+Startup resolves the pinned Deno package's executable explicitly, so it works
+when the container omits Python's user script directory from `PATH`. The native
+check decodes audio and checks cleanup after both success and playback failure.
+
+Memory status reports pending/quarantined jobs. Temporary provider failures
+retry twice; malformed extraction is quarantined. Pause stops recall and new
+background work; erase/correct/forget invalidate pending writes and summaries.
+API quotas cover foreground, repairs, summaries and extraction. Provider failures
+are charged attempts, with no automatic retry of an ambiguous paid response.
 
 For local-only work, use `./scripts/deploy-local.sh`; it never contacts Daki.
 

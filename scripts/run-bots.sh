@@ -25,16 +25,19 @@ else
   "$PYTHON" -m pip install -q -r requirements.txt
   "$PYTHON" -m pip check
 fi
+export PATH="$("$PYTHON" -c 'import os, deno; print(os.path.dirname(deno.find_deno_bin()))'):$PATH"
 chmod 600 "$ENV_FILE"
 LOCAL_ONLY=$(grep -E '^OWAUA_LOCAL_ONLY=' "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)
 if [[ "$LOCAL_ONLY" =~ ^(1|true|yes|on)$ ]]; then
   OWAUA_ENV_FILE="$ENV_FILE" "$ROOT_DIR/scripts/start-local-ai.sh"
 fi
-if [[ "${OWAUA_VERIFY_DEPLOY:-0}" == "1" ]]; then
+if [[ ! "$LOCAL_ONLY" =~ ^(1|true|yes|on)$ ]]; then
   "$PYTHON" scripts/check-runtime.py
+fi
+if [[ "${OWAUA_VERIFY_DEPLOY:-0}" == "1" ]]; then
   PYTHONPATH="$ROOT_DIR/src/owaua:$ROOT_DIR/tests" "$PYTHON" -m unittest -q \
     test_ask test_bot_helpers test_channel_commands test_switch_bot test_cloudflare \
-    test_memory test_music_attachments test_security
+    test_memory test_music_attachments test_security test_intelligence test_improvements
   echo "OWAUA_DEPLOY_TESTS_PASSED"
 fi
 exec "$PYTHON" src/owaua/bot.py

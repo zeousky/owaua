@@ -1,5 +1,7 @@
 """Security boundaries: all provider/network operations are mocked."""
 
+import offline_test_config
+
 import asyncio
 import io
 import json

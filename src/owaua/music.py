@@ -903,10 +903,6 @@ async def stop_music(bot: object, guild: object) -> None:
                 await disconnect()
             except Exception:
                 log.debug("Could not leave music voice channel", exc_info=True)
-    tracks = getattr(bot, "music_tracks", None)
-    guild_id = getattr(guild, "id", None)
-    if isinstance(tracks, dict) and guild_id is not None:
-        tracks.pop(guild_id, None)
 
 
 async def abandon_music_if_needed(
@@ -1087,6 +1083,7 @@ async def _play_or_restart(
             hint = "`!music start`"
         return f"join a voice channel first, then use {hint}"
     connected_here = False
+    replacement_started = False
     installed = False
     try:
         if direct_track is not None:
@@ -1118,6 +1115,7 @@ async def _play_or_restart(
         if not unrestricted and getattr(author_channel, "id", None) != getattr(voice_client.channel, "id", None):
             raise ValueError("join my current voice channel to control music")
         old_track = bot.music_tracks.get(message.guild.id)
+        replacement_started = True
         if old_track and old_track.get("_stop_timer"):
             old_track["_stop_timer"].cancel()
         if voice_client.is_playing() or voice_client.is_paused():
@@ -1166,5 +1164,5 @@ async def _play_or_restart(
         return music_error_reply(action, exc)
 
     finally:
-        if connected_here and not installed:
+        if (connected_here or replacement_started) and not installed:
             await stop_music(bot, message.guild)

@@ -37,11 +37,18 @@ MAX_TRACKED_USERS = 4096
 
 @dataclass(frozen=True)
 class ApiLimits:
-    per_user: int = 0
+    per_user: int = 30
     window_seconds: int = 600
 
+    def __post_init__(self) -> None:
+        if self.per_user < 0 or self.window_seconds < 1:
+            raise ValueError("API quota must be nonnegative and its window positive")
 
-API_LIMITS = ApiLimits()
+
+API_LIMITS = ApiLimits(
+    per_user=limit("API_REQUESTS_PER_USER", 30, 10000),
+    window_seconds=limit("API_WINDOW_SECONDS", 600, 86400),
+)
 FULL_MODE_API_LIMITS = API_LIMITS
 
 

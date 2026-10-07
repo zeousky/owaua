@@ -22,6 +22,7 @@ COPY src/owaua ./src/owaua
 COPY personas ./personas
 COPY pfps ./pfps
 COPY banners ./banners
+COPY scripts/check-runtime.py ./scripts/check-runtime.py
 
 RUN useradd --create-home --shell /usr/sbin/nologin owaua \
     && mkdir -p /app/data \
@@ -30,4 +31,4 @@ RUN useradd --create-home --shell /usr/sbin/nologin owaua \
 USER owaua
 
 VOLUME ["/app/data"]
-ENTRYPOINT ["python", "src/owaua/bot.py"]
+ENTRYPOINT ["sh", "-c", "python scripts/check-runtime.py && exec python src/owaua/bot.py"]

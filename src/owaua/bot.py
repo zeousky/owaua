@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import hashlib
 import base64
 import io
 import logging
@@ -27,6 +29,7 @@ from ask import (
     MAX_ATTACHMENTS,
     LUNA_MODEL,
     OPENAI_API_KEY,
+    INCEPTION_API_KEY,
     PERSONAS,
     RANDOM_PERSONA,
     RANDOM_PERSONA_CHOICES,
@@ -45,6 +48,7 @@ from ask import (
 )
 from cloudflare import describe_protection
 from memory import CHANNEL_CONTEXT_LINES, MemoryStore
+from intelligence import DOCUMENT_COUNT, document_kind, read_document, extract_pending_notes, summarize_pending_conversation
 from security import (OWNER_IDS, BLOCKED_USERS, ALLOWED_GUILDS, ALLOW_DMS,
                       MAX_INFLIGHT, MAX_INPUT_CHARS, MAX_REPLY_CHARS, MAX_TRACKED_USERS)
 from music import (
@@ -85,6 +89,8 @@ COMMANDS = frozenset(
         "!security",
         "!shutdown",
         "!switch",
+        "!context",
+        "!model",
     }
 )
 AI_CREDITS_WARNING = (
@@ -133,10 +139,14 @@ HELP_TEXT = """**Owaua commands**
 `!owner's note` — a note from the bot's owner
 `!persona rudeish low|medium|high` (or `nerdish|flirty|irritating|cute|normal|random`) — view or switch your persona
 `!human on|off` — talk like a person, or use the usual hangout-bot voice
+`!model luna|mercury|reset` — choose your chat model (tools and images use Luna)
+`!context status|on|off|clear` — control this channel's surrounding chat (Manage Server to change)
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
-`!memory erase mine` — erase your own conversation history
+`!memory erase mine` — erase your conversation history and durable notes
+`!memory view|stats|pause|resume|forget` — control your durable notes here
+`!memory correct <id> <text>` / `!memory forget <id>` — correct or remove one note
 `!reset all` — fully reset this bot in this server (Manage Server required)
 `!switch bot` — run sefbot in this server, or switch back (Manage Server)
 
@@ -147,10 +157,14 @@ OWNER_HELP_TEXT = """**Owaua commands**
 `!owner's note` — a note from the bot's owner
 `!persona rudeish low|medium|high` (or `nerdish|flirty|irritating|cute|normal|random`) — view or switch your persona
 `!human on|off` — talk like a person, or use the usual hangout-bot voice
+`!model luna|mercury|reset` — choose your chat model (tools and images use Luna)
+`!context status|on|off|clear` — control this channel's surrounding chat (Manage Server to change)
 `!language <full name>|reset` — this server's reply language and profile (Manage Server)
 `!music help` — play a song in your voice channel
 `!memory erase` — erase server memory (Manage Server required)
-`!memory erase mine` — erase your own conversation history
+`!memory erase mine` — erase your conversation history and durable notes
+`!memory view|stats|pause|resume|forget` — control your durable notes here
+`!memory correct <id> <text>` / `!memory forget <id>` — correct or remove one note
 `!reset all` — fully reset this bot in this server (Manage Server required)
 `!switch bot` — run sefbot in this server, or switch back (Manage Server)
 `!security status|pause|resume` — API usage and emergency pause (bot owner only)
@@ -183,15 +197,8 @@ def _pricing_line(label: str, model: str) -> str:
 
 
 def pricing_text() -> str:
-    """Owner-only price card. Every cloud reply is GPT-6 Luna."""
-    return "\n".join(
-        [
-            "**Owaua model pricing**",
-            "USD per 1M tokens under 272k. A web search is $0.01. A code session is $0.03.",
-            _pricing_line("every reply", LUNA_MODEL),
-            "Cached input is $0.01 per 1M. Hangout chat sends no tools.",
-        ]
-    )
+    return "**Owaua model pricing**\nDefault: gpt-6-luna. Optional text model: mercury-2.5.\nProvider logs report actual input/output tokens and tool activity.\nCurrent pricing: https://developers.openai.com/api/docs/pricing/ and https://www.inceptionlabs.ai/"
+
 
 OWNER_NOTE_TEXT = (
     "Hello, I hope you like my bot! I'm trying to keep it as simple as possible "
@@ -579,17 +586,34 @@ def split_reply(text: str, limit: int = DISCORD_MESSAGE_LIMIT) -> list[str]:
     remaining = text.strip()
     if not remaining:
         return []
-    chunks: list[str] = []
+    if limit < 32:
+        raise ValueError("message limit must be at least 32")
+    chunks = []
+    fence = ""
+    protected = re.compile(r"!?\[[^\n]*?\]\([^\n]*?\)|https?://[^\s]+|`[^`\n]+`")
     while remaining:
-        if len(remaining) <= limit:
-            chunks.append(remaining)
-            break
-        window = remaining[:limit]
-        break_at = max(window.rfind("\n\n"), window.rfind("\n"), window.rfind(" "))
-        if break_at < limit // 2:
-            break_at = limit
-        chunks.append(remaining[:break_at].rstrip())
-        remaining = remaining[break_at:].lstrip()
+        prefix = fence + "\n" if fence else ""
+        capacity = limit - len(prefix) - 5
+        if len(remaining) <= capacity:
+            piece,remaining = remaining,""
+        else:
+            candidates = [m.end() for m in re.finditer(r"\n| +",remaining[:capacity])]
+            end = candidates[-1] if candidates else capacity
+            for match in protected.finditer(remaining):
+                if match.start()<end<match.end() and match.start()>0:
+                    end = match.start()
+                    break
+                if match.start()>=end:
+                    break
+            piece,remaining = remaining[:end],remaining[end:]
+            if not fence:
+                remaining = remaining.lstrip()
+        for match in re.finditer(r"(?m)^```([^\n]*)",piece):
+            fence = "" if fence else "```"+match.group(1)[:30]
+        chunk = prefix + piece.rstrip()
+        if fence:
+            chunk += "\n```"
+        chunks.append(chunk)
     return chunks
 
 
@@ -695,6 +719,7 @@ class PersonaBot(discord.Client):
         self.inflight_users: set[int] = set()
         self.handler_count = 0
         self.full_mode_users: set[int] = set()
+        self.background_active = False
         self.shutdown_requested = False
         self.active_handlers: set[asyncio.Task[object]] = set()
 
@@ -1285,6 +1310,8 @@ class PersonaBot(discord.Client):
             return True
         if self.memory.get_setting(full_mode_setting_key(parsed), "") != "1":
             return False
+        if len(self.full_mode_users)>=MAX_TRACKED_USERS:
+            self.full_mode_users.clear()
         self.full_mode_users.add(parsed)
         return True
 
@@ -1315,6 +1342,8 @@ class PersonaBot(discord.Client):
 
     def set_full_mode_for(self, user_id: int, enabled: bool) -> None:
         if enabled:
+            if len(self.full_mode_users)>=MAX_TRACKED_USERS:
+                self.full_mode_users.clear()
             self.full_mode_users.add(user_id)
             self.memory.set_setting(full_mode_setting_key(user_id), "1")
             return
@@ -1362,7 +1391,13 @@ class PersonaBot(discord.Client):
         return True, 0
 
     async def on_ready(self) -> None:
+        release = hashlib.sha256(b"".join((ROOT/"src"/"owaua"/name).read_bytes() for name in ("ask.py","bot.py","memory.py","intelligence.py"))).hexdigest()
+        readiness = {"timestamp":time.time(),"release":release,"logged_in_as":str(self.user),"bot_id":getattr(self.user,"id",None)}
+        ready_path = ROOT/"data"/"readiness.json"
+        ready_path.write_text(json.dumps(readiness),encoding="utf-8")
+        os.chmod(ready_path,0o600)
         log.info("Logged in as %s; persona=%s", self.user, self.selected_persona)
+        log.info("Owaua features ready: useful answers, durable notes, conversation summaries, metered requests, auto search, documents, context controls; mercury_configured=%s", bool(INCEPTION_API_KEY))
 
     async def on_disconnect(self) -> None:
         if not self.is_closed():
@@ -1390,9 +1425,18 @@ class PersonaBot(discord.Client):
 
     async def _maintain_memory(self) -> None:
         while True:
-            await asyncio.sleep(3600)
+            await asyncio.sleep(30)
             try:
                 await asyncio.to_thread(self.memory.prune)
+                if OPENAI_API_KEY and not LOCAL_AI_ONLY and len(self.inflight_users)<max(0,MAX_INFLIGHT-1) and self.memory.get_setting("api_paused","0")!="1":
+                    self.background_active = True
+                    try:
+                        if await asyncio.to_thread(self.memory.pending_note_batches):
+                            await extract_pending_notes(self.provider_http, self.memory)
+                        else:
+                            await summarize_pending_conversation(self.provider_http, self.memory)
+                    finally:
+                        self.background_active = False
             except Exception:
                 log.warning("Memory maintenance failed")
 
@@ -1461,7 +1505,7 @@ class PersonaBot(discord.Client):
         if message.author.bot or getattr(message, "webhook_id", None):
             return
         normalized = command_text(message.content, None if self.user is None else self.user.id)
-        if self.shutdown_requested:
+        if self.shutdown_requested or getattr(self,"closing",False):
             return
         if AI_CREDITS_EXHAUSTED and should_warn_for_ai_credits(
             message, normalized, self.user
@@ -1497,7 +1541,8 @@ class PersonaBot(discord.Client):
         ):
             await self._run_sefbot_message(message)
             return
-        if message.guild is not None:
+        if (message.guild is not None and matched_command(normalized) is None
+                and self.memory.channel_context_enabled(str(message.guild.id), str(message.channel.id))):
             await self._remember_channel_line(message)
         if not unrestricted_music and len(message.content) > MAX_INPUT_CHARS:
             audit_filtered("message_too_long")
@@ -1512,6 +1557,7 @@ class PersonaBot(discord.Client):
         count = getattr(self, "handler_count", 0)
         if not unrestricted_music and count >= MAX_HANDLERS:
             audit_filtered("handler_capacity")
+            await self._reply(message,"I'm busy just now; try again in a moment.")
             return
         self.handler_count = count + 1
         current_task = asyncio.current_task()
@@ -1528,6 +1574,7 @@ class PersonaBot(discord.Client):
         except asyncio.TimeoutError:
             log.warning("Message handler exceeded deadline")
             audit_filtered("handler_timeout")
+            await self._reply(message,"That request took too long; try again in a moment.")
         finally:
             if current_task is not None:
                 active_handlers.discard(current_task)
@@ -1621,6 +1668,12 @@ class PersonaBot(discord.Client):
                 message, await handle_music_command(self, message, argument)
             )
             return
+        if name == "!context":
+            await self._reply(message, self._context_command(message, argument))
+            return
+        if name == "!model":
+            await self._reply(message, self._model_command(message, argument))
+            return
         if name == "!memory":
             await self._reply(message, await self._memory_command(message, argument))
             return
@@ -1644,34 +1697,32 @@ class PersonaBot(discord.Client):
                 .strip()
             )
         prompt = sanitize_user_text(prompt).strip()
+        user_statement = prompt
         attachment_limit = MAX_ATTACHMENTS
         image_urls = [
             url
             for attachment in message.attachments[:attachment_limit]
             if (url := image_url(attachment))
         ]
+        document_attachments = [a for a in message.attachments if document_kind(a)][:DOCUMENT_COUNT]
+        documents = []
         relaxed_guardrails = full_mode
         decode_now = not relaxed_guardrails and looks_like_decode_request(prompt)
         repeat_now = not relaxed_guardrails and looks_like_repeat_request(prompt)
         persona = self.persona_for(message.channel, message)
-        use_history = (
-            not full_mode
-            and not LOCAL_AI_ONLY
-            and not full_mode_blocked(message.author.id)
-            and persona_provider(persona) == "gemini"
-        )
+        use_history = True
+        quoted = ""
         if decode_now or repeat_now:
             image_urls = []
-        elif prompt or image_urls:
+        elif prompt or image_urls or document_attachments:
             quoted = referenced_message_context(
                 message,
                 None if self.user is None else self.user.id,
                 unbounded=False,
             )
             if quoted:
-                prompt = f"{quoted}\n{prompt}".strip()
                 use_history = True
-        if not prompt and not image_urls:
+        if not prompt and not image_urls and not document_attachments:
             if mentioned:
                 await self._reply(message, PING_RESPONSE)
             return
@@ -1683,7 +1734,8 @@ class PersonaBot(discord.Client):
         scope_id = str(message.channel.id)
         user_id = str(message.author.id)
         channel_lines: list[dict[str, str]] = []
-        if message.guild is not None and not full_mode:
+        if (message.guild is not None and not full_mode
+                and self.memory.channel_context_enabled(str(message.guild.id), str(message.channel.id))):
             channel_lines = await asyncio.to_thread(
                 self.memory.recent_channel_lines,
                 scope_id,
@@ -1695,7 +1747,8 @@ class PersonaBot(discord.Client):
             self.inflight_users = inflight = set()
         occupies_slot = True
         if occupies_slot:
-            if message.author.id in inflight or len(inflight) >= MAX_INFLIGHT:
+            if message.author.id in inflight or len(inflight) + int(getattr(self,"background_active",False)) >= MAX_INFLIGHT:
+                await self._reply(message,"I'm busy just now; try again in a moment.")
                 return
             inflight.add(message.author.id)
         if full_mode and self.promoted_full_mode_limited_for(message.author.id):
@@ -1710,6 +1763,16 @@ class PersonaBot(discord.Client):
                 inflight.discard(message.author.id)
                 return
         try:
+            if document_attachments:
+                for attachment in document_attachments:
+                    try:
+                        documents.append(await read_document(self.provider_http, attachment))
+                    except Exception as exc:
+                        log.warning("Document reading failed (%s)", type(exc).__name__)
+                        await self._reply(message, "couldn't read that attachment; use a text PDF (up to 20 pages, 8 MiB) or TXT/MD/CSV/JSON")
+                        return
+                if not prompt:
+                    prompt = "Summarize the attached document."
             async with message.channel.typing():
                 request = ask(
                         self.provider_http,
@@ -1740,12 +1803,17 @@ class PersonaBot(discord.Client):
                         relaxed_guardrails=relaxed_guardrails,
                         human=not full_mode and self.human_mode_for(message),
                         channel_lines=channel_lines,
+                        documents_text="\n\n".join(documents),
+                        user_statement=user_statement,
+                        quoted_context=quoted,
+                        model_key=self.memory.get_setting(f"chat_model:user:{user_id}", "luna"),
                     )
                 answer = await asyncio.wait_for(request, timeout=ASK_TIMEOUT)
             if not answer:
                 return
             await self._reply(message, answer)
-            if message.guild is not None and not full_mode:
+            if (message.guild is not None and not full_mode
+                    and self.memory.channel_context_enabled(str(message.guild.id), str(message.channel.id))):
                 await self._remember_channel_text(
                     event_id=f"line:assistant:{message.id}",
                     scope_id=scope_id,
@@ -1757,8 +1825,11 @@ class PersonaBot(discord.Client):
                 )
         except asyncio.CancelledError:
             raise
-        except Exception:
-            log.exception("AI reply failed in channel %s", message.channel.id)
+        except asyncio.TimeoutError:
+            log.warning("AI reply exceeded deadline")
+            await self._reply(message,"The AI took too long; try again in a moment.")
+        except Exception as exc:
+            log.warning("AI reply failed (%s)",type(exc).__name__)
             await self._reply(message, "I couldn't reach the AI provider just now.")
         finally:
             if occupies_slot:
@@ -1849,7 +1920,6 @@ class PersonaBot(discord.Client):
             self.memory.set_setting(
                 random_persona_setting_key(message), random.choice(choices)
             )
-            self.memory.erase_user_memory(str(message.author.id))
             # Never reveal which persona was chosen.
             return "persona: random"
         provider = persona_provider(persona)
@@ -1861,7 +1931,6 @@ class PersonaBot(discord.Client):
         if problem is not None:
             return problem
         self.memory.set_setting(persona_setting_key(message), persona)
-        self.memory.erase_user_memory(str(message.author.id))
         return f"persona: {persona_label(persona)}"
 
     def _human_command(self, message: discord.Message, requested: str) -> str:
@@ -2008,10 +2077,83 @@ class PersonaBot(discord.Client):
             "are restored"
         )
 
+    def _model_command(self, message: discord.Message, argument: str) -> str:
+        key = f"chat_model:user:{message.author.id}"
+        selected = argument.strip().casefold()
+        if not selected:
+            return f"model: {self.memory.get_setting(key, 'luna')}"
+        if selected not in {"luna", "mercury", "reset"}:
+            return "usage: !model luna|mercury|reset"
+        if selected == "mercury" and (LOCAL_AI_ONLY or not INCEPTION_API_KEY):
+            return "Mercury 2.5 isn't configured here"
+        self.memory.set_setting(key, "luna" if selected == "reset" else selected)
+        return "model: " + ("Luna" if selected in {"luna", "reset"} else "Mercury 2.5 (web search and images use Luna)")
+
+    def _context_command(self, message: discord.Message, argument: str) -> str:
+        if message.guild is None:
+            return "channel context only works in a server"
+        action = argument.strip().casefold() or "status"
+        server, channel = str(message.guild.id), str(message.channel.id)
+        if action == "status":
+            enabled = self.memory.channel_context_enabled(server, channel)
+            return "channel context: " + ("on" if enabled else "off")
+        if action not in {"on", "off", "clear"}:
+            return "usage: !context status|on|off|clear"
+        if message.author.id not in OWNER_IDS and not message.author.guild_permissions.manage_guild:
+            return "you need the Manage Server permission to change channel context"
+        if action != "clear":
+            self.memory.set_setting(f"channel_context:{server}:{channel}", action)
+        if action in {"off", "clear"}:
+            self.memory.clear_channel_lines(channel)
+        return "channel context: " + ("cleared" if action == "clear" else action)
+
     async def _memory_command(self, message: discord.Message, argument: str) -> str:
+        words = argument.strip().split(maxsplit=2)
+        action = words[0].casefold() if words else ""
+        user, server = str(message.author.id), str(message.guild.id) if message.guild else ""
+        if action in {"view", "stats", "status"}:
+            notes = self.memory.list_notes(user, server)
+            state = "paused" if self.memory.notes_paused(user, server) else "active"
+            if action != "view":
+                pending,failed = await asyncio.to_thread(self.memory.background_status,user,server)
+                return f"durable notes: {len(notes)} stored here; {state}; {pending} pending; {failed} failed background jobs"
+            if not notes:
+                return f"no durable notes about you here; {state}"
+            # Guild notes are delivered privately; don't expose a personal
+            # notebook to everyone standing in the channel.
+            lines = [f"your durable notes here ({state}):"]
+            for note in notes:
+                day = time.strftime("%Y-%m-%d", time.gmtime(note["created_at"]))
+                source = f"channel {note['source_channel']}" if server else "DM"
+                lines.append(f"#{note['id']}: {note['text']} ({day}; {source})")
+            content = "\n".join(lines)
+            if message.guild is not None:
+                try:
+                    for chunk in split_reply(content):
+                        await message.author.send(chunk, allowed_mentions=discord.AllowedMentions.none(), suppress_embeds=True)
+                    return "sent your durable notes by DM"
+                except (discord.HTTPException, discord.Forbidden):
+                    return "I couldn't DM your notes; enable DMs from this server and try again"
+            return content
+        if action in {"pause", "resume"}:
+            self.memory.pause_notes(user, server, action == "pause")
+            return "durable notes paused; existing notes kept, recall and new extraction stopped" if action == "pause" else "durable notes resumed"
+        if action == "forget":
+            if len(words) == 1:
+                count = self.memory.forget_notes(user, server)
+                return f"erased {count} durable notes about you here"
+            if len(words) == 2 and words[1].isdigit() and len(words[1]) < 19:
+                changed = self.memory.edit_note(user, server, int(words[1]), None)
+                return "note erased" if changed else "that note wasn't found in your notes here"
+            return "usage: !memory forget [note id]"
+        if action == "correct":
+            if len(words) != 3 or not words[1].isdigit() or len(words[1]) >= 19 or not sanitize_user_text(words[2]).strip():
+                return "usage: !memory correct <note id> <replacement text>"
+            changed = self.memory.edit_note(user, server, int(words[1]), sanitize_user_text(words[2]))
+            return "note corrected" if changed else "that note wasn't found, or the correction duplicates another note"
         if argument.casefold() == "erase mine":
             await asyncio.to_thread(self.memory.erase_user_memory, str(message.author.id))
-            return "your conversation memory has been erased; usage counters remain"
+            return "your conversation memory and durable notes have been erased; usage counters remain"
         if message.guild is None:
             return "!memory erase only works in a server"
         if argument.casefold() != "erase":
@@ -2095,10 +2237,13 @@ class PersonaBot(discord.Client):
                 return
 
     async def close(self) -> None:
+        self.closing = True
         current_task = asyncio.current_task()
-        for task in tuple(getattr(self, "active_handlers", ())):
-            if task is not current_task and not task.done():
-                task.cancel()
+        handlers = [task for task in tuple(getattr(self,"active_handlers",())) if task is not current_task and not task.done()]
+        for handler in handlers:
+            handler.cancel()
+        if handlers:
+            await asyncio.gather(*handlers,return_exceptions=True)
         task = getattr(self, "maintenance_task", None)
         prepare = getattr(self, "sefbot_prepare", None)
         for background in (task, prepare):

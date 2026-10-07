@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import offline_test_config
+
 import tempfile
 import unittest
 from pathlib import Path

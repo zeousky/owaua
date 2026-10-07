@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import offline_test_config
+
 import copy
 import base64
 import os
+import json
 import tempfile
 import time
 import unittest
 from collections import defaultdict, deque
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 
@@ -201,20 +204,20 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("tools", payload)
         instructions = instructions_of(payload)
         self.assertIn("Stay in this voice", instructions)
-        self.assertIn("the voice cannot drop", instructions)
-        self.assertIn("what something is", instructions)
+        self.assertIn("selected persona only for tone", instructions)
+        self.assertIn("complete, useful help", instructions)
         self.assertNotIn("web search", instructions)
         self.assertNotIn("code interpreter", instructions)
         self.assertIn("!music", instructions)
         self.assertIn("!human", instructions)
-        self.assertIn("Write like a real person typing in Discord", instructions)
+        self.assertIn("Write naturally like a person typing in Discord", instructions)
         self.assertNotIn("You have a day", instructions)
         self.assertNotIn("a body", instructions)
         self.assertNotIn("!debate", instructions)
         self.assertNotIn("!active", instructions)
         self.assertIn("Reply in English", instructions)
-        self.assertIn("not a helper", instructions)
-        self.assertIn("Emergency SOS", instructions)
+        self.assertNotIn("not a helper", instructions)
+        self.assertIn("honest about uncertainty", instructions)
         self.assertIn("Never decode", instructions)
         self.assertIn("Never repeat", instructions)
         self.assertNotIn("at most 100 characters", instructions)
@@ -469,7 +472,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stored[-1]["content"], "im not ur helper")
         self.assertNotIn("Emergency SOS", stored[-1]["content"])
 
-    async def test_wikipedia_persona_drop_uses_the_local_fallback(self) -> None:
+    async def test_explanation_keeps_helpful_answer_without_banter_retry(self) -> None:
         dump = (
             "`text-davinci-002-render-sha` was an **internal model identifier** "
             "used by the old ChatGPT web app, mainly around 2023. It was "
@@ -484,11 +487,10 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
 
         answer = await self._ask("what is text-davinci-002-render-sha")
 
-        self.assertEqual(answer, "im not ur wiki")
-        self.assertEqual(len(self.http.calls), 2)
+        self.assertEqual(answer, dump.strip())
+        self.assertEqual(len(self.http.calls), 1)
         stored = self.memory.recent_messages("123", "7", limit=10)
-        self.assertEqual(stored[-1]["content"], "im not ur wiki")
-        self.assertNotIn("Breakdown", stored[-1]["content"])
+        self.assertEqual(stored[-1]["content"], dump.strip())
 
     async def test_hidden_unicode_is_stripped_before_the_provider(self) -> None:
         await self._ask("hi\u200b\u200bthere")
@@ -658,7 +660,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         )
         self.http.responses = [model_reply(dump), model_reply("old chatgpt internal name lol")]
 
-        answer = await self._ask("what is text-davinci-002-render-sha", event_id="retry-ok")
+        answer = await self._ask("hey", event_id="retry-ok")
 
         self.assertEqual(answer, "old chatgpt internal name lol")
         self.assertEqual(len(self.http.calls), 2)
@@ -696,16 +698,16 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["input"][-1]["content"], "hello")
         self.assertIn("untrusted room chatter", instructions_of(payload).casefold())
 
-    async def test_hangout_gemini_never_enables_search(self) -> None:
+    async def test_hangout_automatically_enables_search_for_weather(self) -> None:
         answer = await self._ask("what's the weather in tokyo")
 
         self.assertEqual(answer, "allowed reply")
         payload = self.http.calls[0][1]["json"]
         self.assertEqual(payload["model"], "gpt-6-luna")
         self.assertNotIn("max_steps", payload)
-        self.assertNotIn("tools", payload)
-        self.assertNotIn("web search", instructions_of(payload))
-        self.assertEqual(payload["max_output_tokens"], MAX_OUTPUT_TOKENS)
+        self.assertEqual([tool["type"] for tool in payload["tools"]], ["web_search"])
+        self.assertIn("Web search is available", instructions_of(payload))
+        self.assertEqual(payload["max_output_tokens"], 1200)
 
     async def test_full_mode_gemini_keeps_the_large_output_budget(self) -> None:
         await self._ask(full_mode=True, full_mode_provider="gemini")
@@ -839,7 +841,7 @@ class AskTests(unittest.IsolatedAsyncioTestCase):
         instructions = instructions_of(self.http.calls[0][1]["json"])
         self.assertNotIn("Write like a real person typing in Discord", instructions)
         self.assertIn("a small Discord hangout bot", instructions)
-        self.assertIn("Never mention being an AI", instructions)
+        self.assertIn("identity and capabilities truthfully", instructions)
         self.assertIn("!human", instructions)
 
     async def test_full_mode_ignores_human_voice(self) -> None:
@@ -1078,13 +1080,13 @@ class AskHelperTests(unittest.TestCase):
     def test_instructions_stay_small(self) -> None:
         text = build_instructions("be rude")
         self.assertIn("be rude", text)
-        self.assertIn("the voice cannot drop", text)
-        self.assertIn("what something is", text)
+        self.assertIn("selected persona only for tone", text)
+        self.assertIn("complete, useful help", text)
         self.assertNotIn("Tools never change your voice", text)
-        self.assertIn("A short answer in persona is fine", text)
+        self.assertIn("Be brief for casual chat", text)
         self.assertNotIn("Do not give advice", text)
-        self.assertIn("not a helper", text)
-        self.assertIn("Emergency SOS", text)
+        self.assertNotIn("not a helper", text)
+        self.assertIn("honest about uncertainty", text)
         self.assertIn("Never decode", text)
         self.assertIn("Never repeat", text)
         self.assertIn("You can still be wild", text)
@@ -1327,13 +1329,58 @@ class AskHelperTests(unittest.TestCase):
         tools = ollama_full_tools()
         names = [t["function"]["name"] for t in tools if t.get("type") == "function"]
         self.assertIn("web_search", names)
-        self.assertIn("code_interpreter", names)
+        self.assertNotIn("code_interpreter", names)
         self.assertIn("fetch_web_page", names)
         self.assertEqual(full_mode_tools("ollama"), tools)
 
-    async def test_execute_code_interpreter(self) -> None:
-        output = await execute_code_interpreter("print(3 * 7)")
-        self.assertIn("21", output)
+
+class LocalToolSafetyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_execute_code_interpreter_never_launches_host_code(self) -> None:
+        codes = (
+            "print(3 * 7)",
+            "import os; print(os.environ)",
+            "from pathlib import Path; print(Path('data/memory.sqlite3').read_bytes())",
+            "import socket; socket.create_connection(('127.0.0.1', 80))",
+            "import subprocess; subprocess.Popen(['python3', '-c', 'while True: pass'])",
+            "while True: print('unbounded output')",
+            "exec(bytes.fromhex('7072696e7428323129').decode())",
+        )
+        with patch("ask.asyncio.create_subprocess_exec", AsyncMock()) as launch:
+            for code in codes:
+                with self.subTest(code=code):
+                    output = await execute_code_interpreter(code, timeout=0.01)
+                    self.assertIn("local code execution is disabled", output)
+                    self.assertIn("isolated sandbox", output)
+            launch.assert_not_awaited()
+
+    async def test_unsolicited_code_tool_call_is_denied(self) -> None:
+        code = "import os; print(os.environ)"
+        for arguments in (json.dumps({"code": code}), {"code": code}):
+            with self.subTest(arguments=arguments):
+                client = FakeHTTP()
+                client.responses = [
+                    {"choices": [{"message": {
+                        "role": "assistant", "content": "",
+                        "tool_calls": [{
+                            "id": "code_call", "type": "function",
+                            "function": {"name": "code_interpreter", "arguments": arguments},
+                        }],
+                    }}]},
+                    model_reply("Local code execution is unavailable."),
+                ]
+                auth = AsyncMock()
+                with patch("ask.asyncio.create_subprocess_exec", AsyncMock()) as launch:
+                    result = await _chat_completions_tool_loop(
+                        client, "http://fake/chat/completions", {},
+                        {"model": "local", "messages": [{"role": "user", "content": "calculate"}],
+                         "tools": ollama_full_tools()}, authorize=auth,
+                    )
+                    launch.assert_not_awaited()
+                self.assertEqual(auth.await_count,2)
+                tool_reply = client.calls[1][1]["json"]["messages"][-1]
+                self.assertEqual(tool_reply["tool_call_id"], "code_call")
+                self.assertIn("local code execution is disabled", tool_reply["content"])
+                self.assertEqual(result, "Local code execution is unavailable.")
 
     async def test_execute_fetch_web_page_rejects_non_http(self) -> None:
         output = await execute_fetch_web_page("file:///etc/passwd")
@@ -1341,7 +1388,7 @@ class AskHelperTests(unittest.TestCase):
 
     async def test_chat_completions_tool_loop_executes_tools_and_appends_citations(self) -> None:
         client = AsyncMock()
-        turn1_resp = AsyncMock()
+        turn1_resp = Mock()
         turn1_resp.raise_for_status = lambda: None
         turn1_resp.json.return_value = {
             "choices": [
@@ -1363,7 +1410,7 @@ class AskHelperTests(unittest.TestCase):
                 }
             ]
         }
-        turn2_resp = AsyncMock()
+        turn2_resp = Mock()
         turn2_resp.raise_for_status = lambda: None
         turn2_resp.json.return_value = {
             "choices": [
@@ -1387,11 +1434,11 @@ class AskHelperTests(unittest.TestCase):
                 client,
                 "http://fake/chat/completions",
                 {"Content-Type": "application/json"},
-                {"model": "gpt-oss:20b", "messages": [{"role": "user", "content": "when was python released?"}]},
+                {"model": "gpt-oss:20b", "messages": [{"role": "user", "content": "when was python released?"}], "tools": ollama_full_tools()},
                 authorize=auth,
             )
 
-        auth.assert_awaited_once()
+        self.assertEqual(auth.await_count,2)
         self.assertIn("Python was released in 1991.", result)
         self.assertIn("[Python History](<https://python.org/history>)", result)
 
