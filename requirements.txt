@@ -9,7 +9,7 @@ yt-dlp[default,deno]==2026.8.19
 
 aiohttp==3.14.3
 httpcore==1.0.9
-multidict==6.8.0
+multidict==6.9.1
 yarl==1.24.5
 aiohappyeyeballs==2.7.1
 aiosignal==1.4.0
