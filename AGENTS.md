@@ -15,6 +15,10 @@ website repositories. Work from the repository root; use relative paths.
 - The repository currently has existing lint findings. Compare with the base
   revision and report existing versus introduced issues; avoid broad automatic
   fixes, especially removal of `offline_test_config` imports with side effects.
+- Ubuntu CI also has a pre-existing failure in
+  `test_security.NativeAudioTests.test_valid_wave_decodes_with_pipe_only_protocols`
+  (the restricted FFmpeg decoder returns empty audio). Keep that test enabled
+  and report it if it still fails; see the evidence in `docs/CODEX_CLOUD.md`.
 - These checks need no Discord token or provider API keys. Tests mock provider
   requests and use temporary databases. The native decoder test runs on Linux
   with FFmpeg. The optional real Sefbot host test skips if that checkout or Node

@@ -33,6 +33,15 @@ The existing code has lint findings; compare lint output with the base revision
 when reviewing a change. Do not automatically remove `offline_test_config`
 imports: they configure the credential-free test profile.
 
+Ubuntu CI also has an existing failure in
+`test_security.NativeAudioTests.test_valid_wave_decodes_with_pipe_only_protocols`:
+the restricted FFmpeg decoder returns empty audio. It failed on the
+[previous commit](https://github.com/zeousky/owaua/actions/runs/37663407584) and
+on the [cloud setup commit](https://github.com/zeousky/owaua/actions/runs/37682474033).
+Dependency setup succeeds; this runtime regression is separate from the cloud
+bootstrap. Keep the test enabled and report its result. The clean macOS copy
+passed all 359 tests, with four platform/optional checks skipped.
+
 For a focused change, use test module names, for example:
 
 ```sh
