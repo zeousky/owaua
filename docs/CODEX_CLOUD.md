@@ -6,18 +6,30 @@ AI model, or the website checkout to edit and test Owaua.
 
 ## One-time environment settings
 
-Connect `zeousky/owaua` to Codex cloud and create/select its environment:
+Open **Settings > Codex Cloud > Environments** and select or edit the private
+`owaua` environment connected to `zeousky/owaua`. Its install script should be:
 
-- Python version: **3.12**.
-- Setup script: `bash scripts/setup-codex.sh`.
-- Maintenance script: `bash scripts/setup-codex.sh` (refreshes dependencies
-  when Codex resumes a cached environment after changing branches).
-- No environment variables or secrets are needed for development.
-- Agent internet access can stay **off**. Setup needs internet access to install
-  packages; the offline test suite does not need provider or Discord access.
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
+cd /workspace/owaua
+bash scripts/setup-codex.sh
+```
 
-These are settings in Codex's environment UI; committing the script does not
-automatically select it. See the [official cloud environment documentation](https://learn.chatgpt.com/docs/environments/cloud-environment).
+The **Start skill** should tell Codex to read `AGENTS.md`, work from
+`/workspace/owaua`, use `.venv`, and run `bash scripts/test.sh` for offline checks.
+No long-running service, environment variables, or secrets are needed for
+development. Python **3.12** is recommended. Installation needs package registry
+access; the offline tests do not need provider or Discord access.
+
+Save the draft and **Publish**, then choose **Work in > Cloud > owaua** in a new
+chat. Existing chats keep their own state. Repository refreshes do not rerun
+installation commands automatically: rerun `bash scripts/setup-codex.sh` when
+dependencies change or `.venv` is missing. See the
+[official cloud environment documentation](https://learn.chatgpt.com/docs/environments/cloud-environments).
+
+The separate **Legacy Codex Cloud** interface uses **Setup** and **Maintenance**
+fields instead; set both to `bash scripts/setup-codex.sh` if using that interface.
 
 ## Normal workflow
 

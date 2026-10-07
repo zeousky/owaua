@@ -8,7 +8,8 @@ website repositories. Work from the repository root; use relative paths.
 - Python 3.12 is recommended; CI also tests 3.11 and 3.13.
 - Install dependencies: `bash scripts/setup-codex.sh`. On Linux this also
   installs FFmpeg if needed. It creates `.venv` without reading `.env` or
-  starting any services. Run it as the cloud setup and maintenance script.
+  starting any services. Use it as the cloud install script; rerun it after
+  dependency changes or if a refreshed checkout has no `.venv`.
 - Run offline tests: `bash scripts/test.sh`.
 - Run focused tests: `bash scripts/test.sh test_ask test_memory` (module names).
 - Run lint: `.venv/bin/ruff check .`.
