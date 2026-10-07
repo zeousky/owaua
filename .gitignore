@@ -1,0 +1,46 @@
+# Credentials and private profiles (keep the example).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python environments, caches, and build output.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Bot memory, audit logs, deployment backups, and downloaded runtimes.
+/data/
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+*.pid
+
+# Separate projects and downloaded dependencies/models.
+/owaua.com/
+/sefbot/
+/deepgrove/
+node_modules/
+*.gguf
+*.safetensors
+
+# Desktop/editor files.
+.DS_Store
+._*
+.idea/
+.vscode/
+*~

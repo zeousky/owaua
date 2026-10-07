@@ -17,6 +17,8 @@ Use `!help` for all commands. A few essentials:
 
 [Commands and behavior](docs/USAGE.md) · [Setup and deployment](docs/OPERATIONS.md) · [Configuration](.env.example)
 
+Editing with Codex cloud? [Environment setup and test commands](docs/CODEX_CLOUD.md).
+
 Every AI reply uses paid credits, so please don't spam it.
 
 If you like it, tell me: Discord `ckazros` or `ckazros@owaua.com`.

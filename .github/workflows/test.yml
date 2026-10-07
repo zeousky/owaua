@@ -19,13 +19,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
-      - name: Install native decoder for security integration tests
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Set up cloud development environment
+        run: bash scripts/setup-codex.sh
       - name: Run unit tests
-        env:
-          PYTHONPATH: src/owaua:tests
-        run: python -m unittest discover -s tests -v
+        run: bash scripts/test.sh
       - name: Audit runtime dependencies
-        run: python -m pip install pip-audit && python -m pip_audit -r requirements.txt
+        run: .venv/bin/python -m pip install pip-audit && .venv/bin/python -m pip_audit -r requirements.txt
