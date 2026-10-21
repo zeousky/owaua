@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { Client, Events, GatewayIntentBits, Partials, REST, Routes, AttachmentBuilder } from 'discord.js';
+import { MusicManager, parseMusicCommand, musicHelp } from './music.js';
 import { AICore, ProviderError } from './ai.js';
 import { ConversationStore, conversationScope } from './store.js';
 
@@ -26,11 +27,12 @@ const concurrency = integer('MAX_CONCURRENT_REQUESTS', 3, 1, 20);
 const active = new Set();
 const lastRequest = new Map();
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel], allowedMentions: { parse: [], repliedUser: false },
 });
+const music = new MusicManager();
 let stopping = false;
-const help = '**Kirmy** · Grok 4.7\nUse `/ask`, mention me, reply to me, or send a DM.\nI can search the web and X, run calculations with sandboxed Python, and understand attached images.\n`/reset` or `!reset` clears your history in this channel. `/help` or `!help` shows this message.\nHistory is private to your user/channel context and retained for up to 30 days. Prompts and attachments are sent to xAI.';
+const help = '**Kirmy** · Grok 4.7\nUse `/ask`, mention me, reply to me, or send a DM.\nI can search the web and X, run calculations with sandboxed Python, and understand attached images.\n`/reset` or `!reset` clears your history in this channel. `/help` or `!help` shows this message.\nHistory is private to your user/channel context and retained for up to 30 days. Prompts and attachments are sent to xAI.\n\n' + musicHelp;
 
 function allowed(guildId) { return !guildId || !allowedGuilds.size || allowedGuilds.has(guildId); }
 function logError(event, error) {
@@ -107,6 +109,11 @@ client.on(Events.InteractionCreate, async interaction => {
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !allowed(message.guildId)) return;
   try {
+    const musicCommand = parseMusicCommand(message.content);
+    if (musicCommand) {
+      if (stopping) return message.reply('I’m restarting. Please try again shortly.');
+      return await music.handle(message, musicCommand);
+    }
     let replyToBot = false;
     if (message.reference?.messageId) {
       const reference = await message.fetchReference().catch(() => null);
@@ -136,6 +143,7 @@ client.on(Events.MessageCreate, async message => {
     } finally { clearInterval(typing); }
   } catch (error) { logError('message_error', error); }
 });
+client.on(Events.VoiceStateUpdate, (oldState, newState) => music.voiceStateUpdate(oldState, newState));
 client.on(Events.Error, error => logError('discord_error', error));
 const server = createServer((request, response) => {
   if (request.url !== '/health') { response.writeHead(404); return response.end(); }
@@ -148,6 +156,7 @@ async function shutdown() {
   if (stopping) return;
   stopping = true;
   server.close();
+  music.close();
   const deadline = Date.now() + 20000;
   while (active.size && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
   client.destroy(); store.close(); process.exit(0);

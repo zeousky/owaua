@@ -1,4 +1,10 @@
 FROM node:24-bookworm-slim
+# FFmpeg encodes Opus; yt-dlp's EJS solver uses the existing Node runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg python3 python3-venv ca-certificates \
+    && python3 -m venv /opt/music \
+    && /opt/music/bin/pip install --no-cache-dir 'yt-dlp[default]==2026.8.19' \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH="/opt/music/bin:${PATH}"
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev \

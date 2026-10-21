@@ -4,6 +4,8 @@ Discord AI core using **Grok 4.7** directly through the official xAI Responses A
 
 ## Use
 
+- `.music <song name or YouTube video link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
+- `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
 - `/ask prompt:...` — ask a question, optionally with an image.
 - Mention Kirmy, reply to one of its messages, or send it a DM.
 - `/reset` — erase your history in the current channel.
@@ -16,7 +18,7 @@ Conversation history is scoped to **server + channel + user**, so another user's
 
 ## Local setup
 
-Requires Node.js 24 or later.
+Requires Node.js 24 or later, FFmpeg with libopus, and `yt-dlp[default]` (2026.8.19) with Python 3.10+. The Dockerfile includes the music dependencies. For local development, install FFmpeg and yt-dlp and put them on PATH (or set `FFMPEG_PATH` / `YTDLP_PATH`). yt-dlp uses Node for YouTube JavaScript challenges.
 
 ```sh
 npm ci
@@ -25,7 +27,7 @@ cp .env.example .env
 npm start
 ```
 
-Enable **Message Content Intent** in the Discord Developer Portal for ordinary messages, replies, and DMs. Invite the bot with `bot` and `applications.commands` scopes and View Channels, Send Messages, Read Message History, and Attach Files permissions. It registers `/ask`, `/help`, and `/reset` on startup. Slash commands may take time to appear globally.
+Enable **Message Content Intent** in the Discord Developer Portal for ordinary messages, replies, and DMs. Invite the bot with `bot` and `applications.commands` scopes and View Channels, Send Messages, Read Message History, Attach Files, Connect, and Speak permissions. Music also needs View Channel in the selected voice channel. It registers `/ask`, `/help`, and `/reset` on startup. Slash commands may take time to appear globally.
 
 `ALLOWED_GUILD_IDS` can restrict server access; empty allows every server the bot joins. DMs remain enabled. API tokens, SQLite data, and `.env` files are excluded from Git and Docker build context. Never commit them.
 
@@ -48,6 +50,12 @@ railway logs --lines 100
 ```
 
 Run one replica to avoid duplicate Discord replies and concurrent SQLite writers. The database is `/app/data/kirmy.sqlite`; keep backups private. No public domain is required for this gateway bot.
+
+## Music
+
+Music runs independently of xAI and makes no AI generation calls. Search uses the first YouTube result; include the artist for a more precise match. Only single YouTube videos are accepted as links. Playlists, live streams, tracks over one hour, and Stage channels are unsupported. Restricted videos or YouTube bot checks can prevent playback; the bot reports a failure so you can try another song. No cookies or account credentials are used. Music searches and streaming requests go to YouTube.
+
+There is one player per server. Only members in its voice channel can enqueue or control playback. Kirmy leaves after 60 seconds without queued music, when the voice channel has no human listeners, or on `.music stop`. Queues are in memory and reset on restart. Disconnects and shutdown clean up child audio processes. Keep yt-dlp updated when YouTube changes.
 
 ## Limits and extension
 
