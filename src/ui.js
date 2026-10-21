@@ -17,17 +17,23 @@ export function answerCard(text) {
 }
 
 export function helpCard(musicHelp) {
-  return card('A little of everything.', 'Ask a question. Create something. Put a song on.', {
-    section: 'Kirmy / Guide', fields: [
-      { name: 'Conversation', value: 'Use `/ask`, mention me, reply to me, or send a DM. I can search the web and X, calculate with sandboxed Python, understand images, and analyze attached PDF/text/code documents. `/ask` also has reasoning, web domain, X handle/date, and visual search options.' },
-      { name: 'Create & edit', value: 'Ask for images or videos and specify count, shape, resolution, or duration. Defaults are one medium-quality 1K image or six seconds of 720p video. Use up to five reference images, animate an image, or attach/reply to an MP4 to edit or extend it. Larger outputs can cost more. Save generated media before its link expires.' },
-      { name: 'Voice', value: '`/transcribe` converts a recording to text. `/speak` creates spoken audio. `/ask spoken:true` adds an MP3 reply. `/voice join` starts a ten-minute voice conversation using only your microphone; replies are audible to the channel. `/voice leave` ends it. Stop music before joining voice.' },
-      { name: 'Documents & exports', value: '`/knowledge add` saves a document at xAI until you forget or clear it. `/knowledge list` shows your private library here; `/ask library:true` includes it in a question. Ask for downloadable data or charts; `/ask output:json` returns validated JSON. `/integrations` lists read-only MCP choices for `/ask integrations:...`.' },
-      { name: 'Music', value: musicHelp },
-      { name: 'Your persona', value: '`/persona set description:...` sets your default persona (up to 120 characters). I use it automatically only for you, across servers and DMs. `/persona view` shows it privately; `/persona reset` restores Kirmy’s usual persona. Safety rules still apply.' },
-      { name: 'Your memory', value: 'I keep recent context, search older conversations, and save important facts you tell me. Memory stays scoped to your user and channel. `/memory view` shows saved notes privately; `/memory remember` saves or corrects a note; `/memory forget` deletes one. `/memory pause` stops reading and saving context until `/memory resume`. `/reset`, `!reset`, or `/memory clear` erases your history, archive, and notes here. Conversations default to 180 days / 1,000 exchanges; notes stay until deleted. Prompts, recalled context, and attachments are sent to xAI.' },
-    ], footer: 'Kirmy · Conversation / Creativity / Music',
-  });
+  return card('', [
+    '**Kirmy help**',
+    'Chat in DMs, mention or reply to me, or use `/ask`. I can search the web and X, calculate with sandboxed Python, understand images, and analyze PDF/text/code files. Create or edit images (including up to five references), animate images, generate or edit/extend videos, transcribe recordings, create spoken replies, and talk for up to ten minutes in voice. Make charts, data/code files, and schema-checked JSON; save documents to a private channel library; use read-only integrations; set your own persona; and keep channel-scoped conversation memory. Prompts and attachments are sent to xAI; generated media links can expire.',
+    '',
+    '**Commands**',
+    '`/ask prompt:` — ask, with optional image/file/video/audio, web/X filters, reasoning, visual search, spoken reply, library, integrations, or JSON output.',
+    '`/help`, `.help`, or `!help` — show this guide. `.help` works without mentioning me.',
+    '`/reset` or `!reset` — clear your history and saved memories in this channel.',
+    '`/persona set|view|reset` — choose, view, or reset your personal style.',
+    '`/memory view|remember|forget|pause|resume|clear` — manage your channel memory.',
+    '`/knowledge add|list|forget|clear` — manage saved documents for this channel.',
+    '`/integrations` — list available read-only connections.',
+    '`/speak`, `/transcribe`, `/voice join|leave|status|voices` — audio and voice tools.',
+    '`.music <song or SoundCloud link>` — play in your voice channel; `.music help|queue|skip|pause|resume|stop|leave` shows help and controls playback.',
+    '',
+    musicHelp,
+  ].join('\n\n'));
 }
 
 export function loadingCard(frame = 0, activity = 'thinking') {

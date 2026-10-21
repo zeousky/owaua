@@ -274,6 +274,7 @@ client.on(Events.InteractionCreate, async interaction => {
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !allowed(message.guildId)) return;
   try {
+    if (/^\.help$/i.test(message.content.trim())) return await message.reply(help);
     const musicCommand = parseMusicCommand(message.content);
     if (musicCommand) {
       if (stopping) return message.reply(card('Restarting', 'I’m restarting. Please try again shortly.', { tone: 'warning' }));
