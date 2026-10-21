@@ -31,14 +31,14 @@ Enable **Message Content Intent** in the Discord Developer Portal for ordinary m
 
 ## Railway
 
-The Dockerfile installs locked production dependencies on Node 24. `railway.toml` configures `/health`, which returns 200 only when the Discord gateway is ready. A running container alone does not prove a Discord login.
+The Dockerfile installs locked production dependencies on Node 24. Set the Railway healthcheck path to `/health` with a 120-second startup timeout; it returns 200 only when the Discord gateway is ready. A running container alone does not prove a Discord login.
 
 In a Railway project with available capacity:
 
 1. Create a service from this private repository, branch `main`.
-2. Add a persistent volume mounted at `/app/data`.
+2. Add a persistent volume mounted at `/app/data`. If reusing Sefbot's volume, set `DATA_DIR=/app/data/kirmy` to preserve its database separately.
 3. Set `DISCORD_TOKEN`, `XAI_API_KEY`, `XAI_MODEL=grok-4.7`, and `DATA_DIR=/app/data` as Railway variables. Use the values in your local `.env`; do not upload that file.
-4. Deploy and verify `discord_ready` and `commands_registered` in the new deployment logs.
+4. Set healthcheck path `/health`, startup timeout 120 seconds, one replica, and restart on failure (10 retries). Deploy and verify `discord_ready` and `commands_registered` in the new deployment logs.
 
 For CLI deployment after linking the project/service:
 
