@@ -10,7 +10,9 @@
   "scripts": {
     "start": "node src/bot.js",
     "test": "node --test",
-    "check": "node --check src/bot.js && node --check src/ai.js && node --check src/store.js && node --check src/tools.js && node --check src/music.js"
+    "check": "node --check src/bot.js && node --check src/ai.js && node --check src/store.js && node --check src/memory.js && node --check src/memory-command.js && node --check src/tools.js && node --check src/music.js && node --check src/media.js && node --check src/images.js && node --check src/ui.js && node --check src/persona.js && node --check src/persona-command.js && node --check scripts/backup-memory.js",
+    "memory:backup": "node scripts/backup-memory.js backup",
+    "memory:verify": "node scripts/backup-memory.js verify"
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
