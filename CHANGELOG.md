@@ -2,7 +2,14 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
-## YYYY-MM-DD
+## 2026-10-21 — Test: current development list
 
-### Added
-- Describe the user-visible change.
+- Plan a full Kirmy Discord server
+- Audit Grok API features and capabilities
+- Improve bot memory and reliability
+- Add safe personal personas
+- Add polished embeds and animation
+- Add image and video generation
+- Find the fix
+- Add bot voice music playback
+- Build and deploy Grok bot core

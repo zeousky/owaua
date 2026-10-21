@@ -38,15 +38,23 @@ jobs:
 
           lines = entry.splitlines()
           title = lines[0].strip()
-          body = "\n".join(lines[1:]).strip()
-          message = f"**Kirmy update — {title}**"
-          if body:
-              message += f"\n{body}"
-          if len(message) > 1900:
-              message = message[:1897] + "..."
+          description = "\n".join(lines[1:]).strip()
+          if not description:
+              description = "A new Kirmy changelog entry is available."
+          if len(description) > 4000:
+              description = description[:3997] + "..."
+
+          if len(title) > 256:
+              title = title[:253] + "..."
+          embed = {
+              "title": f"Kirmy changelog — {title}",
+              "description": description,
+              "color": 0x8B5CF6,
+              "footer": {"text": "Kirmy changelog"},
+          }
 
           payload = json.dumps({
-              "content": message,
+              "embeds": [embed],
               "allowed_mentions": {"parse": []},
           }).encode("utf-8")
           request = urllib.request.Request(
