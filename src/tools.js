@@ -1,3 +1,5 @@
+import { registerArtifactTools } from './artifacts.js';
+
 // Add explicitly permitted functions here; model calls never execute local code.
 export class ToolRegistry {
   #tools = new Map();
@@ -58,20 +60,44 @@ export function createTools() {
       return { saved: false, error: error.message };
     }
   });
-  for (const kind of ['image', 'video', 'edit_image']) registry.register({
-    name: kind === 'edit_image' ? kind : `generate_${kind}`,
-    description: kind === 'edit_image'
-      ? 'Edit the attached or replied-to image(s) using the requested changes. Ask what to change if unspecified. Requires reference images.'
-      : `Generate one ${kind} only when explicitly requested. Uses current reference images by default (${kind === 'video' ? 'animates the first reference image' : 'uses up to four images for reference-guided generation'}). Set use_reference=false for an unrelated text-only creation.`,
+  const imageOptions = {
+    count: { type: 'integer', minimum: 1, maximum: 10, description: 'Number of images, only when requested; default 1.' },
+    quality: { type: 'string', enum: ['low', 'medium', 'auto'], description: 'Default medium. Use another quality only if requested.' },
+    resolution: { type: 'string', enum: ['1k', '2k'], description: 'Default 1k.' },
+    aspect_ratio: { type: 'string', enum: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20', '21:9', '5:2', 'auto'],
+      description: 'Omit for exactly one reference image: editing keeps its source ratio.' },
+  };
+  const videoOptions = {
+    model: { type: 'string', enum: ['lite', 'standard', 'classic'], description: 'Default lite for text/one-image animation; standard for multiple reference images. standard supports native 1080p. lite 1080p is upscaled. classic supports up to 720p.' },
+    duration: { type: 'integer', minimum: 1, maximum: 15, description: 'Video seconds, default 6. Classic reference mode maximum 10.' },
+    resolution: { type: 'string', enum: ['480p', '720p', '1080p'], description: 'Default 720p. Reference mode and classic support at most 720p.' },
+    aspect_ratio: { type: 'string', enum: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9', '5:2'], description: 'Default 16:9 for text/reference video. Omit for first-frame animation: it keeps the image ratio.' },
+    reference_mode: { type: 'string', enum: ['animate', 'reference'], description: 'animate uses exactly one image as the first frame. reference uses all supplied images as guidance and needs standard/classic. Multiple supplied images select reference automatically.' },
+  };
+  const mediaDescriptions = {
+    image: 'Create an image only when explicitly requested. Uses up to five attached or replied-to images for reference-guided creation.',
+    edit_image: 'Edit the attached or replied-to image(s) using requested changes. Ask what to change if unspecified. Requires image references.',
+    video: 'Create a video only when explicitly requested. One supplied image is animated; multiple images guide a reference video. With a supplied MP4 use edit_video or extend_video instead.',
+    edit_video: 'Edit one attached or replied-to MP4 video, up to 8.7 seconds long. Output inherits duration/aspect/resolution, capped at 720p. Requires a requested change; no image references.',
+    extend_video: 'Continue one attached or replied-to MP4 video of 2–15 seconds with the requested action. Adds 2–10 seconds (default 6); inherits aspect/resolution capped at 720p. No image references.',
+  };
+  for (const kind of ['image', 'video', 'edit_image', 'edit_video', 'extend_video']) registry.register({
+    name: ['image', 'video'].includes(kind) ? `generate_${kind}` : kind,
+    description: `${mediaDescriptions[kind]} Only set options to fulfill an explicit user preference; otherwise preserve defaults. Reference media comes from the current request automatically. Set use_reference=false only for unrelated creation. Never invent media URLs.`,
     parameters: { type: 'object', properties: { prompt: { type: 'string', minLength: 1, maxLength: 6000 },
-      use_reference: { type: 'boolean', description: 'Use the supplied images as references; defaults to true.' } },
-      required: ['prompt'], additionalProperties: false },
-  }, async ({ prompt, use_reference = true }, context) => {
+      use_reference: { type: 'boolean', description: 'Use supplied reference media; defaults to true. Always true for edits/extensions.' },
+      options: { type: 'object', additionalProperties: false, properties:
+        kind === 'edit_video' ? {} : kind === 'extend_video' ? { duration: { type: 'integer', minimum: 2, maximum: 10,
+          description: 'Seconds to add (not total output duration); default 6.' } }
+          : kind === 'video' ? videoOptions : imageOptions },
+    }, required: ['prompt'], additionalProperties: false },
+  }, async ({ prompt, use_reference = true, options = {}, ...extra }, context) => {
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 6000 ||
-      typeof use_reference !== 'boolean' || !context?.generateMedia) {
+      typeof use_reference !== 'boolean' || !options || typeof options !== 'object' || Array.isArray(options) ||
+      Object.keys(extra).length || !context?.generateMedia) {
       throw new Error('Invalid generation request');
     }
-    return { media: await context.generateMedia(kind, prompt, { useReference: kind === 'edit_image' || use_reference }) };
+    return { media: await context.generateMedia(kind, prompt, { useReference: kind.startsWith('edit_') || kind === 'extend_video' || use_reference, options }) };
   }, { propagateErrors: true });
-  return registry;
+  return registerArtifactTools(registry);
 }

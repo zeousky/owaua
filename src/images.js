@@ -11,6 +11,6 @@ export function requestImages(message, reference, botId) {
     images = (reference.embeds ?? []).map(embed => embed.image?.url).filter(Boolean);
   }
   images = [...new Set(images)];
-  if (images.length > 4) throw new Error('Please use at most four reference images.');
+  if (images.length > 5) throw new Error('Please use at most five reference images.');
   return images;
 }

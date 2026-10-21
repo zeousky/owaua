@@ -123,7 +123,7 @@ test('missing or unsupported edit sources fail before provider submission', asyn
   const media = new MediaGenerator({ fetchImpl: async () => assert.fail('must not submit') });
   await assert.rejects(media.generate('edit_image', 'Make it blue'), /Attach an image/);
   await assert.rejects(media.generate('edit_image', 'Make it blue', { images: ['https://cdn.discordapp.com/a.gif?x=1'] }), /instead of a GIF/);
-  await assert.rejects(media.generate('edit_image', 'Make it blue', { images: Array(5).fill('https://example.com/a.png') }), /at most four/);
+  await assert.rejects(media.generate('edit_image', 'Make it blue', { images: Array(6).fill('https://example.com/a.png') }), /at most five/);
 });
 test('video animation receives the first supplied image while retaining 720p', async () => {
   const media = new MediaGenerator({ fetchImpl: async (url, options) => {

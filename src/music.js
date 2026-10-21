@@ -118,9 +118,10 @@ export function streamTrack(track, onError, launch = spawn) {
 
 export class MusicManager {
   constructor({ resolve = resolveTrack, stream = streamTrack, join = joinVoiceChannel,
-    player = createAudioPlayer, wait = entersState, idleMs = 60000 } = {}) {
+    player = createAudioPlayer, wait = entersState, idleMs = 60000, isVoiceBusy = () => false } = {}) {
     this.sessions = new Map();
-    Object.assign(this, { resolve, stream, join, player, wait, idleMs });
+    this.closed = false;
+    Object.assign(this, { resolve, stream, join, player, wait, idleMs, isVoiceBusy });
   }
   dispose(session) {
     if (this.sessions.get(session.guildId) !== session) return;
@@ -130,7 +131,7 @@ export class MusicManager {
     session.player.stop(true);
     if (session.connection.state.status !== VoiceConnectionStatus.Destroyed) session.connection.destroy();
   }
-  close() { for (const session of this.sessions.values()) this.dispose(session); }
+  close() { this.closed = true; for (const session of this.sessions.values()) this.dispose(session); }
   notify(session, text) { return session.text.send(typeof text === 'string'
     ? card('Music update', text, { tone: 'music', section: 'Kirmy / Music' }) : text).catch(() => {}); }
   async showPlayback(session, track) {
@@ -172,6 +173,7 @@ export class MusicManager {
     const reply = content => message.reply(typeof content === 'string'
       ? card('Music', content, { tone: 'music', section: 'Kirmy / Music' }) : content);
     if (!message.guild) return reply('Music works in server voice channels.');
+    if (this.closed) return reply('I’m restarting. Please try again shortly.');
     if (command.action === 'help') return reply(musicHelp);
     const member = await message.guild.members.fetch(message.author.id);
     const channel = member.voice.channel;
@@ -209,6 +211,14 @@ export class MusicManager {
     if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) {
       return reply('I need View Channel, Connect, and Speak permissions in your voice channel.');
     }
+    // Metadata fetches above can yield to a voice join or another music search.
+    // Recheck immediately before reserving/joining, with no intervening await.
+    if (this.closed) return reply('I’m restarting. Please try again shortly.');
+    if (this.isVoiceBusy(message.guildId)) return reply('End the voice conversation with /voice leave before using music.');
+    session = this.sessions.get(message.guildId);
+    if (session && session.channelId !== channel.id) return reply('I’m playing in another voice channel. Join that channel to control the music.');
+    if (session?.pending) return reply('I’m still finding the last song. Try again in a moment.');
+    if (session?.queue.length >= 20) return reply('The queue is full (20 songs). Wait or skip a song first.');
     if (!session) {
       const connection = this.join({ guildId: message.guildId, channelId: channel.id,
         adapterCreator: message.guild.voiceAdapterCreator, selfDeaf: true });
