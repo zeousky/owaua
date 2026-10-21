@@ -8,9 +8,9 @@ import {
 
 const exec = promisify(execFile);
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
-const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings',
+const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
   '--js-runtimes', `node:${process.execPath}`, '--socket-timeout', '15', '--retries', '2'];
-export const musicHelp = 'Join a voice channel, then use `.music <song name or YouTube link>` (for example `.music go away`). More songs go into the queue.\nControls: `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop`.';
+export const musicHelp = 'Join a voice channel, then use `.music <song name, YouTube link, or SoundCloud link>` (for example `.music go away`). More songs go into the queue.\nControls: `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop`.';
 export function parseMusicCommand(content) {
   const match = /^\.music(?:\s+([\s\S]*))?$/i.exec(content.trim());
   if (!match) return null;
@@ -21,13 +21,18 @@ export function parseMusicCommand(content) {
   return { action: 'play', query: query.replace(/^play\s+/i, '') };
 }
 export function searchTarget(query) {
-  if (!query || query.length > 300) throw new Error('Use a song name or YouTube link under 300 characters.');
+  if (!query || query.length > 300) throw new Error('Use a song name, YouTube link, or SoundCloud link under 300 characters.');
   if (/^(?:https?:\/\/|www\.)/i.test(query)) {
     let url;
     try { url = new URL(query.startsWith('www.') ? `https://${query}` : query); } catch { throw new Error('That YouTube link is invalid.'); }
+    if (['soundcloud.com', 'www.soundcloud.com'].includes(url.hostname) && url.protocol === 'https:'
+      && !url.username && !url.password && !url.port
+      && /^\/[\w-]+\/[\w-]+\/?$/.test(url.pathname) && !/^\/(sets|discover|search|tags)\//.test(url.pathname) && !/\/(sets|albums|tracks|popular-tracks|reposts)\/?$/.test(url.pathname)) {
+      return `https://soundcloud.com${url.pathname.replace(/\/$/, '')}`;
+    }
     if (!['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'].includes(url.hostname)
       || !['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) {
-      throw new Error('Use a YouTube video link or search by song name.');
+      throw new Error('Use a YouTube or SoundCloud track link, or search by song name.');
     }
     const id = url.hostname === 'youtu.be' ? url.pathname.slice(1)
       : url.pathname === '/watch' ? url.searchParams.get('v') : /^\/(shorts|live)\/([^/]+)$/.exec(url.pathname)?.[2];
@@ -37,15 +42,33 @@ export function searchTarget(query) {
   // Always search plain input; never let yt-dlp interpret user text as options or another URL scheme.
   return `ytsearch1:${query}`;
 }
-export async function resolveTrack(query, signal) {
-  const { stdout } = await exec(ytdlp, [...commonArgs, '--dump-single-json', '--skip-download', '-f', 'bestaudio/best', '--', searchTarget(query)],
-    { timeout: 45000, maxBuffer: 4 * 1024 * 1024, signal });
-  const result = JSON.parse(stdout);
-  const info = result.entries ? result.entries[0] : result;
-  if (!info || !/^[\w-]{11}$/.test(info.id || '')) throw new Error('No playable song found. Try adding the artist name.');
-  if (info.is_live || !Number.isFinite(info.duration) || info.duration > 3600) throw new Error('Choose a recorded song shorter than one hour.');
-  return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160),
-    url: `https://www.youtube.com/watch?v=${info.id}`, duration: info.duration };
+export async function resolveTrack(query, signal, run = exec) {
+  const target = searchTarget(query);
+  const extract = async input => {
+    const { stdout } = await run(ytdlp, [...commonArgs, '--dump-single-json', '--skip-download', '-f', 'bestaudio/best', '--', input],
+      { timeout: 45000, maxBuffer: 4 * 1024 * 1024, signal });
+    const result = JSON.parse(stdout);
+    const info = result.entries ? result.entries[0] : result;
+    if (!info) throw new Error('No playable song found. Try adding the artist name.');
+    if (info.is_live || !Number.isFinite(info.duration) || info.duration > 3600) throw new Error('Choose a recorded song shorter than one hour.');
+    let url, source;
+    if (info.extractor === 'soundcloud') {
+      url = searchTarget(info.webpage_url);
+      if (!url.startsWith('https://soundcloud.com/')) throw new Error('Invalid track source');
+      source = 'SoundCloud';
+    } else {
+      if (!/^[\w-]{11}$/.test(info.id || '')) throw new Error('No playable song found. Try adding the artist name.');
+      url = `https://www.youtube.com/watch?v=${info.id}`;
+      source = 'YouTube';
+    }
+    return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160), url, source, duration: info.duration };
+  };
+  try { return await extract(target); }
+  catch (error) {
+    if (signal?.aborted || !target.startsWith('ytsearch1:')) throw error;
+    // Public SoundCloud search remains available when YouTube blocks datacenter IPs.
+    return extract(`scsearch1:${query}`);
+  }
 }
 export function streamTrack(track, onError) {
   const source = spawn(ytdlp, [...commonArgs, '-f', 'bestaudio/best', '-o', '-', '--', track.url], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -104,14 +127,14 @@ export class MusicManager {
     try {
       session.audio = this.stream(track, () => {
         if (this.sessions.get(session.guildId) !== session || session.current !== track) return;
-        this.notify(session, 'I couldn’t stream that song. It may be unavailable or blocked by YouTube. Try another song.');
+        this.notify(session, 'I couldn’t stream that song. It may be unavailable or blocked by the music source. Try another song.');
         session.player.stop(true);
         if (session.current === track) this.next(session);
       });
       session.player.play(session.audio.resource);
       await this.wait(session.player, AudioPlayerStatus.Playing, 45000);
       if (this.sessions.get(session.guildId) === session && session.current === track) {
-        await this.notify(session, `Now playing: **${track.title}**`);
+        await this.notify(session, `Now playing: **${track.title}**${track.source ? ` (${track.source})` : ''}`);
       }
     } catch {
       if (this.sessions.get(session.guildId) === session && session.current === track) {
@@ -196,7 +219,7 @@ export class MusicManager {
       console.error(JSON.stringify({ event: 'music_error', type: error.name, code: error.code ?? null }));
       const safe = ['Choose a recorded song shorter than one hour.', 'No playable song found. Try adding the artist name.',
         'Stay in the voice channel while I find the song.'];
-      await reply(safe.includes(error.message) ? error.message : 'I couldn’t load that song. YouTube may have blocked it, or voice connection failed. Try another song.');
+      await reply(safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.');
     } finally {
       session.pending = false;
       if (!session.current && this.sessions.get(message.guildId) === session) this.next(session);

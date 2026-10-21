@@ -4,7 +4,7 @@ Discord AI core using **Grok 4.7** directly through the official xAI Responses A
 
 ## Use
 
-- `.music <song name or YouTube video link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
+- `.music <song name, YouTube video link, or SoundCloud track link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
 - `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
 - `/ask prompt:...` — ask a question, optionally with an image.
 - Mention Kirmy, reply to one of its messages, or send it a DM.
@@ -53,7 +53,7 @@ Run one replica to avoid duplicate Discord replies and concurrent SQLite writers
 
 ## Music
 
-Music runs independently of xAI and makes no AI generation calls. Search uses the first YouTube result; include the artist for a more precise match. Only single YouTube videos are accepted as links. Playlists, live streams, tracks over one hour, and Stage channels are unsupported. Restricted videos or YouTube bot checks can prevent playback; the bot reports a failure so you can try another song. No cookies or account credentials are used. Music searches and streaming requests go to YouTube.
+Music runs independently of xAI and makes no AI generation calls. Search uses the first YouTube result and falls back to public SoundCloud search if YouTube fails. Include the artist for a more precise match. The now-playing message identifies the source. Only single YouTube videos and full SoundCloud track links are accepted as links. Playlists, live streams, tracks over one hour, and Stage channels are unsupported. Restricted videos or YouTube bot checks can prevent playback; the bot reports a failure so you can try another song. No cookies or account credentials are used. Music searches and streaming requests go to YouTube and, when used, SoundCloud. YouTube currently challenges the Railway server with a bot check; song-name searches can use the SoundCloud fallback. Direct YouTube links may still fail; search by song name or use a SoundCloud track link instead.
 
 There is one player per server. Only members in its voice channel can enqueue or control playback. Kirmy leaves after 60 seconds without queued music, when the voice channel has no human listeners, or on `.music stop`. Queues are in memory and reset on restart. Disconnects and shutdown clean up child audio processes. Keep yt-dlp updated when YouTube changes.
 
