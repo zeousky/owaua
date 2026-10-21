@@ -10,9 +10,10 @@
   "scripts": {
     "start": "node src/bot.js",
     "test": "node --test",
-    "check": "node --check src/bot.js && node --check src/ai.js && node --check src/store.js && node --check src/tools.js"
+    "check": "node --check src/bot.js && node --check src/ai.js && node --check src/store.js && node --check src/tools.js && node --check src/music.js"
   },
   "dependencies": {
+    "@discordjs/voice": "^0.19.2",
     "discord.js": "^14.27.0",
     "dotenv": "^18.0.8"
   }
