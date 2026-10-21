@@ -65,7 +65,10 @@ jobs:
           request = urllib.request.Request(
               webhook,
               data=payload,
-              headers={"Content-Type": "application/json"},
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "DiscordBot (https://github.com/zeousky/kirmy-bot, 1.0)",
+              },
               method="POST",
           )
           try:
