@@ -74,7 +74,7 @@ client.once(Events.ClientReady, async ready => {
   try {
     await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN).put(Routes.applicationCommands(ready.user.id), { body: [
       { name: 'ask', description: 'Ask Kirmy anything', options: [
-        { type: 3, name: 'prompt', description: 'Your question', required: true, max_length: 16000 },
+        { type: 3, name: 'prompt', description: 'Your question', required: true, max_length: 6000 },
         { type: 11, name: 'image', description: 'Optional image to understand' },
       ] },
       { name: 'reset', description: 'Clear your Kirmy history in this channel' },
