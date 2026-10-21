@@ -9,7 +9,7 @@ import { AudioPlayerStatus, VoiceConnectionStatus } from '@discordjs/voice';
 import { MusicManager, parseMusicCommand, searchTarget, resolveTrack, streamTrack, audioDiagnostic } from '../src/music.js';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function fixture(resolve = async query => ({ title: query, url: 'https://www.youtube.com/watch?v=abcdefghijk', duration: 60 })) {
+function fixture(resolve = async query => ({ title: query, url: 'https://soundcloud.com/artist/song', duration: 60 })) {
   const sent = [];
   let closed = 0;
   const player = new EventEmitter();
@@ -39,15 +39,20 @@ test('music prefix matches without a mention and preserves song queries', () => 
   assert.deepEqual(parseMusicCommand('.music STOP'), { action: 'stop' });
   assert.equal(parseMusicCommand('.musical go away'), null);
 });
-test('only canonical YouTube video URLs reach the extractor', () => {
-  assert.equal(searchTarget('go away'), 'ytsearch1:go away');
-  assert.equal(searchTarget('--exec rm'), 'ytsearch1:--exec rm');
-  assert.equal(searchTarget('https://youtu.be/abcdefghijk?t=2'), 'https://www.youtube.com/watch?v=abcdefghijk');
-  assert.equal(searchTarget('https://youtube.com/watch?v=abcdefghijk&list=other'), 'https://www.youtube.com/watch?v=abcdefghijk');
-  for (const query of ['https://localhost/a', 'https://youtube.com.evil/a', 'https://youtube.com:123/watch?v=abcdefghijk',
-    'https://youtube.com/playlist?list=x', 'https://user@youtube.com/watch?v=abcdefghijk', 'x'.repeat(301)]) {
+test('song names search SoundCloud and other providers cannot reach the extractor', async () => {
+  assert.equal(searchTarget('go away'), 'scsearch1:go away');
+  assert.equal(searchTarget('--exec rm'), 'scsearch1:--exec rm');
+  for (const query of ['https://youtu.be/abcdefghijk?t=2', 'https://youtube.com/watch?v=abcdefghijk',
+    'https://music.youtube.com/watch?v=abcdefghijk', 'https://localhost/a', 'x'.repeat(301)]) {
     assert.throws(() => searchTarget(query));
+    let calls = 0;
+    await assert.rejects(resolveTrack(query, undefined, async () => { calls++; }));
+    assert.equal(calls, 0);
   }
+  const f = fixture();
+  await f.manager.handle(f.message, { action: 'play', query: 'https://youtu.be/abcdefghijk' });
+  assert.equal(f.manager.sessions.size, 0);
+  assert.match(f.sent.at(-1), /Use a SoundCloud track link/);
 });
 test('songs queue, skip advances, and stop releases resources', async () => {
   const f = fixture();
@@ -154,76 +159,47 @@ test('SoundCloud links are restricted to canonical public track paths', () => {
     'https://soundcloud.com.evil/artist/song', 'https://user@soundcloud.com/artist/song',
     'http://soundcloud.com/artist/song', 'https://soundcloud.com:123/artist/song']) assert.throws(() => searchTarget(url));
 });
-test('song-name search falls back to SoundCloud when YouTube blocks extraction', async () => {
+test('song-name search resolves directly through SoundCloud', async () => {
   const inputs = [];
   const track = await resolveTrack('go away', undefined, async (exe, args) => {
     inputs.push(args.at(-1));
-    if (inputs.length === 1) throw new Error('Sign in to confirm you are not a bot');
     return { stdout: JSON.stringify({ entries: [{ extractor: 'soundcloud', title: 'Artist - Go Away',
       duration: 180, webpage_url: 'https://soundcloud.com/artist/go-away' }] }) };
   });
-  assert.deepEqual(inputs, ['ytsearch1:go away', 'scsearch1:go away']);
+  assert.deepEqual(inputs, ['scsearch1:go away']);
   assert.equal(track.source, 'SoundCloud');
   assert.equal(track.url, 'https://soundcloud.com/artist/go-away');
 });
-test('exact YouTube links and aborted requests never silently search another source', async () => {
-  for (const [query, signal] of [['https://youtu.be/abcdefghijk', undefined], ['go away', { aborted: true }]]) {
-    let count = 0;
-    await assert.rejects(resolveTrack(query, signal, async () => { count++; throw new Error('blocked'); }), /blocked/);
-    assert.equal(count, 1);
-  }
-});
-test('resolver rejects live streams, long tracks, and unexpected SoundCloud destinations', async () => {
-  for (const info of [
-    { id: 'abcdefghijk', is_live: true, duration: 60 },
-    { id: 'abcdefghijk', duration: 3601 },
-    { extractor: 'soundcloud', duration: 60, webpage_url: 'https://localhost/private' },
-  ]) {
-    await assert.rejects(resolveTrack('https://youtu.be/abcdefghijk', undefined, async () => ({ stdout: JSON.stringify(info) })));
-  }
-});
-test('a YouTube stream failure retries SoundCloud before the next queued song', async () => {
-  const f = fixture(async query => ({ title: query, source: 'YouTube', fallbackQuery: query, duration: 60 }));
-  const failures = [];
-  f.manager.stream = (track, fail) => { failures.push(fail); return { resource: {}, close() {} }; };
-  let retries = 0;
-  f.manager.fallback = async query => { retries++; return { title: query + ' fallback', source: 'SoundCloud', duration: 60 }; };
-  await f.manager.handle(f.message, { action: 'play', query: 'first' });
-  await f.manager.handle(f.message, { action: 'play', query: 'second' });
-  failures[0](new Error('429'));
-  failures[0](new Error('duplicate')); await tick();
-  assert.equal(retries, 1);
-  assert.equal(f.manager.sessions.get('guild').current.title, 'first fallback');
-  assert.equal(f.manager.sessions.get('guild').queue[0].title, 'second');
-  failures[1](new Error('SoundCloud failed')); await tick();
-  assert.equal(retries, 1);
-  assert.equal(f.manager.sessions.get('guild').current.title, 'second');
-  f.manager.close();
-});
-test('stop and skip cancel a pending streaming fallback without late playback', async () => {
-  for (const action of ['skip', 'stop']) {
-    const f = fixture(async query => ({ title: query, source: 'YouTube', fallbackQuery: query, duration: 60 }));
-    let fail, finish, signal;
-    f.manager.stream = (track, callback) => { fail = callback; return { resource: {}, close() {} }; };
-    f.manager.fallback = (query, abort) => { signal = abort; return new Promise(resolve => { finish = resolve; }); };
-    await f.manager.handle(f.message, { action: 'play', query: 'first' });
-    fail(new Error('blocked')); await tick();
-    await f.manager.handle(f.message, { action });
-    assert.equal(signal.aborted, true);
-    finish({ title: 'late fallback', duration: 60 }); await tick();
-    assert.ok(!f.manager.sessions.get('guild')?.current);
-    f.manager.close();
-  }
-});
-test('explicit SoundCloud resolution bypasses YouTube and cannot recursively fall back', async () => {
+test('SoundCloud track links resolve without searching', async () => {
   const inputs = [];
-  const track = await resolveTrack('go away', undefined, async (exe, args) => {
+  await resolveTrack('https://soundcloud.com/artist/go-away', undefined, async (exe, args) => {
     inputs.push(args.at(-1));
     return { stdout: JSON.stringify({ extractor: 'soundcloud', title: 'Go Away', duration: 180,
       webpage_url: 'https://soundcloud.com/artist/go-away' }) };
-  }, 'soundcloud');
-  assert.deepEqual(inputs, ['scsearch1:go away']);
-  assert.equal(track.fallbackQuery, undefined);
+  });
+  assert.deepEqual(inputs, ['https://soundcloud.com/artist/go-away']);
+});
+test('extraction failures propagate without retrying another music source', async () => {
+  for (const signal of [undefined, AbortSignal.abort()]) {
+    let count = 0;
+    await assert.rejects(resolveTrack('go away', signal, async (exe, args, options) => {
+      count++;
+      assert.equal(options.signal, signal);
+      throw new Error('unavailable');
+    }), /unavailable/);
+    assert.equal(count, 1);
+  }
+});
+test('resolver rejects live streams, long tracks, and unexpected sources', async () => {
+  for (const info of [
+    { extractor: 'soundcloud', is_live: true, duration: 60, webpage_url: 'https://soundcloud.com/artist/song' },
+    { extractor: 'soundcloud', duration: 3601, webpage_url: 'https://soundcloud.com/artist/song' },
+    { extractor: 'soundcloud', duration: 60, webpage_url: 'https://localhost/private' },
+    { extractor: 'youtube', id: 'abcdefghijk', duration: 60, webpage_url: 'https://soundcloud.com/artist/song' },
+    { extractor: 'soundcloud', duration: 60, webpage_url: 'https://youtu.be/abcdefghijk' },
+  ]) {
+    await assert.rejects(resolveTrack('go away', undefined, async () => ({ stdout: JSON.stringify(info) })));
+  }
 });
 test('extractor failure reports bounded diagnostics and kills both child processes', async () => {
   const children = [];
@@ -234,7 +210,7 @@ test('extractor failure reports bounded diagnostics and kills both child process
     children.push(child); return child;
   };
   let reported;
-  const audio = streamTrack({ url: 'https://www.youtube.com/watch?v=abcdefghijk', duration: 10 }, error => { reported = error; }, launch);
+  const audio = streamTrack({ url: 'https://soundcloud.com/artist/song', duration: 10 }, error => { reported = error; }, launch);
   children[0].stderr.write('ERROR: HTTP Error 429 https://media.example/audio?secret=token');
   children[0].emit('close', 1);
   assert.equal(reported.stage, 'extractor');

@@ -12,8 +12,8 @@ import {
 const exec = promisify(execFile);
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
 const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
-  '--js-runtimes', `node:${process.execPath}`, '--socket-timeout', '15', '--retries', '2'];
-export const musicHelp = 'Join a voice channel, then use `.music <song name, YouTube link, or SoundCloud link>` (for example `.music go away`). More songs go into the queue.\nControls: `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop`.';
+  '--socket-timeout', '15', '--retries', '2'];
+export const musicHelp = 'Join a voice channel, then use `.music <song name or SoundCloud track link>` (for example `.music go away`). More songs go into the queue.\nControls: `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop`.';
 export function parseMusicCommand(content) {
   const match = /^\.music(?:\s+([\s\S]*))?$/i.exec(content.trim());
   if (!match) return null;
@@ -24,56 +24,33 @@ export function parseMusicCommand(content) {
   return { action: 'play', query: query.replace(/^play\s+/i, '') };
 }
 export function searchTarget(query) {
-  if (!query || query.length > 300) throw new Error('Use a song name, YouTube link, or SoundCloud link under 300 characters.');
+  if (!query || query.length > 300) throw new Error('Use a song name or SoundCloud track link under 300 characters.');
   if (/^(?:https?:\/\/|www\.)/i.test(query)) {
     let url;
-    try { url = new URL(query.startsWith('www.') ? `https://${query}` : query); } catch { throw new Error('That YouTube link is invalid.'); }
+    try { url = new URL(query.startsWith('www.') ? `https://${query}` : query); } catch { throw new Error('That SoundCloud track link is invalid.'); }
     if (['soundcloud.com', 'www.soundcloud.com'].includes(url.hostname) && url.protocol === 'https:'
       && !url.username && !url.password && !url.port
       && /^\/[\w-]+\/[\w-]+\/?$/.test(url.pathname) && !/^\/(sets|discover|search|tags)\//.test(url.pathname) && !/\/(sets|albums|tracks|popular-tracks|reposts)\/?$/.test(url.pathname)) {
       return `https://soundcloud.com${url.pathname.replace(/\/$/, '')}`;
     }
-    if (!['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'].includes(url.hostname)
-      || !['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) {
-      throw new Error('Use a YouTube or SoundCloud track link, or search by song name.');
-    }
-    const id = url.hostname === 'youtu.be' ? url.pathname.slice(1)
-      : url.pathname === '/watch' ? url.searchParams.get('v') : /^\/(shorts|live)\/([^/]+)$/.exec(url.pathname)?.[2];
-    if (!/^[\w-]{11}$/.test(id || '')) throw new Error('Use a single YouTube video link, not a playlist or channel.');
-    return `https://www.youtube.com/watch?v=${id}`;
+    throw new Error('Use a SoundCloud track link, or search by song name.');
   }
   // Always search plain input; never let yt-dlp interpret user text as options or another URL scheme.
-  return `ytsearch1:${query}`;
+  return `scsearch1:${query}`;
 }
-export async function resolveTrack(query, signal, run = exec, preferredSource = 'youtube') {
-  const requested = searchTarget(query);
-  const target = preferredSource === 'soundcloud' && requested.startsWith('ytsearch1:') ? `scsearch1:${query}` : requested;
-  const extract = async input => {
-    const { stdout } = await run(ytdlp, [...commonArgs, '--dump-single-json', '--skip-download', '-f', 'bestaudio/best', '--', input],
-      { timeout: 45000, maxBuffer: 4 * 1024 * 1024, signal });
-    const result = JSON.parse(stdout);
-    const info = result.entries ? result.entries[0] : result;
-    if (!info) throw new Error('No playable song found. Try adding the artist name.');
-    if (info.is_live || !Number.isFinite(info.duration) || info.duration > 3600) throw new Error('Choose a recorded song shorter than one hour.');
-    let url, source;
-    if (info.extractor === 'soundcloud') {
-      url = searchTarget(info.webpage_url);
-      if (!url.startsWith('https://soundcloud.com/')) throw new Error('Invalid track source');
-      source = 'SoundCloud';
-    } else {
-      if (!/^[\w-]{11}$/.test(info.id || '')) throw new Error('No playable song found. Try adding the artist name.');
-      url = `https://www.youtube.com/watch?v=${info.id}`;
-      source = 'YouTube';
-    }
-    return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160), url, source, duration: info.duration,
-      ...(source === 'YouTube' && requested.startsWith('ytsearch1:') ? { fallbackQuery: query } : {}) };
-  };
-  try { return await extract(target); }
-  catch (error) {
-    if (signal?.aborted || !target.startsWith('ytsearch1:')) throw error;
-    // Public SoundCloud search remains available when YouTube blocks datacenter IPs.
-    return extract(`scsearch1:${query}`);
-  }
+export async function resolveTrack(query, signal, run = exec) {
+  const target = searchTarget(query);
+  const { stdout } = await run(ytdlp, [...commonArgs, '--dump-single-json', '--skip-download', '-f', 'bestaudio/best', '--', target],
+    { timeout: 45000, maxBuffer: 4 * 1024 * 1024, signal });
+  const result = JSON.parse(stdout);
+  const info = result.entries ? result.entries[0] : result;
+  if (!info) throw new Error('No playable song found. Try adding the artist name.');
+  if (info.is_live || !Number.isFinite(info.duration) || info.duration > 3600) throw new Error('Choose a recorded song shorter than one hour.');
+  if (info.extractor !== 'soundcloud') throw new Error('Invalid track source');
+  const url = searchTarget(info.webpage_url);
+  if (!url.startsWith('https://soundcloud.com/')) throw new Error('Invalid track source');
+  return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160),
+    url, source: 'SoundCloud', duration: info.duration };
 }
 export function audioDiagnostic(text) {
   let result = String(text).replace(/https?:\/\/\S+/gi, '[URL]').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
@@ -139,15 +116,14 @@ export function streamTrack(track, onError, launch = spawn) {
 
 export class MusicManager {
   constructor({ resolve = resolveTrack, stream = streamTrack, join = joinVoiceChannel,
-    player = createAudioPlayer, wait = entersState, idleMs = 60000,
-    fallback = (query, signal) => resolveTrack(query, signal, exec, 'soundcloud') } = {}) {
+    player = createAudioPlayer, wait = entersState, idleMs = 60000 } = {}) {
     this.sessions = new Map();
-    Object.assign(this, { resolve, stream, join, player, wait, idleMs, fallback });
+    Object.assign(this, { resolve, stream, join, player, wait, idleMs });
   }
   dispose(session) {
     if (this.sessions.get(session.guildId) !== session) return;
     this.sessions.delete(session.guildId);
-    session.abort.abort(); session.current?.recoveryAbort?.abort(); clearTimeout(session.idle);
+    session.abort.abort(); clearTimeout(session.idle);
     session.audio?.close(); session.audio = null;
     session.player.stop(true);
     if (session.connection.state.status !== VoiceConnectionStatus.Destroyed) session.connection.destroy();
@@ -161,24 +137,7 @@ export class MusicManager {
       stage: error?.stage ?? 'player', code: error?.code ?? null, detail: audioDiagnostic(error?.detail || error?.message || '') }));
     session.current = null; session.audio?.close(); session.audio = null;
     session.player.stop(true);
-    if (track.fallbackQuery) {
-      const recovery = { ...track, recovering: true, recoveryAbort: new AbortController() };
-      session.current = recovery;
-      this.notify(session, 'YouTube blocked the audio stream. Trying SoundCloud…');
-      try {
-        const replacement = await this.fallback(track.fallbackQuery, recovery.recoveryAbort.signal);
-        if (this.sessions.get(session.guildId) !== session || session.current !== recovery) return;
-        session.queue.unshift(replacement);
-      } catch (fallbackError) {
-        if (this.sessions.get(session.guildId) !== session || session.current !== recovery) return;
-        console.error(JSON.stringify({ event: 'music_fallback_error', type: fallbackError.name, code: fallbackError.code ?? null }));
-        this.notify(session, 'Both music sources failed for that song. Try adding the artist name or using a SoundCloud track link.');
-      }
-      if (this.sessions.get(session.guildId) !== session || session.current !== recovery) return;
-      session.current = null;
-    } else {
-      this.notify(session, 'I couldn’t stream that song. Try searching by song name or using another SoundCloud track link.');
-    }
+    this.notify(session, 'I couldn’t stream that song. Try searching by song name or using another SoundCloud track link.');
     this.next(session);
   }
   async next(session) {
@@ -223,7 +182,6 @@ export class MusicManager {
       if (command.action === 'resume') return reply(session.player.unpause() ? 'Resumed.' : 'Nothing is paused.');
       if (command.action === 'skip') {
         if (!session.current) return reply('Nothing is playing to skip.');
-        session.current.recoveryAbort?.abort();
         session.current = null; session.audio?.close(); session.audio = null;
         session.player.stop(true); this.next(session); return reply('Skipped.');
       }
@@ -246,9 +204,9 @@ export class MusicManager {
         queue: [], current: null, audio: null, abort: new AbortController(), text: message.channel };
       this.sessions.set(message.guildId, session);
       connection.subscribe(session.player);
-      session.player.on(AudioPlayerStatus.Idle, () => { if (session.current && !session.current.recovering) this.next(session); });
+      session.player.on(AudioPlayerStatus.Idle, () => { if (session.current) this.next(session); });
       session.player.on('error', error => {
-        if (session.current && !session.current.recovering) this.playbackFailed(session, session.current, error);
+        if (session.current) this.playbackFailed(session, session.current, error);
       });
       connection.on('error', () => { this.notify(session, 'Voice connection failed. Please try again.'); this.dispose(session); });
       connection.on(VoiceConnectionStatus.Disconnected, async () => {
