@@ -28,7 +28,7 @@ function fixture(resolve = async query => ({ title: query, url: 'https://soundcl
   const member = { voice: { channel: voice, channelId: voice.id } };
   const message = { guildId: 'guild', author: { id: 'user' }, guild: { voiceAdapterCreator: {},
     members: { me: {}, fetch: async () => member } },
-    channel: { send: async payload => sent.push(payload.content) }, reply: async payload => sent.push(payload.content) };
+    channel: { send: async payload => sent.push(payload.embeds?.[0]?.description ?? payload.content) }, reply: async payload => sent.push(payload.embeds?.[0]?.description ?? payload.content) };
   return { manager, player, connection, message, sent, member, voice, closed: () => closed };
 }
 

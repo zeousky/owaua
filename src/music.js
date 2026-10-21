@@ -9,6 +9,8 @@ import {
   AudioPlayerStatus, VoiceConnectionStatus, NoSubscriberBehavior, StreamType,
 } from '@discordjs/voice';
 
+import { card, animate, trackCard } from './ui.js';
+
 const exec = promisify(execFile);
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
 const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
@@ -129,7 +131,11 @@ export class MusicManager {
     if (session.connection.state.status !== VoiceConnectionStatus.Destroyed) session.connection.destroy();
   }
   close() { for (const session of this.sessions.values()) this.dispose(session); }
-  notify(session, text) { return session.text.send({ content: text, allowedMentions: { parse: [] } }).catch(() => {}); }
+  notify(session, text) { return session.text.send(typeof text === 'string'
+    ? card('Music update', text, { tone: 'music', section: 'Kirmy / Music' }) : text).catch(() => {}); }
+  async showPlayback(session, track) {
+    await this.notify(session, trackCard(track));
+  }
   async playbackFailed(session, track, error) {
     if (this.sessions.get(session.guildId) !== session || session.current !== track || track.failed) return;
     track.failed = true;
@@ -156,14 +162,15 @@ export class MusicManager {
       session.player.play(session.audio.resource);
       await this.wait(session.player, AudioPlayerStatus.Playing, 45000);
       if (this.sessions.get(session.guildId) === session && session.current === track) {
-        await this.notify(session, `Now playing: **${track.title}**${track.source ? ` (${track.source})` : ''}`);
+        await this.showPlayback(session, track);
       }
     } catch (error) {
       await this.playbackFailed(session, track, error);
     }
   }
   async handle(message, command) {
-    const reply = content => message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
+    const reply = content => message.reply(typeof content === 'string'
+      ? card('Music', content, { tone: 'music', section: 'Kirmy / Music' }) : content);
     if (!message.guild) return reply('Music works in server voice channels.');
     if (command.action === 'help') return reply(musicHelp);
     const member = await message.guild.members.fetch(message.author.id);
@@ -178,8 +185,14 @@ export class MusicManager {
         ...session.queue.map((track, i) => `${i + 1}. ${track.title}`),
       ].join('\n').slice(0, 1900));
       if (['stop', 'leave'].includes(command.action)) { this.dispose(session); return reply('Stopped music and left the voice channel.'); }
-      if (command.action === 'pause') return reply(session.player.pause() ? 'Paused.' : 'Nothing is playing to pause.');
-      if (command.action === 'resume') return reply(session.player.unpause() ? 'Resumed.' : 'Nothing is paused.');
+      if (command.action === 'pause') {
+        const paused = session.player.pause();
+        return reply(paused ? 'Paused.' : 'Nothing is playing to pause.');
+      }
+      if (command.action === 'resume') {
+        const resumed = session.player.unpause();
+        return reply(resumed ? 'Resumed.' : 'Nothing is paused.');
+      }
       if (command.action === 'skip') {
         if (!session.current) return reply('Nothing is playing to skip.');
         session.current = null; session.audio?.close(); session.audio = null;
@@ -218,26 +231,35 @@ export class MusicManager {
       connection.on(VoiceConnectionStatus.Destroyed, () => this.dispose(session));
     }
     session.pending = true; clearTimeout(session.idle);
+    let progress;
     try {
-      await reply('Finding your song…');
+      progress = await animate(reply);
       const [track] = await Promise.all([
         this.resolve(command.query, session.abort.signal),
         this.wait(session.connection, VoiceConnectionStatus.Ready, 20000),
       ]);
-      if (this.sessions.get(message.guildId) !== session) return;
+      if (this.sessions.get(message.guildId) !== session) {
+        await progress.finish(card('Search cancelled', 'Playback was stopped.', { tone: 'music' })); return;
+      }
       // The requester must still be in the same channel after the asynchronous search.
       if (member.voice.channelId !== session.channelId) throw new Error('Stay in the voice channel while I find the song.');
       session.text = message.channel;
       session.queue.push(track);
+      await progress.finish(card('Added to your queue', `**[${track.title}](${track.url})**`, {
+        tone: 'music', section: 'Kirmy / Music', footer: `Kirmy · Position ${session.queue.length} in queue`,
+      }));
       if (!session.current) this.next(session);
-      else await reply(`Queued: **${track.title}**`);
     } catch (error) {
-      if (this.sessions.get(message.guildId) !== session) return;
+      if (this.sessions.get(message.guildId) !== session) {
+        await progress?.finish(card('Search cancelled', 'Playback was stopped.', { tone: 'music' })); return;
+      }
       console.error(JSON.stringify({ event: 'music_error', type: error.name, code: error.code ?? null }));
       const safe = ['Choose a recorded song shorter than one hour.', 'No playable song found. Try adding the artist name.',
         'Stay in the voice channel while I find the song.'];
-      await reply(safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.');
+      const payload = card('Couldn’t load your song', safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.', { tone: 'error', section: 'Kirmy / Music' });
+      await (progress ? progress.finish(payload) : reply(payload));
     } finally {
+      await progress?.stop();
       session.pending = false;
       if (!session.current && this.sessions.get(message.guildId) === session) this.next(session);
     }
