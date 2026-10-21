@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { ChannelType } from 'discord.js';
 import { AudioPlayerStatus, VoiceConnectionStatus } from '@discordjs/voice';
-import { MusicManager, parseMusicCommand, searchTarget } from '../src/music.js';
+import { MusicManager, parseMusicCommand, searchTarget, resolveTrack } from '../src/music.js';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function fixture(resolve = async query => ({ title: query, url: 'https://www.youtube.com/watch?v=abcdefghijk', duration: 60 })) {
@@ -144,4 +144,38 @@ test('failed audio source advances to the next song exactly once', async () => {
   failures[0](new Error('late error')); await tick();
   assert.equal(f.manager.sessions.get('guild').current.title, 'second');
   f.manager.close();
+});
+test('SoundCloud links are restricted to canonical public track paths', () => {
+  assert.equal(searchTarget('https://soundcloud.com/artist/song?utm_source=abc'), 'https://soundcloud.com/artist/song');
+  for (const url of ['https://soundcloud.com/artist/sets/list', 'https://soundcloud.com/artist/sets',
+    'https://soundcloud.com.evil/artist/song', 'https://user@soundcloud.com/artist/song',
+    'http://soundcloud.com/artist/song', 'https://soundcloud.com:123/artist/song']) assert.throws(() => searchTarget(url));
+});
+test('song-name search falls back to SoundCloud when YouTube blocks extraction', async () => {
+  const inputs = [];
+  const track = await resolveTrack('go away', undefined, async (exe, args) => {
+    inputs.push(args.at(-1));
+    if (inputs.length === 1) throw new Error('Sign in to confirm you are not a bot');
+    return { stdout: JSON.stringify({ entries: [{ extractor: 'soundcloud', title: 'Artist - Go Away',
+      duration: 180, webpage_url: 'https://soundcloud.com/artist/go-away' }] }) };
+  });
+  assert.deepEqual(inputs, ['ytsearch1:go away', 'scsearch1:go away']);
+  assert.equal(track.source, 'SoundCloud');
+  assert.equal(track.url, 'https://soundcloud.com/artist/go-away');
+});
+test('exact YouTube links and aborted requests never silently search another source', async () => {
+  for (const [query, signal] of [['https://youtu.be/abcdefghijk', undefined], ['go away', { aborted: true }]]) {
+    let count = 0;
+    await assert.rejects(resolveTrack(query, signal, async () => { count++; throw new Error('blocked'); }), /blocked/);
+    assert.equal(count, 1);
+  }
+});
+test('resolver rejects live streams, long tracks, and unexpected SoundCloud destinations', async () => {
+  for (const info of [
+    { id: 'abcdefghijk', is_live: true, duration: 60 },
+    { id: 'abcdefghijk', duration: 3601 },
+    { extractor: 'soundcloud', duration: 60, webpage_url: 'https://localhost/private' },
+  ]) {
+    await assert.rejects(resolveTrack('https://youtu.be/abcdefghijk', undefined, async () => ({ stdout: JSON.stringify(info) })));
+  }
 });
