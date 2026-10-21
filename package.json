@@ -1,0 +1,19 @@
+{
+  "name": "kirmy-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kirmy's Discord AI core powered by the official xAI API",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/bot.js",
+    "test": "node --test",
+    "check": "node --check src/bot.js && node --check src/ai.js && node --check src/store.js && node --check src/tools.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "dotenv": "^18.0.8"
+  }
+}
