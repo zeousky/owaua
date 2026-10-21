@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
 import { EventEmitter } from 'node:events';
+import { existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ChannelType } from 'discord.js';
 import { AudioPlayerStatus, VoiceConnectionStatus } from '@discordjs/voice';
 import { MusicManager, parseMusicCommand, searchTarget, resolveTrack, streamTrack, audioDiagnostic } from '../src/music.js';
@@ -228,7 +230,7 @@ test('extractor failure reports bounded diagnostics and kills both child process
   const launch = () => {
     const child = new EventEmitter();
     child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
-    child.kill = () => { child.killed = true; };
+    child.kill = () => { child.killed = true; setImmediate(() => child.emit('close', null)); };
     children.push(child); return child;
   };
   let reported;
@@ -242,4 +244,54 @@ test('extractor failure reports bounded diagnostics and kills both child process
   assert.ok(children.every(child => child.killed));
   assert.ok(audioDiagnostic('x'.repeat(10000)).length <= 800);
   audio.close();
+  await tick();
+});
+
+test('HLS fragment files are writable, isolated between streams, and removed after child exit', async () => {
+  const children = [], directories = [];
+  const launch = (file, args, options) => {
+    const child = new EventEmitter();
+    child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    child.kill = () => { child.killed = true; };
+    if (children.length % 2 === 0) {
+      assert.ok(args.includes('--abort-on-unavailable-fragments'));
+      directories.push(options.cwd);
+      // yt-dlp uses this same relative filename even when streaming to stdout.
+      writeFileSync(join(options.cwd, '--Frag1.part'), String(directories.length));
+    }
+    children.push(child);
+    return child;
+  };
+  const track = { url: 'https://soundcloud.com/artist/song', duration: 60 };
+  const first = streamTrack(track, assert.fail, launch);
+  const second = streamTrack(track, assert.fail, launch);
+  assert.notEqual(directories[0], directories[1]);
+  assert.equal(readFileSync(join(directories[0], '--Frag1.part'), 'utf8'), '1');
+  assert.equal(readFileSync(join(directories[1], '--Frag1.part'), 'utf8'), '2');
+  first.close();
+  assert.ok(children[0].killed && children[1].killed);
+  children[0].emit('close', null);
+  assert.ok(existsSync(directories[0]), 'wait for both children before removing files');
+  children[1].emit('close', null);
+  assert.equal(existsSync(directories[0]), false);
+  assert.ok(existsSync(directories[1]));
+  children[2].emit('close', 0); children[3].emit('close', 0);
+  assert.equal(existsSync(directories[1]), false);
+  second.close();
+});
+
+test('encoder startup failure terminates the downloader and cleans its fragments', () => {
+  let directory, child;
+  const launch = (file, args, options) => {
+    if (child) throw new Error('spawn failed');
+    directory = options.cwd;
+    writeFileSync(join(directory, '--Frag1.part'), 'partial');
+    child = new EventEmitter();
+    child.kill = () => { child.killed = true; setImmediate(() => child.emit('close', null)); };
+    return child;
+  };
+  assert.throws(() => streamTrack({ duration: 60 }, assert.fail, launch), /spawn failed/);
+  assert.equal(child.killed, true);
+  child.emit('close', null);
+  assert.equal(existsSync(directory), false);
 });

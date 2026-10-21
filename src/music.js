@@ -1,5 +1,8 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import {
   joinVoiceChannel, createAudioPlayer, createAudioResource, entersState,
@@ -80,10 +83,28 @@ export function audioDiagnostic(text) {
   return result.slice(-800);
 }
 export function streamTrack(track, onError, launch = spawn) {
-  const source = launch(ytdlp, [...commonArgs, '-f', 'bestaudio/best', '-o', '-', '--', track.url], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const encoder = launch(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-hide_banner', '-loglevel', 'error',
+  // Native HLS downloads still write --Frag*.part files when output is stdout.
+  // /app is read-only to the runtime user; isolate fragments for every playback.
+  const workDir = mkdtempSync(joinPath(tmpdir(), 'kirmy-music-'));
+  const children = new Set();
+  const cleanup = () => { if (!children.size) rmSync(workDir, { recursive: true, force: true }); };
+  const start = (file, args, stdio) => {
+    const child = launch(file, args, { cwd: workDir, stdio });
+    children.add(child);
+    child.once('close', () => { children.delete(child); cleanup(); });
+    return child;
+  };
+  let source, encoder;
+  try {
+    source = start(ytdlp, [...commonArgs, '--abort-on-unavailable-fragments', '-f', 'bestaudio/best', '-o', '-', '--', track.url], ['ignore', 'pipe', 'pipe']);
+    encoder = start(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-hide_banner', '-loglevel', 'error',
     '-i', 'pipe:0', '-vn', '-t', '3600', '-c:a', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2', '-f', 'ogg', 'pipe:1'],
-  { stdio: ['pipe', 'pipe', 'pipe'] });
+    ['pipe', 'pipe', 'pipe']);
+  } catch (error) {
+    for (const child of children) child.kill('SIGKILL');
+    cleanup();
+    throw error;
+  }
   let closed = false;
   let sourceDiagnostic = '', encoderDiagnostic = '';
   const timer = setTimeout(() => fail('timeout'), (track.duration + 120) * 1000);
