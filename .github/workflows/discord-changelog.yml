@@ -1,0 +1,62 @@
+name: Post changelog to Discord
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - CHANGELOG.md
+
+permissions:
+  contents: read
+
+jobs:
+  post-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post the newest changelog entry
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          webhook = os.environ.get("DISCORD_WEBHOOK", "")
+          if not webhook:
+              raise SystemExit("DISCORD_CHANGELOG_WEBHOOK is not configured")
+
+          text = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          sections = re.split(r"(?m)^##\s+", text)
+          entry = next((part.strip() for part in sections[1:] if part.strip()), "")
+          if not entry or entry == "YYYY-MM-DD":
+              print("No dated changelog entry to post; skipping.")
+              raise SystemExit(0)
+
+          lines = entry.splitlines()
+          title = lines[0].strip()
+          body = "\n".join(lines[1:]).strip()
+          message = f"**Kirmy update — {title}**"
+          if body:
+              message += f"\n{body}"
+          if len(message) > 1900:
+              message = message[:1897] + "..."
+
+          payload = json.dumps({
+              "content": message,
+              "allowed_mentions": {"parse": []},
+          }).encode("utf-8")
+          request = urllib.request.Request(
+              webhook,
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=20) as response:
+              if not 200 <= response.status < 300:
+                  raise SystemExit(f"Discord returned HTTP {response.status}")
+          print("Posted the newest changelog entry to Discord.")
+          PY
