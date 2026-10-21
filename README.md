@@ -6,7 +6,18 @@ Discord AI core using **Grok 4.7** directly through the official xAI Responses A
 
 - `.music <song name or SoundCloud track link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
 - `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
-- `/ask prompt:...` — ask a question, optionally with an image.
+- `/ask prompt:...` — ask a question, optionally with an image, a PDF/text/code document (`file`), or an MP4 (`video`) to edit or extend.
+- `/ask reasoning:low|medium|high|xhigh` — choose reasoning effort for that request. Higher effort can take longer and cost more.
+- `/ask web_domains:docs.x.ai,example.com x_handles:xai from_date:2026-10-01 to_date:2026-10-22` — narrow web/X research. Options are independent; the X end date is exclusive.
+- `/ask visual_search:true` — also allow web image search and image/video understanding inside web/X search results.
+- `/ask output:json` — download a schema-validated JSON answer; optionally supply your own JSON object `schema`.
+- `/ask library:true` — include your saved document library in this channel.
+- `/ask integrations:xai_docs,deepwiki` — enable selected read-only MCP integrations for this request; `/integrations` lists available choices privately.
+- `/ask audio:<recording> spoken:true` — transcribe and answer a recording, optionally with a spoken MP3 reply.
+- `/transcribe audio:<recording>` — download a transcript and word timestamps; optional speaker identification and language hints.
+- `/speak text:...` — generate an AI-spoken MP3/WAV with voice, language, speed, normalization and optional caption timing.
+- `/voice join`, `/voice leave`, `/voice status`, `/voice voices` — talk with Grok Voice 3 in your voice channel or inspect voice choices.
+- `/knowledge add file:<document>`, `/knowledge list`, `/knowledge forget id:...`, `/knowledge clear` — manage your private saved documents in this channel.
 - Mention Kirmy with “generate an image of a cat” or “generate a video of a cat” to create media.
 - Mention Kirmy, reply to one of its messages, or send it a DM.
 - `/memory view` — privately inspect your saved notes and archive count here.
@@ -19,7 +30,37 @@ Discord AI core using **Grok 4.7** directly through the official xAI Responses A
 - `/help` — show capabilities and data handling.
 - In DMs or when mentioning Kirmy, `!reset` and `!help` also work.
 
-Tools are selected automatically by Grok: web search and browsing, X search, xAI-hosted sandboxed Python, and a local `current_time` function. PNG, JPEG, WebP, and GIF attachments up to 20 MB are accepted, up to four per message. Long answers are sent as Markdown files. Source citations are preserved.
+Tools are selected automatically by Grok: web search and browsing, X search, xAI-hosted sandboxed Python, and a local `current_time` function. PNG, JPEG, WebP, and GIF attachments up to 20 MB are accepted, up to five per message. Long answers are sent as Markdown files. Source citations are preserved. Search filters affect their respective search tools; X thread retrieval can fetch posts outside handle/date filters, and ordinary web search remains available alongside filtered X search. These are research controls, not access restrictions.
+
+Attach up to four PDF or UTF-8 text/code documents (20 MiB each, 40 MiB total) through Discord to summarize, compare, or ask questions about them. `/ask` accepts one document; message requests support multiple documents and mixed image/document/audio attachments. Current attachments take priority over replied-to attachments. Ordinary documents are uploaded to xAI Files for the current request and deletion is attempted afterward, including on failures; a one-hour provider expiry is a fallback if cleanup fails or the process stops. Raw documents and temporary file IDs are not saved locally or carried into future requests. Normal answers derived from them remain in text history. Reattach or reply to the source document for a new analysis, or explicitly save it using `/knowledge add`. Binary Office documents are not supported by this attachment path.
+
+## Voice and spoken replies
+
+Audio attachments and Discord voice messages in mentions, replies or DMs are transcribed before the normal chat request. Audio is limited to one recording up to 20 MiB per question. Transcripts over 24,000 characters must use `/transcribe` instead. The audio bytes are not saved locally; the transcript becomes normal conversation text when used with `/ask` or ordinary chat. Standalone `/transcribe` delivers files without saving a conversation. `/speak` accepts up to 4,000 characters; speech output is capped at 8 MiB. `/ask spoken:true` speaks the first 4,000 characters of a text answer and preserves its full text. JSON answers are file-only.
+
+`/voice join` starts a native `grok-voice-3.0` conversation and sends **only the initiating user's microphone audio** to xAI. Replies are audible to everyone in that voice channel. Only that user can control the session from the same channel. Voice sessions use the user's current persona, with custom descriptions kept in a separate user message, but do not read or save SQLite conversation history or knowledge libraries. Web/X search is available inside the voice session. Barge-in cancels the current spoken answer before starting the next one.
+
+There is one music or voice connection per server, at most three voice sessions across the bot, and a ten-minute maximum per session. Sessions end after two minutes without speech, when the creator leaves, when Kirmy is moved/disconnected, or during shutdown. Stop music before joining voice; end voice before starting music. Voice/audio requests incur normal xAI charges; raw audio and realtime transcripts are not written to local logs. Built-in and eligible existing custom voice IDs can be selected; custom-voice creation and regional/account eligibility are not changed by this integration.
+
+## Saved knowledge and MCP integrations
+
+`/knowledge add` deliberately stores a document at xAI until `/knowledge forget` or `/knowledge clear`. Local `knowledge.sqlite` stores private filename/size/provider-ID metadata in the same persistent `DATA_DIR` as conversation memory. The library is scoped to **server + channel + user**. Each scope holds up to 20 PDF/text/code documents, 20 MiB per file and 40 MiB total. `/knowledge` replies are private. Use `/ask library:true` to make saved documents available for that question; normal `/ask` answers remain visible in the channel. `/reset`, `/memory clear` and `/memory pause` affect conversation memory, while document libraries have their own explicit deletion controls. Earlier text answers can retain information derived from deleted documents.
+
+The normal `XAI_API_KEY` supports persistent Files and native attachment search immediately. If `XAI_MANAGEMENT_API_KEY` is configured with collection permissions, Kirmy additionally creates a private collection per scope, indexes documents and uses hosted `file_search` when the full index is ready. Pending or failed indexing keeps the stored Files usable. Removing a configured management key can prevent deletion of an associated collection; restore its permissions before deleting that library. Back up both SQLite databases when migrating hosting. The backup helper also accepts `--source ./data/knowledge.sqlite` for a separate consistent snapshot.
+
+MCP is opt-in for each request. `xai_docs` reads official xAI documentation; `deepwiki` reads public GitHub repository documentation. These public read-only endpoints need no extra account credentials. Custom integrations are deployment-owned `MCP_SERVERS_JSON` entries with an explicit tool allowlist and `readOnly:true`. Requests select labels, never URLs, headers or credentials. Authenticated entries must also restrict `guildIds` or `userIds`, and refer to a token using `authorizationEnv`; never put a token in the JSON or a Discord prompt. Provider approval flags are unsupported, so write tools are not exposed by this registry. Selected integrations receive relevant request data through xAI.
+
+Example deployment configuration (the referenced token stays in a separate environment variable):
+
+```json
+[{"label":"manuals","url":"https://mcp.example.com/mcp","readOnly":true,"allowedTools":["search_docs"],"authorizationEnv":"MANUALS_MCP_TOKEN","userIds":["123456789012345678"]}]
+```
+
+## Structured answers and downloadable analysis
+
+`/ask output:json` attaches valid JSON with `answer` and `sources` fields by default. The optional `schema` accepts a bounded JSON object schema, up to 4,000 characters, eight levels and 64 properties per object. Basic types, objects/arrays, required fields, enum/const/anyOf and numeric/length bounds are supported; remote references and regular expressions are rejected. Results are parsed and validated locally before delivery. Incomplete or invalid provider JSON produces a clear error, with no automatic paid retry. Notices and additional attachments never alter the JSON file's schema.
+
+Ask for a downloadable CSV, JSON, Markdown, text/code file or PNG chart. Hosted Python can compute the data; the application renders line/bar chart files from validated numeric data. Genuine Python-generated PNG/PDF/XLSX/CSV files can also be delivered through bounded provider stdout exports. Only actual returned bytes are attached; sandbox paths and invented URLs do not establish a downloadable file. Exports are capped at three files, 1 MiB each and 3 MiB combined. Unsupported or oversized exports are reported; a successful text answer is retained. Export bytes are replaced by small metadata before tool continuations to avoid resending binary content as paid context.
 
 Conversation memory is scoped to **server + channel + user**, so another user's history is never included in your prompt. Recent context uses up to 16 exchanges within a 32,000-character budget. A separate archive keeps up to 1,000 exchanges for 180 days by default. Local full-text search ranks relevant older conversations using topic matches and stemming, returning dated excerpts. Important preferences, projects, constraints, and plans can be saved as durable notes (up to 200 per scope, 1,000 characters each), including through ordinary conversation. Automatic saves must quote the current user's message; invented facts, assistant replies, and retrieved web text are not accepted as quote sources. Reusing a topic key corrects the existing note. Notes remain until forgotten or cleared, independently of archive expiry.
 
@@ -45,7 +86,13 @@ Chat, media generation, and music lookup show only a moving loading bar as a pla
 
 ## Image and video generation
 
-Ask Kirmy in a mention, reply, DM, or `/ask`: “generate an image of a cat” or “make a video of waves at sunset.” Both use the existing `XAI_API_KEY`. Image generation uses `grok-imagine-image-2.0` with explicit `quality: medium` and `resolution: 1k`. Video uses `grok-imagine-video-1.5-lite` at 720p for six seconds. Image generation can use up to four reference images, and video generation can animate the first supplied image. Attach a PNG, JPEG, or WebP and describe your edit, for example “make the background blue.” You can also reply to an image message or one of Kirmy’s generated images to edit it further. New attachments take priority over replied-to images. If you only say “edit this image,” Kirmy asks what to change. GIFs remain supported for understanding but not editing or animation.
+Ask Kirmy in a mention, reply, DM, or `/ask`: “generate an image of a cat” or “make a video of waves at sunset.” Both use the existing `XAI_API_KEY`. Defaults remain one `grok-imagine-image-2.0` image at medium quality / 1k, or a six-second 720p `grok-imagine-video-1.5-lite` video. Explicit requests can select 1–10 image outputs, low/medium/auto quality, 1k/2k resolution, and supported aspect ratios. For example: “make three square 2k images of a lighthouse.” Auto quality is chosen by the provider and billed at the quality served.
+
+Image creation/editing accepts up to five reference images. Attach a PNG, JPEG, or WebP and describe the edit, such as “make the background blue.” Single-image editing keeps the source aspect ratio; crop it before uploading to change that shape. You can also reply to an image message or Kirmy’s generated images to edit them further. New attachments take priority over replied-to sources. If you only say “edit this image,” Kirmy asks what to change. GIFs remain supported by the existing understanding path, but not editing or animation; current xAI image-understanding documentation explicitly lists JPEG/PNG, so WebP/GIF provider compatibility has not been verified by live prompts.
+
+Video requests can select 1–15 seconds, shape, 480p/720p/1080p, and lite/standard/classic models where supported. Standard (`grok-imagine-video-1.5`) provides native 1080p; lite 1080p is upscaled. One image is animated as the first frame and keeps its source aspect ratio. Multiple supplied images automatically use standard reference-to-video; explicitly request reference mode to choose a different aspect ratio with one image. Reference mode is limited to 720p; classic reference mode supports up to ten seconds.
+
+Attach one MP4 under 20 MB using `/ask video:...`, a message, or a reply to a generated MP4, and ask to **edit** it or **extend** it. Editing uses `/videos/edits` with `grok-imagine-video` and supports source clips up to 8.7 seconds. Extension uses `/videos/extensions`, accepts 2–15-second sources, and adds 2–10 seconds (six by default). Both inherit source shape/resolution up to 720p. Source duration is validated by xAI when Discord does not provide it. These operations do not analyze or summarize video contents. Generation-only options are rejected for editing/extension; larger outputs and the standard model can cost more.
 
 Images display in Discord as image previews without a visible source link; videos are returned as direct MP4 links. Provider links are temporary, so save results promptly. Media URLs are not saved in conversation history. Generation shares the existing per-user cooldown, per-conversation lock, and global request limit. Each request attempts at most one generation, with no automatic submission retries. Videos are polled every five seconds with a separate ten-minute deadline (`MEDIA_TIMEOUT_MS`). A timeout or restart does not cancel an already-submitted provider job; manually retrying can incur another charge.
 
@@ -68,7 +115,7 @@ Enable **Message Content Intent** in the Discord Developer Portal for ordinary m
 
 ## Run in the background on macOS
 
-**Current hosting decision (2026-10-21):** Kirmy is temporarily hosted on the owner's Mac while Railway is being fixed. The intended destination is Railway once it is working again. Keep the SQLite database when moving so conversation memory and personas follow the bot.
+**Current hosting (2026-10-21):** Kirmy runs on Railway's existing `kirmy` service with persistent `DATA_DIR=/app/data/kirmy`. The Mac LaunchAgent is a fallback and is not loaded. Keep `kirmy.sqlite` and `knowledge.sqlite` when moving so conversation memory, personas and document ownership follow the bot. Run only one hosted copy.
 
 With Node 24+, FFmpeg, yt-dlp, and the local `.env` ready, run:
 
@@ -126,11 +173,15 @@ There is one player per server. Only members in its voice channel can enqueue or
 
 ## Limits and extension
 
-`.env.example` lists configurable limits. Defaults: 4,096 output tokens, 8 tool calls, 4 custom-tool continuation rounds, a 180-second request deadline, 5-second per-user cooldown, and 3 concurrent requests. Tool calls and tokens incur xAI charges. These limits bound individual requests; they are **not** a monthly spending cap. Set spending controls in your provider account separately.
+`.env.example` lists configurable limits. Defaults: 4,096 visible output tokens, 8 local tool dispatches, 4 custom-tool continuation rounds, a 180-second request deadline, 5-second per-user cooldown, and 3 concurrent requests. Tool calls and tokens incur xAI charges. These limits bound individual requests; they are **not** a monthly spending cap. Set spending controls in your provider account separately.
+
+`MAX_TOOL_CALLS` bounds local tool dispatch and supplies the remaining provider `max_turns` ceiling. The xAI ceiling limits assistant/tool turns per Responses request, not individual hosted calls; multiple tools can run within a turn, and a custom-tool continuation starts a new provider turn budget. It is not an exact total hosted-call or spending cap. `MAX_OUTPUT_TOKENS` limits visible output, not reasoning tokens. Opaque per-conversation cache keys route requests for potential prompt-cache reuse, but changing recalled context or omitting prior reasoning can still reduce cache hits. Cache savings have not been measured.
 
 Register new local functions in `src/tools.js` through `ToolRegistry.register(definition, execute)`. Each executor must validate arguments, enforce access using the supplied context, and bound any I/O. Only registered functions can execute; model requests cannot run shell commands or access environment variables. Python executes on xAI's sandbox, not on the Railway host.
 
-`src/ai.js` is transport-independent and can be reused for another interface. `src/store.js` owns SQLite recent history, full-text archives, durable notes, and persona settings. `src/memory.js` bounds context and stages grounded memory updates; `src/memory-command.js` handles private memory controls. `src/persona.js` validates style choices and compiles fixed prompt text; `src/persona-command.js` handles private, actor-only commands. `src/bot.js` handles Discord, admission limits, health, and shutdown. Logs contain readiness, usage, and error classifications, not prompts or credentials.
+`src/ai.js` is transport-independent and can be reused for another interface. `src/request-options.js` validates typed research controls; `src/attachments.js` separates current image/document/video sources; `src/files.js` bounds temporary document uploads and cleanup. `src/store.js` owns SQLite recent history, full-text archives, durable notes, and persona settings. `src/memory.js` bounds context and stages grounded memory updates; `src/memory-command.js` handles private memory controls. `src/persona.js` validates style choices and compiles fixed prompt text; `src/persona-command.js` handles private, actor-only commands. `src/bot.js` handles Discord, admission limits, health, and shutdown. Logs contain readiness, separate chat/media usage, job IDs, and error classifications, not prompts or credentials. Hashed user identifiers are sent as xAI `safety_identifier`; raw Discord IDs are not used for that API field.
+
+See [the complete Grok API audit and expansion plan](docs/GROK_API_AUDIT.md) for supported, partial, and missing capabilities. Multi-agent research is deliberately excluded. Some advanced media, transport and account-management APIs remain separate from these user-facing additions.
 
 ## Verification
 
@@ -139,6 +190,6 @@ npm run check
 npm test
 ```
 
-Tests mock the provider: tool continuation, denied/invalid tools, loop bounds, sanitized provider errors, citations, persistent isolated history, media quality settings, video polling, deadlines, failed/moderated output, chat-to-media routing, image edits, reference selection, and image-to-video requests. Persona tests cover authenticated-user isolation, forged targets, private replies, persistence/reset, malformed stored data, injection rejection, concurrent requests, and prompt stability across tool rounds. They make no paid generation calls. Model catalog access and a Discord gateway login verify credentials separately; they do not establish live answer quality, successful web/code execution, or actual generated media delivery.
+Tests mock the provider: tool continuation, denied/invalid tools, loop bounds, sanitized provider errors, citations, persistent isolated history, typed reasoning/search options, cache identifiers, mixed attachments, bounded document uploads/cleanup, media settings, video polling, deadlines, failed/moderated output, reference selection, reference-to-video, and video edit/extension endpoints. Persona tests cover authenticated-user isolation, forged targets, private replies, persistence/reset, malformed stored data, injection rejection, concurrent requests, and prompt stability across tool rounds. They make no paid generation calls. Model catalog access and a Discord gateway login verify credentials separately; they do not establish live answer quality, successful web/code execution, or actual generated media delivery.
 
 API references: [Grok 4.7](https://docs.x.ai/developers/grok-4-7), [web search](https://docs.x.ai/developers/tools/web-search), [code execution](https://docs.x.ai/developers/tools/code-execution), [function calling](https://docs.x.ai/developers/tools/function-calling).

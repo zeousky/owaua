@@ -98,6 +98,22 @@ test('permissions are checked before joining and DMs are rejected', async () => 
   await f.manager.handle({ ...f.message, guild: null }, { action: 'play', query: 'first' });
   assert.match(f.sent.at(-1), /server voice channels/);
 });
+test('voice join or shutdown during delayed metadata cannot be hijacked by music', async () => {
+  for (const shutdown of [false, true]) {
+    const f = fixture();
+    let finish;
+    f.message.guild.members.me = null;
+    f.message.guild.members.fetchMe = () => new Promise(resolve => { finish = resolve; });
+    const pending = f.manager.handle(f.message, { action: 'play', query: 'first' });
+    await tick();
+    if (shutdown) f.manager.close();
+    else f.manager.isVoiceBusy = () => true;
+    finish({}); await pending;
+    assert.equal(f.manager.sessions.size, 0);
+    assert.equal(f.player.resource, undefined);
+    assert.match(f.sent.at(-1), shutdown ? /restarting/ : /voice conversation/);
+  }
+});
 test('empty queue disconnects after idle timeout', async () => {
   const f = fixture();
   await f.manager.handle(f.message, { action: 'play', query: 'first' });

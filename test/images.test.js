@@ -23,7 +23,7 @@ test('bot image embeds support iterative edits but other users embeds are ignore
 test('oversize, unsupported, and too many attachments are rejected', () => {
   for (const attachments of [[attachment('https://example.com/a', 'image/png', 21 * 1024 * 1024)],
     [attachment('https://example.com/a', 'video/mp4')],
-    Array.from({ length: 5 }, (_, i) => attachment(`https://example.com/${i}.png`))]) {
+    Array.from({ length: 6 }, (_, i) => attachment(`https://example.com/${i}.png`))]) {
     assert.throws(() => requestImages(msg(attachments), undefined, 'bot'));
   }
 });
