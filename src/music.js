@@ -42,8 +42,9 @@ export function searchTarget(query) {
   // Always search plain input; never let yt-dlp interpret user text as options or another URL scheme.
   return `ytsearch1:${query}`;
 }
-export async function resolveTrack(query, signal, run = exec) {
-  const target = searchTarget(query);
+export async function resolveTrack(query, signal, run = exec, preferredSource = 'youtube') {
+  const requested = searchTarget(query);
+  const target = preferredSource === 'soundcloud' && requested.startsWith('ytsearch1:') ? `scsearch1:${query}` : requested;
   const extract = async input => {
     const { stdout } = await run(ytdlp, [...commonArgs, '--dump-single-json', '--skip-download', '-f', 'bestaudio/best', '--', input],
       { timeout: 45000, maxBuffer: 4 * 1024 * 1024, signal });
@@ -61,7 +62,8 @@ export async function resolveTrack(query, signal, run = exec) {
       url = `https://www.youtube.com/watch?v=${info.id}`;
       source = 'YouTube';
     }
-    return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160), url, source, duration: info.duration };
+    return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160), url, source, duration: info.duration,
+      ...(source === 'YouTube' && requested.startsWith('ytsearch1:') ? { fallbackQuery: query } : {}) };
   };
   try { return await extract(target); }
   catch (error) {
@@ -70,13 +72,21 @@ export async function resolveTrack(query, signal, run = exec) {
     return extract(`scsearch1:${query}`);
   }
 }
-export function streamTrack(track, onError) {
-  const source = spawn(ytdlp, [...commonArgs, '-f', 'bestaudio/best', '-o', '-', '--', track.url], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const encoder = spawn(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-hide_banner', '-loglevel', 'error',
+export function audioDiagnostic(text) {
+  let result = String(text).replace(/https?:\/\/\S+/gi, '[URL]').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
+  for (const name of ['DISCORD_TOKEN', 'XAI_API_KEY']) {
+    if (process.env[name]) result = result.split(process.env[name]).join('[REDACTED]');
+  }
+  return result.slice(-800);
+}
+export function streamTrack(track, onError, launch = spawn) {
+  const source = launch(ytdlp, [...commonArgs, '-f', 'bestaudio/best', '-o', '-', '--', track.url], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const encoder = launch(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-hide_banner', '-loglevel', 'error',
     '-i', 'pipe:0', '-vn', '-t', '3600', '-c:a', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2', '-f', 'ogg', 'pipe:1'],
   { stdio: ['pipe', 'pipe', 'pipe'] });
   let closed = false;
-  const timer = setTimeout(() => fail(), (track.duration + 120) * 1000);
+  let sourceDiagnostic = '', encoderDiagnostic = '';
+  const timer = setTimeout(() => fail('timeout'), (track.duration + 120) * 1000);
   timer.unref();
   const close = () => {
     if (closed) return;
@@ -86,33 +96,70 @@ export function streamTrack(track, onError) {
     source.kill('SIGKILL'); encoder.kill('SIGKILL');
     source.stdout.destroy(); encoder.stdin.destroy(); encoder.stdout.destroy();
   };
-  const fail = () => { if (!closed) { close(); onError(new Error('Audio source or encoder failed')); } };
-  // Drain diagnostics without logging signed media URLs or untrusted source text.
-  source.stderr.resume(); encoder.stderr.resume();
-  source.on('error', fail); encoder.on('error', fail);
-  source.on('close', code => { if (code !== 0) fail(); });
-  encoder.on('close', code => { if (code !== 0) fail(); });
-  source.stdout.on('error', fail); encoder.stdin.on('error', fail); encoder.stdout.on('error', fail);
+  const fail = (stage, code = null, detail = '') => {
+    if (closed) return;
+    const error = new Error('Audio source or encoder failed');
+    error.stage = stage; error.code = code;
+    error.detail = audioDiagnostic(sourceDiagnostic || detail || encoderDiagnostic);
+    close(); onError(error);
+  };
+  source.stderr.on('data', chunk => { sourceDiagnostic = (sourceDiagnostic + chunk).slice(-8000); });
+  encoder.stderr.on('data', chunk => { encoderDiagnostic = (encoderDiagnostic + chunk).slice(-8000); });
+  source.on('error', error => fail('extractor', error.code, error.message));
+  encoder.on('error', error => fail('encoder', error.code, error.message));
+  source.on('close', code => { if (code !== 0) fail('extractor', code); });
+  encoder.on('close', code => { if (code !== 0) fail('encoder', code); });
+  source.stdout.on('error', error => fail('extractor_pipe', error.code, error.message));
+  encoder.stdin.on('error', error => fail('encoder_pipe', error.code, error.message));
+  encoder.stdout.on('error', error => fail('encoder_output', error.code, error.message));
   source.stdout.pipe(encoder.stdin);
   return { resource: createAudioResource(encoder.stdout, { inputType: StreamType.OggOpus }), close };
 }
 
 export class MusicManager {
   constructor({ resolve = resolveTrack, stream = streamTrack, join = joinVoiceChannel,
-    player = createAudioPlayer, wait = entersState, idleMs = 60000 } = {}) {
+    player = createAudioPlayer, wait = entersState, idleMs = 60000,
+    fallback = (query, signal) => resolveTrack(query, signal, exec, 'soundcloud') } = {}) {
     this.sessions = new Map();
-    Object.assign(this, { resolve, stream, join, player, wait, idleMs });
+    Object.assign(this, { resolve, stream, join, player, wait, idleMs, fallback });
   }
   dispose(session) {
     if (this.sessions.get(session.guildId) !== session) return;
     this.sessions.delete(session.guildId);
-    session.abort.abort(); clearTimeout(session.idle);
+    session.abort.abort(); session.current?.recoveryAbort?.abort(); clearTimeout(session.idle);
     session.audio?.close(); session.audio = null;
     session.player.stop(true);
     if (session.connection.state.status !== VoiceConnectionStatus.Destroyed) session.connection.destroy();
   }
   close() { for (const session of this.sessions.values()) this.dispose(session); }
   notify(session, text) { return session.text.send({ content: text, allowedMentions: { parse: [] } }).catch(() => {}); }
+  async playbackFailed(session, track, error) {
+    if (this.sessions.get(session.guildId) !== session || session.current !== track || track.failed) return;
+    track.failed = true;
+    console.error(JSON.stringify({ event: 'music_stream_error', source: track.source ?? null,
+      stage: error?.stage ?? 'player', code: error?.code ?? null, detail: audioDiagnostic(error?.detail || error?.message || '') }));
+    session.current = null; session.audio?.close(); session.audio = null;
+    session.player.stop(true);
+    if (track.fallbackQuery) {
+      const recovery = { ...track, recovering: true, recoveryAbort: new AbortController() };
+      session.current = recovery;
+      this.notify(session, 'YouTube blocked the audio stream. Trying SoundCloud…');
+      try {
+        const replacement = await this.fallback(track.fallbackQuery, recovery.recoveryAbort.signal);
+        if (this.sessions.get(session.guildId) !== session || session.current !== recovery) return;
+        session.queue.unshift(replacement);
+      } catch (fallbackError) {
+        if (this.sessions.get(session.guildId) !== session || session.current !== recovery) return;
+        console.error(JSON.stringify({ event: 'music_fallback_error', type: fallbackError.name, code: fallbackError.code ?? null }));
+        this.notify(session, 'Both music sources failed for that song. Try adding the artist name or using a SoundCloud track link.');
+      }
+      if (this.sessions.get(session.guildId) !== session || session.current !== recovery) return;
+      session.current = null;
+    } else {
+      this.notify(session, 'I couldn’t stream that song. Try searching by song name or using another SoundCloud track link.');
+    }
+    this.next(session);
+  }
   async next(session) {
     if (this.sessions.get(session.guildId) !== session) return;
     clearTimeout(session.idle);
@@ -125,24 +172,14 @@ export class MusicManager {
     }
     session.current = track;
     try {
-      session.audio = this.stream(track, () => {
-        if (this.sessions.get(session.guildId) !== session || session.current !== track) return;
-        this.notify(session, 'I couldn’t stream that song. It may be unavailable or blocked by the music source. Try another song.');
-        session.player.stop(true);
-        if (session.current === track) this.next(session);
-      });
+      session.audio = this.stream(track, error => { this.playbackFailed(session, track, error); });
       session.player.play(session.audio.resource);
       await this.wait(session.player, AudioPlayerStatus.Playing, 45000);
       if (this.sessions.get(session.guildId) === session && session.current === track) {
         await this.notify(session, `Now playing: **${track.title}**${track.source ? ` (${track.source})` : ''}`);
       }
-    } catch {
-      if (this.sessions.get(session.guildId) === session && session.current === track) {
-        this.notify(session, 'I couldn’t start that song. Check my Connect/Speak permissions or try another song.');
-        // Clear the track before stop so Idle cannot advance twice.
-        session.current = null; session.audio?.close(); session.audio = null;
-        session.player.stop(true); this.next(session);
-      }
+    } catch (error) {
+      await this.playbackFailed(session, track, error);
     }
   }
   async handle(message, command) {
@@ -165,7 +202,9 @@ export class MusicManager {
       if (command.action === 'resume') return reply(session.player.unpause() ? 'Resumed.' : 'Nothing is paused.');
       if (command.action === 'skip') {
         if (!session.current) return reply('Nothing is playing to skip.');
-        session.player.stop(true); return reply('Skipped.');
+        session.current.recoveryAbort?.abort();
+        session.current = null; session.audio?.close(); session.audio = null;
+        session.player.stop(true); this.next(session); return reply('Skipped.');
       }
       return;
     }
@@ -186,10 +225,9 @@ export class MusicManager {
         queue: [], current: null, audio: null, abort: new AbortController(), text: message.channel };
       this.sessions.set(message.guildId, session);
       connection.subscribe(session.player);
-      session.player.on(AudioPlayerStatus.Idle, () => { if (session.current) this.next(session); });
-      session.player.on('error', () => {
-        if (!session.current) return;
-        this.notify(session, 'Playback failed. Trying the next song.'); this.next(session);
+      session.player.on(AudioPlayerStatus.Idle, () => { if (session.current && !session.current.recovering) this.next(session); });
+      session.player.on('error', error => {
+        if (session.current && !session.current.recovering) this.playbackFailed(session, session.current, error);
       });
       connection.on('error', () => { this.notify(session, 'Voice connection failed. Please try again.'); this.dispose(session); });
       connection.on(VoiceConnectionStatus.Disconnected, async () => {

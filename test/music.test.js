@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { PassThrough } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import { ChannelType } from 'discord.js';
 import { AudioPlayerStatus, VoiceConnectionStatus } from '@discordjs/voice';
-import { MusicManager, parseMusicCommand, searchTarget, resolveTrack } from '../src/music.js';
+import { MusicManager, parseMusicCommand, searchTarget, resolveTrack, streamTrack, audioDiagnostic } from '../src/music.js';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function fixture(resolve = async query => ({ title: query, url: 'https://www.youtube.com/watch?v=abcdefghijk', duration: 60 })) {
@@ -178,4 +179,67 @@ test('resolver rejects live streams, long tracks, and unexpected SoundCloud dest
   ]) {
     await assert.rejects(resolveTrack('https://youtu.be/abcdefghijk', undefined, async () => ({ stdout: JSON.stringify(info) })));
   }
+});
+test('a YouTube stream failure retries SoundCloud before the next queued song', async () => {
+  const f = fixture(async query => ({ title: query, source: 'YouTube', fallbackQuery: query, duration: 60 }));
+  const failures = [];
+  f.manager.stream = (track, fail) => { failures.push(fail); return { resource: {}, close() {} }; };
+  let retries = 0;
+  f.manager.fallback = async query => { retries++; return { title: query + ' fallback', source: 'SoundCloud', duration: 60 }; };
+  await f.manager.handle(f.message, { action: 'play', query: 'first' });
+  await f.manager.handle(f.message, { action: 'play', query: 'second' });
+  failures[0](new Error('429'));
+  failures[0](new Error('duplicate')); await tick();
+  assert.equal(retries, 1);
+  assert.equal(f.manager.sessions.get('guild').current.title, 'first fallback');
+  assert.equal(f.manager.sessions.get('guild').queue[0].title, 'second');
+  failures[1](new Error('SoundCloud failed')); await tick();
+  assert.equal(retries, 1);
+  assert.equal(f.manager.sessions.get('guild').current.title, 'second');
+  f.manager.close();
+});
+test('stop and skip cancel a pending streaming fallback without late playback', async () => {
+  for (const action of ['skip', 'stop']) {
+    const f = fixture(async query => ({ title: query, source: 'YouTube', fallbackQuery: query, duration: 60 }));
+    let fail, finish, signal;
+    f.manager.stream = (track, callback) => { fail = callback; return { resource: {}, close() {} }; };
+    f.manager.fallback = (query, abort) => { signal = abort; return new Promise(resolve => { finish = resolve; }); };
+    await f.manager.handle(f.message, { action: 'play', query: 'first' });
+    fail(new Error('blocked')); await tick();
+    await f.manager.handle(f.message, { action });
+    assert.equal(signal.aborted, true);
+    finish({ title: 'late fallback', duration: 60 }); await tick();
+    assert.ok(!f.manager.sessions.get('guild')?.current);
+    f.manager.close();
+  }
+});
+test('explicit SoundCloud resolution bypasses YouTube and cannot recursively fall back', async () => {
+  const inputs = [];
+  const track = await resolveTrack('go away', undefined, async (exe, args) => {
+    inputs.push(args.at(-1));
+    return { stdout: JSON.stringify({ extractor: 'soundcloud', title: 'Go Away', duration: 180,
+      webpage_url: 'https://soundcloud.com/artist/go-away' }) };
+  }, 'soundcloud');
+  assert.deepEqual(inputs, ['scsearch1:go away']);
+  assert.equal(track.fallbackQuery, undefined);
+});
+test('extractor failure reports bounded diagnostics and kills both child processes', async () => {
+  const children = [];
+  const launch = () => {
+    const child = new EventEmitter();
+    child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    child.kill = () => { child.killed = true; };
+    children.push(child); return child;
+  };
+  let reported;
+  const audio = streamTrack({ url: 'https://www.youtube.com/watch?v=abcdefghijk', duration: 10 }, error => { reported = error; }, launch);
+  children[0].stderr.write('ERROR: HTTP Error 429 https://media.example/audio?secret=token');
+  children[0].emit('close', 1);
+  assert.equal(reported.stage, 'extractor');
+  assert.equal(reported.code, 1);
+  assert.match(reported.detail, /429/);
+  assert.ok(!reported.detail.includes('secret'));
+  assert.ok(children.every(child => child.killed));
+  assert.ok(audioDiagnostic('x'.repeat(10000)).length <= 800);
+  audio.close();
 });
