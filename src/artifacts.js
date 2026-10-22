@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
+import { assertSafeText, assertSafeValue } from './safety.js';
 
 export const MAX_ARTIFACT_FILES = 3;
 export const MAX_ARTIFACT_BYTES = 1024 * 1024;
@@ -21,11 +22,13 @@ function decodeBase64(value) {
 }
 function validatedArtifact(name, bytes, encoding) {
   if (!safeName(name) || !Buffer.isBuffer(bytes) || !bytes.length || bytes.length > MAX_ARTIFACT_BYTES) throw invalid();
+  assertSafeText(name);
   const extension = name.split('.').at(-1).toLowerCase();
   let contentType;
   if (Object.hasOwn(TEXT_TYPES, extension)) {
     contentType = TEXT_TYPES[extension];
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    assertSafeText(text);
     if (text.includes('\0')) throw invalid();
     if (extension === 'json') JSON.parse(text);
   } else if (extension === 'png') {
@@ -53,6 +56,7 @@ export function exportFile({ filename, content, encoding = 'utf8', ...extra }) {
 const escape = text => String(text).replace(/[&<>"']/g, value => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[value]);
 const COLORS = ['#3879de', '#d85c3a', '#299268', '#8a5dc6'];
 export function exportChart({ title, x_label = '', y_label = '', series, chart_type = 'line', ...extra }) {
+  assertSafeValue({ title, x_label, y_label, series });
   if (Object.keys(extra).length || !['line', 'bar'].includes(chart_type) ||
     [title, x_label, y_label].some(label => typeof label !== 'string' || label.length > 120) ||
     !Array.isArray(series) || !series.length || series.length > 4) throw invalid();
@@ -110,14 +114,20 @@ export function exportChart({ title, x_label = '', y_label = '', series, chart_t
 }
 
 export class ArtifactCollector {
+  #safety;
+  constructor({ safety = {} } = {}) { this.#safety = safety; }
   #files = [];
   #hashes = new Set();
   #total = 0;
   #warnings = new Set();
   #pythonExports = new Map();
-  add(artifact) {
+  add(artifact, safety = this.#safety) {
     if (!artifact || !Buffer.isBuffer(artifact.attachment)) throw invalid();
     const verified = validatedArtifact(artifact.name, artifact.attachment, 'base64');
+    assertSafeText(verified.name, safety);
+    if (verified.contentType.startsWith('text/') || verified.contentType === 'application/json') {
+      assertSafeText(new TextDecoder('utf-8', { fatal: true }).decode(verified.attachment), safety);
+    }
     const hash = createHash('sha256').update(verified.attachment).digest('hex');
     if (this.#hashes.has(hash)) return { filename: this.#files.find(file => file.hash === hash).name, bytes: verified.attachment.length, duplicate: true };
     if (this.#files.length >= MAX_ARTIFACT_FILES || this.#total + verified.attachment.length > MAX_ARTIFACT_TOTAL_BYTES) {
@@ -133,7 +143,7 @@ export class ArtifactCollector {
     this.#files.push({ ...verified, hash }); this.#hashes.add(hash); this.#total += verified.attachment.length;
     return { filename: verified.name, bytes: verified.attachment.length, attached: true };
   }
-  collectPython(output) {
+  collectPython(output, safety = this.#safety) {
     for (const item of output) {
       if (item?.type !== 'code_interpreter_call' || item.status !== 'completed' || !Array.isArray(item.outputs)) continue;
       for (const entry of item.outputs) {
@@ -149,7 +159,7 @@ export class ArtifactCollector {
             if (!envelope || Object.keys(envelope).sort().join(',') !== 'base64,filename,mime_type' || typeof envelope.mime_type !== 'string') throw invalid();
             const artifact = exportFile({ filename: envelope.filename, content: envelope.base64, encoding: 'base64' });
             if (artifact.contentType !== envelope.mime_type) throw invalid();
-            const metadata = this.add(artifact);
+            const metadata = this.add(artifact, safety);
             this.#pythonExports.set(key, metadata.error ? { attached: false, error: 'Export limit reached.' } :
               { filename: metadata.filename, bytes: metadata.bytes, attached: true });
           } catch {

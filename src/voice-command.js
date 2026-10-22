@@ -1,6 +1,7 @@
 import { card, answerCard } from './ui.js';
 import { ProviderError } from './ai.js';
 import { VoiceInputError } from './voice.js';
+import { SafetyError } from './safety.js';
 
 export const speakCommand = {
   name: 'speak', description: 'Turn your text into an AI-generated spoken audio file', options: [
@@ -32,6 +33,7 @@ export const voiceCommand = {
   ],
 };
 export function voiceErrorMessage(error) {
+  if (error instanceof SafetyError) return error.message;
   if (error instanceof VoiceInputError) return error.message;
   if (error instanceof ProviderError && error.status === 429) return 'xAI is rate limiting voice requests. Please try again shortly.';
   if (['AbortError', 'TimeoutError'].includes(error?.name)) return 'The voice request timed out or was stopped. Please try again shortly.';

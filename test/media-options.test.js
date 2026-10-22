@@ -8,7 +8,7 @@ const video = 'https://cdn.discordapp.com/source.mp4';
 const response = body => ({ ok: true, json: async () => body });
 function fixture() {
   const requests = [];
-  return { requests, media: new MediaGenerator({ fetchImpl: async (url, options) => {
+  return { requests, media: new MediaGenerator({ authorize: async () => true, fetchImpl: async (url, options) => {
     const body = options.body && JSON.parse(options.body);
     requests.push({ url, body });
     if (url.includes('/images/')) return response({ model: 'resolved-image-model', usage: { cost_in_usd_ticks: 123 },
@@ -83,7 +83,7 @@ test('edit and extend use their dedicated endpoints and classic model without ge
 });
 
 test('invalid or incompatible media options fail before any provider submission', async () => {
-  const media = new MediaGenerator({ fetchImpl: async () => assert.fail('must not submit') });
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async () => assert.fail('must not submit') });
   const cases = [
     ['image', { options: { count: 11 } }], ['image', { options: { count: 1.5 } }],
     ['image', { options: { resolution: '4k' } }], ['image', { options: { quality: 'high' } }],

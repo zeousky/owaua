@@ -1,4 +1,4 @@
-import { AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder, MessageFlags } from 'discord.js';
 
 const mentions = { parse: [], repliedUser: false };
 
@@ -13,7 +13,7 @@ export function card(_title, description, { fields = [] } = {}) {
 }
 
 export function answerCard(text) {
-  return card('', text);
+  return { ...card('', text), flags: MessageFlags.SuppressEmbeds };
 }
 
 export function helpCard(musicHelp) {

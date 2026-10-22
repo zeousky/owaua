@@ -1,5 +1,6 @@
 import { conversationScope } from './store.js';
 import { card } from './ui.js';
+import { assertSafeValue, SafetyError } from './safety.js';
 
 const MAX_VIEW_LENGTH = 30000;
 const MAX_VISIBLE_NOTES = 20;
@@ -42,9 +43,12 @@ function describeMemory(status, notes, page) {
   ];
   let shown = 0;
   for (const note of notes.slice(start, start + MAX_VISIBLE_NOTES)) {
+    let hidden = false;
+    try { assertSafeValue({ key: note.key, text: note.text }, { instructions: true }); }
+    catch (error) { if (!(error instanceof SafetyError)) throw error; hidden = true; }
     // Bound even malformed legacy data before escaping or producing an attachment.
-    const key = escapeMarkdown(String(note.key).slice(0, 80));
-    let text = escapeMarkdown(String(note.text).slice(0, 1000));
+    const key = hidden ? 'Hidden note' : escapeMarkdown(String(note.key).slice(0, 80));
+    let text = hidden ? 'This saved note is hidden by the reply policy. Use /memory forget with its ID to remove it.' : escapeMarkdown(String(note.text).slice(0, 1000));
     // Keep every note ID on its page accessible even when escaping expands text.
     if (text.length > MAX_ESCAPED_TEXT) text = text.slice(0, MAX_ESCAPED_TEXT).replace(/\\+$/, '') + '\n[Fact text shortened]';
     const entry = `#${note.id} · ${key} · updated ${dateLabel(note.updated_at)}\n${text}`;

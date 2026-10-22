@@ -5,7 +5,7 @@ import { AICore, ProviderError } from '../src/ai.js';
 
 const response = body => ({ ok: true, json: async () => body });
 test('images pin medium quality, 1K, and one output; Discord displays the result', async () => {
-  const media = new MediaGenerator({ apiKey: 'test', fetchImpl: async (url, options) => {
+  const media = new MediaGenerator({ authorize: async () => true, apiKey: 'test', fetchImpl: async (url, options) => {
     assert.equal(url, 'https://api.x.ai/v1/images/generations');
     assert.deepEqual(JSON.parse(options.body), { model: 'grok-imagine-image-2.0', prompt: 'A cat',
       n: 1, quality: 'medium', resolution: '1k', response_format: 'url' });
@@ -17,7 +17,7 @@ test('images pin medium quality, 1K, and one output; Discord displays the result
 test('videos submit once then poll to completion with a shared deadline', async () => {
   const requests = [];
   let sleeps = 0;
-  const media = new MediaGenerator({ apiKey: 'test', sleep: async () => { sleeps++; },
+  const media = new MediaGenerator({ authorize: async () => true, apiKey: 'test', sleep: async () => { sleeps++; },
     fetchImpl: async (url, options) => {
       requests.push({ url, ...options });
       if (requests.length === 1) return response({ request_id: 'job-1' });
@@ -38,16 +38,16 @@ test('failed, moderated, missing, and unsafe results are rejected', async () => 
   for (const body of [ { status: 'failed' }, { status: 'done', video: { url: 'https://vidgen.x.ai/v.mp4', respect_moderation: false } },
     { status: 'done' }, { status: 'done', video: { url: 'file:///secret' } } ]) {
     let calls = 0;
-    const media = new MediaGenerator({ fetchImpl: async () => response(++calls === 1 ? { request_id: 'job' } : body) });
+    const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async () => response(++calls === 1 ? { request_id: 'job' } : body) });
     await assert.rejects(media.generate('video', 'test'));
     assert.equal(calls, 2);
   }
-  const media = new MediaGenerator({ fetchImpl: async () => response({ data: [] }) });
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async () => response({ data: [] }) });
   await assert.rejects(media.generate('image', 'test'), ProviderError);
 });
 test('invalid prompts never call the provider and HTTP errors do not reveal bodies', async () => {
   let calls = 0;
-  const media = new MediaGenerator({ fetchImpl: async () => { calls++; return { ok: false, status: 429,
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async () => { calls++; return { ok: false, status: 429,
     json: async () => ({ error: 'secret' }) }; } });
   for (const [kind, prompt] of [['image', ' '], ['video', 'x'.repeat(6001)], ['unknown', 'test']]) {
     await assert.rejects(media.generate(kind, prompt));
@@ -58,7 +58,7 @@ test('invalid prompts never call the provider and HTTP errors do not reveal bodi
 });
 test('pending video stops at deadline without submitting another paid job', async () => {
   let submissions = 0;
-  const media = new MediaGenerator({ timeoutMs: 20, pollIntervalMs: 1000,
+  const media = new MediaGenerator({ authorize: async () => true, timeoutMs: 20, pollIntervalMs: 1000,
     fetchImpl: async (url, options) => {
       if (options.method === 'POST') { submissions++; return response({ request_id: 'job' }); }
       return response({ status: 'pending' });
@@ -95,7 +95,7 @@ test('chat media failure propagates without a second submission or model retry',
 });
 
 test('single reference uses the JSON image edits endpoint at medium quality', async () => {
-  const media = new MediaGenerator({ fetchImpl: async (url, options) => {
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async (url, options) => {
     assert.equal(url, 'https://api.x.ai/v1/images/edits');
     const body = JSON.parse(options.body);
     assert.deepEqual(body.image, { url: 'https://cdn.discordapp.com/photo.png', type: 'image_url' });
@@ -110,7 +110,7 @@ test('single reference uses the JSON image edits endpoint at medium quality', as
 });
 test('multiple references use images rather than image, including reference-guided generation', async () => {
   const images = ['https://cdn.discordapp.com/a.jpg', 'https://cdn.discordapp.com/b.png'];
-  const media = new MediaGenerator({ fetchImpl: async (url, options) => {
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async (url, options) => {
     assert.match(url, /images\/edits$/);
     const body = JSON.parse(options.body);
     assert.deepEqual(body.images, images.map(url => ({ url, type: 'image_url' })));
@@ -120,13 +120,13 @@ test('multiple references use images rather than image, including reference-guid
   await media.generate('image', 'Use the first subject with the style of the second', { images });
 });
 test('missing or unsupported edit sources fail before provider submission', async () => {
-  const media = new MediaGenerator({ fetchImpl: async () => assert.fail('must not submit') });
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async () => assert.fail('must not submit') });
   await assert.rejects(media.generate('edit_image', 'Make it blue'), /Attach an image/);
   await assert.rejects(media.generate('edit_image', 'Make it blue', { images: ['https://cdn.discordapp.com/a.gif?x=1'] }), /instead of a GIF/);
   await assert.rejects(media.generate('edit_image', 'Make it blue', { images: Array(6).fill('https://example.com/a.png') }), /at most five/);
 });
 test('video animation receives the first supplied image while retaining 720p', async () => {
-  const media = new MediaGenerator({ fetchImpl: async (url, options) => {
+  const media = new MediaGenerator({ authorize: async () => true, fetchImpl: async (url, options) => {
     if (options.method === 'POST') {
       const body = JSON.parse(options.body);
       assert.deepEqual(body.image, { url: 'https://cdn.discordapp.com/cat.png', type: 'image_url' });

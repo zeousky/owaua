@@ -1,7 +1,15 @@
 import { card, answerCard } from './ui.js';
 import { mediaReply } from './media.js';
+import { assertSafeText, assertSafeValue } from './safety.js';
 
 export function resultReply(result, { notices = [], speech } = {}) {
+  assertSafeValue({ text: result.text, notices, warnings: result.artifactWarnings });
+  for (const artifact of result.artifacts ?? []) {
+    assertSafeText(artifact.name);
+    if (/\.(?:txt|md|csv|json|py|js|ts|css|html)$/i.test(artifact.name)) {
+      assertSafeText(new TextDecoder('utf-8', { fatal: true }).decode(artifact.attachment));
+    }
+  }
   const warnings = [...notices, ...(result.artifactWarnings ?? [])].filter(Boolean);
   let payload;
   if (result.media) payload = mediaReply(result.media);

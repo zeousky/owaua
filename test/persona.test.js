@@ -373,7 +373,7 @@ test('concurrent users receive only their own history and compiled persona with 
   assert.doesNotMatch(requests[0].instructions, /fictional robot/);
   assert.match(requests[1].instructions, /fictional robot/);
   assert.doesNotMatch(requests[1].instructions, /fictional pirate/);
-  assert.match(requests[2].instructions, /usual Kirmy voice/);
+  assert.match(requests[2].instructions, /Act Gen Z-ish and swear a lot/);
   assert.equal(requests[0].input[0].content, 'Alice private');
   assert.equal(requests[1].input[0].content, 'Bob private');
   assert.doesNotMatch(JSON.stringify(requests[0].input), /Bob/);

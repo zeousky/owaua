@@ -2,6 +2,21 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-10-22
+
+### Changed
+
+- Image and video requests generate directly, using defaults for unspecified settings.
+- Kirmy's default persona uses casual Gen Z language and frequent swearing. Personal persona choices still apply.
+- Ordinary swearing is allowed in text and voice; casual insults directed at Kirmy can reach chat.
+- Source links remain clickable without large webpage preview cards.
+
+### Fixed
+
+- Reply checks cover common text encodings, downloadable text, and chart labels. Voice playback waits for a completed transcript to pass these checks.
+- JSON answers cannot run media generation tools.
+- Automatic memory saves use your typed words rather than attached or transcribed content.
+
 ## 2026-10-21
 
 ### Added

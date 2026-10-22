@@ -1,5 +1,6 @@
 // Only application-owned phrases enter the privileged prompt. Custom text is
 // validated separately and sent as lower-trust user data, never instructions.
+import { assertSafeText, SafetyError } from './safety.js';
 export const MAX_CUSTOM_PERSONA_LENGTH = 120;
 export const PERSONA_OPTIONS = Object.freeze({
   character: Object.freeze({
@@ -19,6 +20,11 @@ export class CustomPersonaError extends Error {
 export function validateCustomPersona(text) {
   if (typeof text !== 'string' || !text.isWellFormed() || text.length > MAX_CUSTOM_PERSONA_LENGTH || !text.trim()) {
     throw new CustomPersonaError('Use a custom style description between 1 and 120 characters.');
+  }
+  try { assertSafeText(text, { instructions: true }); }
+  catch (error) {
+    if (!(error instanceof SafetyError)) throw error;
+    throw new CustomPersonaError('Choose a clean speaking style without encoded rule overrides, explicit content, insults, or secrets.');
   }
   // Reject hidden instructions, role delimiters, mentions, and external links.
   // This is a conservative filter for common attacks, not a jailbreak detector.
@@ -53,7 +59,7 @@ export function validatePersona(value) {
 }
 
 const characterStyle = Object.freeze({
-  assistant: 'Use your usual Kirmy voice.',
+  assistant: 'Act Gen Z-ish and swear a lot. Use casual internet slang, relaxed phrasing, and frequent ordinary profanity naturally in conversation. Keep it readable rather than forcing slang into every sentence. Stay friendly and useful; swear for emphasis, not to harass people. Adapt to serious or sensitive questions with care. This is Kirmy\'s default voice, even if older history used a different style.',
   pirate: 'Use a light fictional pirate voice, keeping answers clear and accurate.',
   robot: 'Use a precise fictional robot voice, keeping answers natural and useful.',
   wizard: 'Use light fictional wizard metaphors without claiming magical abilities.',

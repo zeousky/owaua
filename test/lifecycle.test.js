@@ -20,7 +20,7 @@ test('pre-aborted AI and media requests never call the provider', async () => {
   let calls = 0;
   const fetchImpl = async () => { calls++; throw new Error('Unexpected provider call'); };
   const ai = new AICore({ apiKey: 'fixture', fetchImpl });
-  const media = new MediaGenerator({ apiKey: 'fixture', fetchImpl });
+  const media = new MediaGenerator({ authorize: async () => true, apiKey: 'fixture', fetchImpl });
   await assert.rejects(ai.respond({ input: 'hello', signal: controller.signal }), error => error === reason);
   for (const kind of ['image', 'video', 'edit_image']) {
     await assert.rejects(media.generate(kind, 'fixture prompt', {
@@ -75,7 +75,7 @@ test('caller cancellation stops video polling sleep without submitting another j
   const sleeping = Promise.withResolvers();
   const methods = [];
   let sleepSignal;
-  const media = new MediaGenerator({ apiKey: 'fixture', fetchImpl: async (url, { method }) => {
+  const media = new MediaGenerator({ authorize: async () => true, apiKey: 'fixture', fetchImpl: async (url, { method }) => {
     methods.push(method);
     return response(method === 'POST' ? { request_id: 'fixture-job' } : { status: 'pending' });
   }, sleep: (milliseconds, value, { signal }) => {
@@ -97,7 +97,7 @@ test('caller cancellation aborts an in-flight video poll without another paid su
   const polling = Promise.withResolvers();
   const methods = [];
   let pollSignal;
-  const media = new MediaGenerator({ apiKey: 'fixture', fetchImpl: async (url, { method, signal }) => {
+  const media = new MediaGenerator({ authorize: async () => true, apiKey: 'fixture', fetchImpl: async (url, { method, signal }) => {
     methods.push(method);
     if (method === 'POST') return response({ request_id: 'fixture-job' });
     pollSignal = signal; polling.resolve();
@@ -121,7 +121,7 @@ test('provider errors retain classification codes without reading response bodie
   const ai = new AICore({ apiKey: 'fixture', fetchImpl });
   await assert.rejects(ai.respond({ input: 'hello' }), error =>
     error instanceof ProviderError && error.status === 429 && error.code === 'provider_error' && !error.message.includes('private fixture body'));
-  const media = new MediaGenerator({ apiKey: 'fixture', fetchImpl });
+  const media = new MediaGenerator({ authorize: async () => true, apiKey: 'fixture', fetchImpl });
   await assert.rejects(media.generate('image', 'fixture image'), error =>
     error instanceof ProviderError && error.status === 429 && error.code === 'media_provider_error');
   assert.equal(bodiesRead, 0);

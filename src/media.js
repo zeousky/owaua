@@ -1,6 +1,7 @@
 import { card } from './ui.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ProviderError } from './ai.js';
+import { assertSafeText } from './safety.js';
 
 export function mediaUrl(value) {
   const url = new URL(value);
@@ -33,12 +34,14 @@ function validOptions(options, allowed) {
 
 export class MediaGenerator {
   constructor({ apiKey, timeoutMs = 600000, fetchImpl = fetch, pollIntervalMs = 5000,
-    sleep = delay } = {}) {
-    Object.assign(this, { apiKey, timeoutMs, fetchImpl, pollIntervalMs, sleep });
+    sleep = delay, authorize } = {}) {
+    Object.assign(this, { apiKey, timeoutMs, fetchImpl, pollIntervalMs, sleep, authorize });
   }
-  async generate(kind, prompt, { images = [], videos = [], options = {}, signal: callerSignal } = {}) {
+  async generate(kind, prompt, { images = [], videos = [], options = {}, signal: callerSignal,
+    authorize = this.authorize } = {}) {
     if (!['image', 'video', 'edit_image', 'edit_video', 'extend_video'].includes(kind) || typeof prompt !== 'string' ||
       !prompt.trim() || prompt.length > 6000) throw new Error('Invalid generation request');
+    assertSafeText(prompt, { instructions: true, secrets: [this.apiKey] });
     if (!Array.isArray(images) || images.length > 5) throw new MediaInputError('Please use at most five reference images.');
     if (!Array.isArray(videos) || videos.length > 1) throw new MediaInputError('Please use one source video per request.');
     const references = images.map(mediaUrl);
@@ -110,6 +113,14 @@ export class MediaGenerator {
           : { aspect_ratio: ratio, ...(references.length ? { reference_images: references.map(url => ({ url })) } : {}) }),
       };
     }
+    // Explicit media requests submit directly. An optional host policy can
+    // still inspect a copy of the validated payload without mutating it.
+    callerSignal?.throwIfAborted();
+    if (authorize !== undefined && (typeof authorize !== 'function' ||
+      await authorize({ kind, path, body: structuredClone(body) }) !== true)) {
+      throw new MediaInputError('Media generation was cancelled or not confirmed. No media request was submitted.');
+    }
+    callerSignal?.throwIfAborted();
     const deadline = AbortSignal.timeout(this.timeoutMs);
     const signal = callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline;
     const request = async (path, body) => {

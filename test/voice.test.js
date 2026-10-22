@@ -142,7 +142,7 @@ test('realtime voice waits for configuration and uses native Voice 3 PCM input/o
   const audio = []; realtime.on('audio', bytes => audio.push(bytes));
   socket.event({ type: 'response.created' }); socket.event({ type: 'response.output_audio.delta', delta: 'AAA=' });
   realtime.interrupt(); socket.event({ type: 'response.output_audio.delta', delta: 'AAA=' });
-  assert.equal(audio.length, 1); assert.equal(socket.sent.at(-1).type, 'response.cancel');
+  assert.equal(audio.length, 0); assert.equal(socket.sent.at(-1).type, 'response.cancel');
   realtime.close(); assert.equal(socket.terminated, true);
 });
 test('realtime provider errors are sanitized and abort closes the socket', async () => {
@@ -171,6 +171,9 @@ test('barge-in waits for delayed cancellation acknowledgement before creating th
   let received = 0; realtime.on('audio', () => { received++; });
   socket.event({ type: 'response.output_audio.delta', response_id: 'first', delta: 'AAA=' });
   socket.event({ type: 'response.output_audio.delta', response_id: 'second', delta: 'AAA=' });
+  assert.equal(received, 0);
+  socket.event({ type: 'response.output_audio_transcript.done', response_id: 'second', transcript: 'Hello.' });
+  socket.event({ type: 'response.done', response: { id: 'second', status: 'completed' } });
   assert.equal(received, 1); realtime.close();
 });
 test('speech before response.created cancels the pending response and keeps its audio muted', async () => {
@@ -189,6 +192,9 @@ test('speech before response.created cancels the pending response and keeps its 
   assert.equal(socket.sent.filter(e => e.type === 'response.create').length, 2);
   socket.event({ type: 'response.created', response: { id: 'second' } });
   socket.event({ type: 'response.output_audio.delta', response_id: 'second', delta: 'AAA=' });
+  assert.equal(responses.length, 1); assert.equal(audio.length, 0);
+  socket.event({ type: 'response.output_audio_transcript.done', response_id: 'second', transcript: 'Hello.' });
+  socket.event({ type: 'response.done', response: { id: 'second', status: 'completed' } });
   assert.equal(responses.length, 1); assert.equal(audio.length, 1); realtime.close();
 });
 test('a newer utterance supersedes a queued answer while an old cancellation is pending', async () => {

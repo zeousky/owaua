@@ -21,6 +21,7 @@ import { createMCPRegistry } from './mcp.js';
 import { personaContext, personaInstructions } from './persona.js';
 import { prepareRequestInput } from './request-input.js';
 import { resultReply } from './reply.js';
+import { assertSafeValue, assertSafeChatInput, SafetyError, withRequestUser } from './safety.js';
 
 function integer(name, fallback, min, max) {
   const value = Number(process.env[name] ?? fallback);
@@ -84,7 +85,10 @@ function allowed(guildId) { return !guildId || !allowedGuilds.size || allowedGui
 function logError(event, error) {
   console.error(JSON.stringify({ event, type: error?.name ?? 'Error', status: error?.status ?? null, code: error?.code ?? null }));
 }
-async function answer({ scope, userId, guildId, text, images = [], documents: documentAttachments = [], videos = [], audio = [],
+function answer(request) {
+  return withRequestUser(request.userId, () => answerForUser(request));
+}
+async function answerForUser({ scope, userId, guildId, text, images = [], documents: documentAttachments = [], videos = [], audio = [],
   useLibrary = false, spoken = false, requestOptions = {}, send }) {
   if (stopping) return send(card('One moment', 'I’m restarting. Please try again shortly.', { tone: 'warning' }));
   if (active.has(scope) || knowledge.isActive(scope)) return send(card('One moment', 'I’m still working on your previous request here.', { tone: 'warning' }));
@@ -101,6 +105,7 @@ async function answer({ scope, userId, guildId, text, images = [], documents: do
   let progress;
   let prepared;
   try {
+    assertSafeChatInput(text);
     const options = normalizeRequestOptions(requestOptions, { model: ai.model });
     mcp.definitions(options.integrations ?? [], { userId, guildId });
     if (spoken && options.outputFormat === 'json') throw new RequestOptionsError('Choose text output for a spoken answer. JSON output is delivered as a file.');
@@ -108,13 +113,12 @@ async function answer({ scope, userId, guildId, text, images = [], documents: do
     progress = await animate(send);
     prepared = await prepareRequestInput({ text, images, documents: documentAttachments, videos, audio, useLibrary, scope,
       voice: voiceAPI, documentInputs: documents, knowledge, signal: shutdownController.signal });
-    const memory = createMemorySession(store, { scope, userId, input: prepared.userText });
+    assertSafeChatInput(prepared.userText);
+    const memory = createMemorySession(store, { scope, userId, input: prepared.memoryInput });
     let generationStarted = false;
     const generateMedia = async (type, prompt, { useReference = true, options = {} } = {}) => {
       if (generationStarted) throw new Error('Only one generation attempt per request');
       generationStarted = true;
-      await progress.stop();
-      progress = await animate(send);
       return media.generate(type, prompt, { images: useReference ? images : [], videos: useReference ? videos : [],
         options, signal: shutdownController.signal });
     };
@@ -126,6 +130,7 @@ async function answer({ scope, userId, guildId, text, images = [], documents: do
       safetyIdentifier: createHash('sha256').update(userId).digest('hex'),
       onActivity: activity => progress?.setActivity(activity) });
     // Keep text history only; Discord attachment links expire.
+    assertSafeValue({ text: result.text, warnings: result.artifactWarnings });
     const notices = [...prepared.notices];
     try { memory.commit(prepared.historyInput, result.text); }
     catch (error) {
@@ -152,7 +157,7 @@ async function answer({ scope, userId, guildId, text, images = [], documents: do
   } catch (error) {
     logError('ai_error', error);
     const message = stopping ? 'I’m restarting. Please try again shortly. A submitted generation may still finish at xAI; retrying starts a new request.'
-      : error instanceof MediaInputError || error instanceof DocumentInputError || error instanceof RequestOptionsError ||
+      : error instanceof SafetyError || error instanceof MediaInputError || error instanceof DocumentInputError || error instanceof RequestOptionsError ||
         error instanceof VoiceInputError || error instanceof KnowledgeError ? error.message
       : error instanceof ProviderError && ['invalid_structured_output', 'incomplete_structured_output'].includes(error.code)
         ? 'xAI did not return a complete answer matching your JSON schema. Try a simpler schema or a larger output limit.'
@@ -185,7 +190,7 @@ async function standalone(interaction, handler) {
   if (unavailable) return interaction.reply({ ...card('', unavailable), flags: 64 });
   if (lastRequest.size > 10000) for (const [key, time] of lastRequest) if (now - time > cooldown) lastRequest.delete(key);
   active.add(scope); lastRequest.set(interaction.user.id, now);
-  try { return await handler(); } finally { active.delete(scope); }
+  try { return await withRequestUser(interaction.user.id, handler); } finally { active.delete(scope); }
 }
 client.once(Events.ClientReady, async ready => {
   console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, model: ai.model }));
