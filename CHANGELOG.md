@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-23
 
+### Changed
+
+- Owaua replies with a service shutdown notice until October 24 at 9:00 AM CEST.
+
+## 2026-10-23
+
 ### Added
 
 - Every slash command now also works with `.` — try `.ask Hello`, `.voice join`, `.memory view`, or `.help`. Subcommands, settings, and attached files are supported. Private results arrive by DM.
