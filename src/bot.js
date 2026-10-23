@@ -9,21 +9,18 @@ import { MediaGenerator, MediaInputError } from './media.js';
 import { MediaStore } from './media-store.js';
 import { MediaService } from './media-service.js';
 import { confirmMedia } from './media-approval.js';
-import { jobsCommand, usageCommand, handleMediaCommand } from './media-command.js';
+import { createCommandHandler } from './command-handler.js';
+import { commands } from './commands.js';
+import { parsePrefixCommand, createPrefixInteraction, PrefixCommandError } from './prefix-command.js';
 import { requestAttachments } from './attachments.js';
 import { DocumentInputs, DocumentInputError } from './files.js';
 import { RequestOptionsError, normalizeRequestOptions } from './request-options.js';
 import { card, helpCard, animate } from './ui.js';
 import { ConversationStore, conversationScope } from './store.js';
-import { personaCommand, handlePersonaCommand } from './persona-command.js';
-import { languageCommand, parseLanguageCommand, handleLanguageCommand } from './language-command.js';
 import { languageInstructions } from './language.js';
-import { memoryCommand, handleMemoryCommand } from './memory-command.js';
 import { createMemorySession } from './memory.js';
 import { VoiceAPI, VoiceManager, VoiceInputError } from './voice.js';
-import { speakCommand, transcribeCommand, voiceCommand, handleSpeakCommand, handleTranscribeCommand, handleVoiceCommand } from './voice-command.js';
 import { KnowledgeLibrary, KnowledgeError } from './knowledge.js';
-import { knowledgeCommand, handleKnowledgeCommand } from './knowledge-command.js';
 import { createMCPRegistry } from './mcp.js';
 import { personaContext, personaInstructions } from './persona.js';
 import { prepareRequestInput } from './request-input.js';
@@ -218,99 +215,25 @@ client.once(Events.ClientReady, async ready => {
   recoveryTimer = setInterval(recoverMedia, 30000);
   recoveryTimer.unref();
   try {
-    await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN).put(Routes.applicationCommands(ready.user.id), { body: [
-      { name: 'ask', description: 'Ask Kirmy anything', options: [
-        { type: 3, name: 'prompt', description: 'Your question', required: true, max_length: 6000 },
-        { type: 11, name: 'image', description: 'Optional image to understand' },
-        { type: 11, name: 'file', description: 'Optional PDF, text, or code document to analyze' },
-        { type: 11, name: 'video', description: 'Optional MP4 to edit or extend' },
-        { type: 11, name: 'audio', description: 'Optional audio or voice message to transcribe and answer' },
-        { type: 5, name: 'spoken', description: 'Also generate a spoken MP3 of the answer' },
-        { type: 5, name: 'library', description: 'Use your saved document library in this channel' },
-        { type: 3, name: 'output', description: 'Answer format (default: text)', choices: [{ name: 'Text', value: 'text' }, { name: 'JSON file', value: 'json' }] },
-        { type: 3, name: 'schema', description: 'Optional JSON Schema for JSON output (object, up to 4000 characters)', max_length: 4000 },
-        { type: 3, name: 'integrations', description: 'Opt into read-only MCP integrations, e.g. xai_docs,deepwiki', max_length: 200 },
-        { type: 3, name: 'reasoning', description: 'Reasoning effort; higher can take longer and cost more', choices:
-          ['low', 'medium', 'high', 'xhigh'].map(value => ({ name: value, value })) },
-        { type: 3, name: 'web_domains', description: 'Limit web search to these domains (comma-separated, up to 5)', max_length: 1000 },
-        { type: 3, name: 'x_handles', description: 'Limit X search to these handles (comma-separated, up to 20)', max_length: 400 },
-        { type: 3, name: 'from_date', description: 'Search X posts from this date (YYYY-MM-DD)', max_length: 10 },
-        { type: 3, name: 'to_date', description: 'Search X posts before this date (YYYY-MM-DD, exclusive)', max_length: 10 },
-        { type: 5, name: 'visual_search', description: 'Allow web image search and search image/video understanding' },
-      ] },
-      { name: 'reset', description: 'Clear your Kirmy history and saved memories in this channel' },
-      { name: 'help', description: 'Show what Kirmy can do' },
-      personaCommand,
-      languageCommand,
-      memoryCommand,
-      jobsCommand, usageCommand,
-      knowledgeCommand, speakCommand, transcribeCommand, voiceCommand,
-      { name: 'integrations', description: 'Privately list the read-only integrations available to you' },
-    ] });
+    await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN).put(Routes.applicationCommands(ready.user.id), { body: commands });
     console.log(JSON.stringify({ event: 'commands_registered', capabilities }));
   } catch (error) { logError('command_registration_error', error); }
 });
+const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping, store, mediaStore, knowledge, mcp, voiceAPI, voiceManager,
+  standalone, active, help, client, answer, signal: shutdownController.signal, logError });
 client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  try {
-    if (!allowed(interaction.guildId)) return interaction.reply({ ...card('Kirmy', 'Kirmy is not enabled in this server.', { tone: 'warning' }), flags: 64 });
-    if (stopping) return interaction.reply({ ...card('', 'I’m restarting — give me a moment, then try again.'), flags: 64 });
-    if (interaction.commandName === 'language') return await handleLanguageCommand(interaction, store, interaction.options.getString('name') ?? '');
-    if (['jobs', 'usage'].includes(interaction.commandName)) return await handleMediaCommand(interaction, mediaStore);
-    if (interaction.commandName === 'knowledge') {
-      const run = () => handleKnowledgeCommand(interaction, knowledge, { isActive: () => false, stopping, signal: shutdownController.signal });
-      return await (interaction.options.getSubcommand() === 'list' ? run() : standalone(interaction, run));
-    }
-    if (interaction.commandName === 'integrations') return interaction.reply({ ...card('',
-      mcp.list({ userId: interaction.user.id, guildId: interaction.guildId })
-        .map(server => `\`${server.label}\` — ${server.description}`).join('\n') + '\n\nChoose labels with /ask integrations:... for that request only.'), flags: 64 });
-    if (interaction.commandName === 'speak') return await standalone(interaction, () => handleSpeakCommand(interaction, voiceAPI, { signal: shutdownController.signal,
-      onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })) }));
-    if (interaction.commandName === 'transcribe') return await standalone(interaction, () => handleTranscribeCommand(interaction, voiceAPI, { signal: shutdownController.signal,
-      onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })) }));
-    if (interaction.commandName === 'voice') {
-      const run = () => handleVoiceCommand(interaction, voiceManager, voiceAPI, { signal: shutdownController.signal });
-      return await (interaction.options.getSubcommand() === 'join' ? standalone(interaction, run) : run());
-    }
-    if (interaction.commandName === 'memory') return await handleMemoryCommand(interaction, store, { isActive: scope => active.has(scope), stopping });
-    if (interaction.commandName === 'persona') {
-      if (stopping) return interaction.reply({ ...card('', 'I’m restarting — give me a moment, then try again.'), flags: 64 });
-      return await handlePersonaCommand(interaction, store);
-    }
-    const scope = conversationScope(interaction.guildId, interaction.channelId, interaction.user.id);
-    if (interaction.commandName === 'help') return interaction.reply({ ...help, flags: 64 });
-    if (interaction.commandName === 'reset') {
-      if (active.has(scope)) return interaction.reply({ ...card('Kirmy', 'Let me finish your current request, then you can reset our chat.', { tone: 'warning' }), flags: 64 });
-      store.reset(scope);
-      return interaction.reply({ ...card('A fresh start', 'Fresh start — I’ve cleared your conversation history and saved notes in this channel.', { tone: 'success' }), flags: 64 });
-    }
-    if (interaction.commandName !== 'ask') return;
-    let attachments;
-    try {
-      const supplied = ['image', 'file', 'video', 'audio'].map(name => interaction.options.getAttachment(name)).filter(Boolean);
-      attachments = requestAttachments({ attachments: new Map(supplied.map((a, i) => [i, a])) }, undefined, client.user.id);
-    } catch (error) {
-      return interaction.reply({ ...card('Kirmy', error.message, { tone: 'warning' }), flags: 64 });
-    }
-    await interaction.deferReply();
-    await answer({ scope, userId: interaction.user.id, guildId: interaction.guildId, text: interaction.options.getString('prompt', true),
-      useLibrary: interaction.options.getBoolean('library') ?? false, spoken: interaction.options.getBoolean('spoken') ?? false,
-      ...attachments, requestOptions: {
-        reasoningEffort: interaction.options.getString('reasoning'), webDomains: interaction.options.getString('web_domains'),
-        xHandles: interaction.options.getString('x_handles'), fromDate: interaction.options.getString('from_date'),
-        toDate: interaction.options.getString('to_date'), visualSearch: interaction.options.getBoolean('visual_search'),
-        outputFormat: interaction.options.getString('output'), schema: interaction.options.getString('schema'), integrations: interaction.options.getString('integrations'),
-      }, send: payload => interaction.editReply(payload) });
-  } catch (error) { logError('interaction_error', error); }
+  if (interaction.isChatInputCommand()) await handleCommand(interaction);
 });
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !allowed(message.guildId)) return;
   try {
-    const language = parseLanguageCommand(message.content);
-    if (language) {
-      if (stopping) return message.reply(card('', 'I’m restarting — give me a moment, then try again.'));
-      return await handleLanguageCommand(message, store, language.value);
+    let command;
+    try { command = parsePrefixCommand(message.content, { attachments: message.attachments }); }
+    catch (error) {
+      if (!(error instanceof PrefixCommandError)) throw error;
+      return message.reply(card('', error.message));
     }
+    if (command) return await handleCommand(createPrefixInteraction(message, command));
     const musicCommand = parseMusicCommand(message.content);
     if (musicCommand) {
       if (stopping) return message.reply(card('Restarting', 'I’m restarting — give me a moment, then try again.', { tone: 'warning' }));

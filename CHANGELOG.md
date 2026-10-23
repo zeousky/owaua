@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-23
 
+### Added
+
+- Every slash command now also works with `.` — try `.ask Hello`, `.voice join`, `.memory view`, or `.help`. Subcommands, settings, and attached files are supported. Private results arrive by DM.
+
+## 2026-10-23
+
 ### Changed
 
 - Help, usage, and everyday command replies sound more conversational, with clearer next steps.

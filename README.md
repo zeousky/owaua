@@ -4,6 +4,20 @@ Discord AI core using **Grok 4.7** directly through the official xAI Responses A
 
 ## Use
 
+Every slash command also works with the `.` prefix, without a mention. Use the same subcommands and `option:value` names:
+
+- `.ask What time is it?` or `.ask prompt:"Summarize the news" reasoning:high web_domains:example.com`
+- `.speak Hello there voice:eve speed:1.1` and `.transcribe language:hu` (attach audio)
+- `.voice join`, `.voice leave`, `.voice status`, `.voice voices`
+- `.persona set description:"Talk like a pirate"`, `.persona view`, `.persona reset`
+- `.language Hungarian`, `.memory view`, `.memory remember key:hobby text:"I like hiking"`, `.memory forget id:3`, `.memory pause`, `.memory resume`, `.memory clear`
+- `.knowledge add` (attach a document), `.knowledge list`, `.knowledge forget id:3`, `.knowledge clear`
+- `.jobs`, `.usage user:@someone server:123456789012345678` (owner only), `.integrations`, `.reset`, `.help`
+
+For `.ask` and `.speak`, put free text first, then named options. Quote values containing text such as `voice:` or `output:` so it stays literal. Structured options work too: `.ask List three colors output:json schema:{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}`. Attach files directly to the command message. Attachment options select an attached filename or a 1-based number, such as `audio:1`; typed URLs are not attachment inputs.
+
+Private command results are sent by DM, with the original server/channel scope preserved. Enable DMs or use slash commands if DMs are blocked. Your prefix command message remains visible in its channel; use slash commands for private input.
+
 - `.music <song name or SoundCloud track link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
 - `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
 - `/ask prompt:...` — ask a question, optionally with an image, a PDF/text/code document (`file`), or an MP4 (`video`) to edit or extend.

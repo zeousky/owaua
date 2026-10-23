@@ -77,6 +77,9 @@ test('help keeps the quick start in chat and preserves advanced settings and pri
     assert.ok(guide.includes(detail), `Detailed guide should retain ${detail}`);
   }
   assert.ok(guide.includes(musicHelp));
+  for (const detail of ['Every slash command also works with', '.ask', '.speak', '.knowledge add', '.transcribe', 'Private results go to your DMs', 'use slash commands for private input']) {
+    assert.ok(guide.includes(detail), `Detailed guide should explain dot commands: ${detail}`);
+  }
   assert.deepEqual(payload.allowedMentions.parse, []);
 });
 

@@ -18,7 +18,7 @@ export function answerCard(text) {
 
 export function helpCard(musicHelp) {
   const quickStart = [
-    'Hey, I’m Kirmy. Here’s how to get started.',
+    'Hey, I’m Kirmy. Here’s how to get started. Every slash command also works with `.` (for example `.ask Hi`). Private command results arrive by DM.',
     '**Chat with me**\nUse `/ask`, @ me, reply to me, or send a DM. Send a question, image, PDF, or code file. I can look things up on the web and X too.',
     '**Make something**\nAsk for an image or video, or send one and tell me what to change. I’ll show you the prompt and settings to confirm before generating. Check `/jobs` for recent results.',
     '**Talk or play music**\n`/voice join` lets us talk; `/voice leave` ends it. `/speak` reads text aloud, and `/transcribe` turns a recording into text. For music, join a voice channel and try `.music <song name>`. Use `.music help` for controls.',
@@ -29,6 +29,7 @@ export function helpCard(musicHelp) {
   ].join('\n\n');
   const guide = [
     '# A little more about Kirmy',
+    '## Dot commands\nEvery slash command also works with a dot, without mentioning me: .ask What time is it?; .speak Hello voice:eve; .voice join; .persona set description:"Talk like a pirate"; .memory remember key:hobby text:"I like hiking"; .knowledge add (attach a document); .transcribe (attach audio); .jobs; .usage; .integrations; .reset; .help. Use the same subcommands and option:value names as slash commands. Quote values containing option-like text. Attach files directly to the command message; filename or attachment number selects a file when needed. Private results go to your DMs and still refer to the server/channel where you ran the command. Your command message stays visible there; use slash commands for private input. Enable DMs to receive private results.',
     '## Chat and search\nAsk naturally with /ask, a mention, a reply, or a DM. I can search the web and X, work through calculations with sandboxed Python, read images, and help with PDFs, text, or code. The /ask options let you adjust reasoning, filter websites or X handles and dates, and turn on visual search.',
     '## Images and videos\nTell me what you want to make and any size, quality, count, or length you have in mind. If you leave those out, I use one medium-quality 1K image or a six-second 720p video. You can send up to five reference images, animate an image, or send/reply to an MP4 to edit or extend it. You’ll review the final prompt and settings before a paid request starts.\n\nEach person gets 2 images and 1 video a day across servers and DMs. Each server gets 5 images and 3 videos a day. Limits reset at midnight Budapest time; the bot owner is exempt. /jobs shows your recent results here and checks saved video jobs after a restart. Download anything you want to keep before the links expire.',
     '## Voice\n/transcribe turns a recording into text. /speak reads text aloud, and /ask spoken:true adds an MP3 of my answer. /voice join starts a conversation for up to ten minutes. I listen only to the person who started it, but everyone in the channel can hear my replies. Use /voice leave to stop, and stop music before starting a voice conversation.',
