@@ -451,24 +451,24 @@ export class VoiceManager {
     let session = this.sessions.get(message.guildId);
     if (action === 'status') return reply(session
       ? `A voice session is ${session.realtime?.ready ? 'connected' : 'connecting'}. Only its creator’s audio is sent to xAI. Sessions end after ten minutes or two minutes without speech.`
-      : 'No voice conversation is running. Use /voice join from a voice channel.');
+      : 'We’re not in a voice chat right now. Use /voice join from a voice channel.');
     const member = await message.guild.members.fetch(message.author.id);
     if (this.closed) return reply('I’m restarting. Please try again shortly.');
     // Fetching membership yields; another user may have reserved this guild.
     session = this.sessions.get(message.guildId);
     const channel = member.voice.channel;
     if (session && (session.ownerId !== message.author.id || channel?.id !== session.channelId)) {
-      return reply('Only the session creator can control it from the same voice channel.');
+      return reply('The person who started this voice chat needs to be in the same voice channel to control it.');
     }
     if (action === 'leave') {
-      if (!session) return reply('No voice conversation is running.');
-      this.dispose(session); return reply('Ended the voice conversation and left the channel.');
+      if (!session) return reply('We’re not in a voice chat right now.');
+      this.dispose(session); return reply('Voice chat’s over — I’ve left the channel.');
     }
     if (action !== 'join') return reply('Use /voice join, /voice leave, or /voice status.');
     if (session) return reply('Your voice conversation is already running. Use /voice leave to end it.');
     if (!channel || channel.type !== ChannelType.GuildVoice) return reply('Join a regular voice channel first.');
     if (this.isMusicBusy(message.guildId)) return reply('Stop the music with `.music stop` before starting a voice conversation.');
-    if (this.sessions.size >= this.maxSessions) return reply('All voice sessions are busy. Please try again shortly.');
+    if (this.sessions.size >= this.maxSessions) return reply('I’m in a few voice chats already. Try me again in a moment.');
     const permissions = channel.permissionsFor(message.guild.members.me);
     if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) {
       return reply('I need View Channel, Connect, and Speak permissions in that voice channel.');
@@ -479,7 +479,7 @@ export class VoiceManager {
     // Reserve synchronously so concurrent joins cannot replace the connection.
     this.sessions.set(message.guildId, session);
     try {
-      await reply('Connecting for a voice conversation. Only your microphone audio is sent to xAI; other participants are not recorded. Use /voice leave to end it. Replies can be heard by everyone in this voice channel.');
+      await reply('I’m joining you now. I’ll send only your microphone audio to xAI, so I won’t record anyone else. Everyone in the channel can hear my replies. Use /voice leave when you’re done.');
       const options = await this.sessionOptions({ userId: session.ownerId, guildId: session.guildId });
       if (this.instructionsFor) options.instructions = await this.instructionsFor(session.ownerId);
       if (this.sessions.get(session.guildId) !== session) return;

@@ -85,7 +85,7 @@ test('provider failures never echo raw content and partial deletion stays accura
   library.clear = async () => ({ deleted: 1, failed: 2 });
   const partial = event('clear');
   await handleKnowledgeCommand(partial, library);
-  assert.match(text(partial), /Deleted 1 documents\. 2 could not be deleted and remain listed/);
+  assert.match(text(partial), /Removed 1 document\. I couldn’t remove 2; they’re still in your list/);
 });
 
 test('invalid IDs and absent attachments are rejected without library changes', async () => {

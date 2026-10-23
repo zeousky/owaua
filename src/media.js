@@ -38,7 +38,7 @@ export class MediaGenerator {
     Object.assign(this, { apiKey, timeoutMs, fetchImpl, pollIntervalMs, sleep, authorize });
   }
   async generate(kind, prompt, { images = [], videos = [], options = {}, signal: callerSignal,
-    authorize = this.authorize } = {}) {
+    authorize = this.authorize, onSubmitting, onSubmitted, onCompleted } = {}) {
     if (!['image', 'video', 'edit_image', 'edit_video', 'extend_video'].includes(kind) || typeof prompt !== 'string' ||
       !prompt.trim() || prompt.length > 6000) throw new Error('Invalid generation request');
     assertSafeText(prompt, { instructions: true, secrets: [this.apiKey] });
@@ -113,8 +113,7 @@ export class MediaGenerator {
           : { aspect_ratio: ratio, ...(references.length ? { reference_images: references.map(url => ({ url })) } : {}) }),
       };
     }
-    // Explicit media requests submit directly. An optional host policy can
-    // still inspect a copy of the validated payload without mutating it.
+    // The host authorizes the final validated payload before reserving budget.
     callerSignal?.throwIfAborted();
     if (authorize !== undefined && (typeof authorize !== 'function' ||
       await authorize({ kind, path, body: structuredClone(body) }) !== true)) {
@@ -123,41 +122,53 @@ export class MediaGenerator {
     callerSignal?.throwIfAborted();
     const deadline = AbortSignal.timeout(this.timeoutMs);
     const signal = callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline;
-    const request = async (path, body) => {
-      signal.throwIfAborted();
-      const response = await this.fetchImpl(`https://api.x.ai/v1/${path}`, {
-        method: body ? 'POST' : 'GET', signal,
-        headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-      if (!response.ok) throw new ProviderError(response.status, 'media_provider_error');
-      const result = await response.json();
-      if (result.error) throw new ProviderError(502, 'media_generation_failed');
-      return result;
-    };
+    const request = (path, body) => this.request(path, body, signal);
+    onSubmitting?.();
     if (kind === 'image' || kind === 'edit_image') {
       const result = await request(path, body);
       if (!Array.isArray(result.data) || !result.data.length || result.data.length > body.n ||
         result.data.some(image => !image.url || image.respect_moderation === false)) throw new ProviderError(502, 'image_unavailable');
       const urls = result.data.map(image => mediaUrl(image.url));
-      return { kind: 'image', url: urls[0], urls, model: result.model ?? body.model, usage: result.usage };
+      const media = { kind: 'image', url: urls[0], urls, model: result.model ?? body.model, usage: result.usage };
+      onCompleted?.(media);
+      return media;
     }
     const job = await request(path, body);
     if (typeof job.request_id !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(job.request_id)) {
       throw new ProviderError(502, 'invalid_video_job');
     }
+    // Persist the ID synchronously before the first GET or any other await.
+    onSubmitted?.(job.request_id);
     for (;;) {
-      const result = await request(`videos/${job.request_id}`);
-      if (result.status === 'done') {
-        if (!result.video?.url || result.video.respect_moderation === false) {
-          throw new ProviderError(502, 'video_unavailable');
-        }
-        return { kind: 'video', url: mediaUrl(result.video.url), model: result.model ?? body.model,
-          usage: result.usage, requestId: job.request_id };
-      }
-      if (result.status !== 'pending') throw new ProviderError(502, 'video_generation_failed');
+      const result = await this.checkVideo(job.request_id, { model: body.model, signal, timeoutMs: null });
+      if (result) { onCompleted?.(result); return result; }
       await this.sleep(this.pollIntervalMs, undefined, { signal });
     }
+  }
+  async request(path, body, signal) {
+    signal?.throwIfAborted();
+    const response = await this.fetchImpl(`https://api.x.ai/v1/${path}`, {
+      method: body ? 'POST' : 'GET', signal,
+      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!response.ok) throw new ProviderError(response.status, 'media_provider_error');
+    const result = await response.json();
+    if (result.error) throw new ProviderError(502, 'media_generation_failed');
+    return result;
+  }
+  async checkVideo(requestId, { model, signal: callerSignal, timeoutMs = 15000 } = {}) {
+    if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(requestId)) throw new Error('Invalid video job');
+    const timeout = timeoutMs === null ? null : AbortSignal.timeout(timeoutMs);
+    const signal = timeout ? (callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout) : callerSignal;
+    const result = await this.request(`videos/${requestId}`, undefined, signal);
+    if (result.status === 'done') {
+      if (!result.video?.url || result.video.respect_moderation === false) throw new ProviderError(502, 'video_unavailable');
+      return { kind: 'video', url: mediaUrl(result.video.url), model: result.model ?? model,
+        usage: result.usage, requestId };
+    }
+    if (result.status !== 'pending') throw new ProviderError(502, 'video_generation_failed');
+    return null;
   }
 }
 

@@ -16,7 +16,7 @@ export function resultReply(result, { notices = [], speech } = {}) {
   else if (result.outputFormat === 'json') {
     // Notices are separate text. The attached JSON remains parseable and keeps
     // its exact schema even when memory, speech or file delivery has a warning.
-    payload = { ...card('', 'JSON response attached.'), files: [
+    payload = { ...card('', 'Here’s your answer as a JSON file.'), files: [
       { attachment: Buffer.from(result.text), name: 'kirmy-answer.json' },
     ] };
   } else payload = answerCard(result.text);

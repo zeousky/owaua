@@ -1,3 +1,4 @@
+import '../src/runtime.js';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createReadStream, chmodSync, closeSync, fsyncSync, linkSync, lstatSync,

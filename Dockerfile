@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim
+FROM node:24.22.1-bookworm-slim
 # yt-dlp fetches SoundCloud audio; FFmpeg encodes it to Opus.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core python3 python3-venv ca-certificates \
     && python3 -m venv /opt/music \

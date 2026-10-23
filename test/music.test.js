@@ -111,7 +111,7 @@ test('voice join or shutdown during delayed metadata cannot be hijacked by music
     finish({}); await pending;
     assert.equal(f.manager.sessions.size, 0);
     assert.equal(f.player.resource, undefined);
-    assert.match(f.sent.at(-1), shutdown ? /restarting/ : /voice conversation/);
+    assert.match(f.sent.at(-1), shutdown ? /restarting/ : /voice chat/);
   }
 });
 test('empty queue disconnects after idle timeout', async () => {

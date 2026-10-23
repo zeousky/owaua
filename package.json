@@ -5,12 +5,12 @@
   "type": "module",
   "description": "Kirmy's Discord AI core powered by the official xAI API",
   "engines": {
-    "node": ">=24"
+    "node": "^24.22.1 || ^26.12.1"
   },
   "scripts": {
     "start": "node src/bot.js",
-    "test": "node --test",
-    "check": "for file in src/*.js scripts/*.js; do node --check \"$file\" || exit; done",
+    "test": "node src/runtime.js && node --test",
+    "check": "node src/runtime.js && for file in src/*.js scripts/*.js; do node --check \"$file\" || exit; done",
     "memory:backup": "node scripts/backup-memory.js backup",
     "memory:verify": "node scripts/backup-memory.js verify"
   },

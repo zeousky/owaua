@@ -86,7 +86,7 @@ test('save and correction use authenticated scope and explicit command provenanc
   }]);
   assert.equal(store.entries.get(scopeA).length, 1);
   assert.equal(store.entries.get(scopeA)[0].text, 'Back on Railway.');
-  assert.match(replyText(second), /Saved memory #1/);
+  assert.match(replyText(second), /saved as memory #1/);
   for (const event of [first, second]) {
     assert.equal(event.replies[0].flags, 64);
     assert.deepEqual(event.replies[0].allowedMentions.parse, []);
@@ -181,7 +181,7 @@ test('empty memory and interactions without an integer accessor default to page 
   const store = memoryStore();
   const event = interaction('view', { page: 1 });
   await handleMemoryCommand(event, store);
-  assert.match(replyText(event), /No saved facts/);
+  assert.match(replyText(event), /haven’t saved any notes/);
   assert.match(replyText(event), /Page 1 of 1\. Showing 0 of 0 saved facts\./);
   const legacy = interaction('view');
   delete legacy.options.getInteger;
@@ -197,11 +197,11 @@ test('forget cannot delete another scope and clear leaves the pause setting inta
   store.entries.set(scopeB, [{ id: 2, key: 'hosting', text: 'Railway', updated_at: Date.now() }]);
   const missing = interaction('forget', { id: 2, user: bob });
   await handleMemoryCommand(missing, store);
-  assert.match(replyText(missing), /not found/);
+  assert.match(replyText(missing), /couldn’t find a saved note/);
   assert.equal(store.entries.get(scopeB).length, 1);
   const forget = interaction('forget', { id: 1 });
   await handleMemoryCommand(forget, store);
-  assert.match(replyText(forget), /Earlier conversations may still mention it/);
+  assert.match(replyText(forget), /might still come up in our old conversations/);
   store.counts.set(scopeA, 50); store.paused.add(scopeA);
   const clear = interaction('clear');
   await handleMemoryCommand(clear, store);
@@ -209,8 +209,8 @@ test('forget cannot delete another scope and clear leaves the pause setting inta
   assert.equal(store.counts.has(scopeA), false);
   assert.equal(store.paused.has(scopeA), true);
   assert.equal(store.entries.get(scopeB).length, 1);
-  assert.match(replyText(clear), /recent history, archived exchanges, and saved facts/);
-  assert.match(replyText(clear), /persona and memory on\/off setting are unchanged/);
+  assert.match(replyText(clear), /cleared your history and saved notes/);
+  assert.match(replyText(clear), /persona and memory on\/off setting stay as they were/);
 });
 
 test('pause, refused save while paused, and resume require no provider', async () => {
@@ -236,13 +236,13 @@ test('active requests block mutations, view remains available, and shutdown bloc
   for (const action of ['remember', 'forget', 'clear', 'pause', 'resume']) {
     const event = interaction(action, { key: 'hosting', text: 'Mac', id: 1 });
     await handleMemoryCommand(event, store, { isActive: scope => scope === scopeA });
-    assert.match(replyText(event), /wait for your current request/);
+    assert.match(replyText(event), /finish your current request/);
     assert.equal(event.replies[0].flags, 64);
   }
   assert.deepEqual(store.calls, []);
   const view = interaction('view');
   await handleMemoryCommand(view, store, { isActive: () => true });
-  assert.match(replyText(view), /No saved facts/);
+  assert.match(replyText(view), /haven’t saved any notes/);
   store.calls.length = 0;
   for (const action of ['view', 'remember', 'forget', 'clear', 'pause', 'resume']) {
     const event = interaction(action);

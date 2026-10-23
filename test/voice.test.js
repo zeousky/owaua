@@ -101,7 +101,7 @@ test('invalid speech options fail before synthesis and provider bodies stay priv
   }
   assert.equal(calls, 0);
   await assert.rejects(voice.speak('Hello'), error => error.status === 401 && !error.message.includes('secret'));
-  assert.equal(voiceErrorMessage(new ProviderError(429, 'failed')), 'xAI is rate limiting voice requests. Please try again shortly.');
+  assert.equal(voiceErrorMessage(new ProviderError(429, 'failed')), 'xAI is getting too many voice requests right now. Try again in a moment.');
 });
 test('PCM mono-to-stereo preserves samples split across odd chunk boundaries', async () => {
   const stream = new MonoToStereo(), buffers = [];
@@ -252,7 +252,7 @@ test('voice sessions exclusively receive consenting creator and commit completed
   assert.equal(f.realtime.interrupted, true);
   f.subscriptions[0].stream.end(Buffer.alloc(9600)); await tick();
   assert.equal(f.realtime.appended.length, 1); assert.equal(f.realtime.commits, 1);
-  assert.ok(f.sent.some(text => /other participants are not recorded/.test(text)));
+  assert.ok(f.sent.some(text => /won’t record anyone else/.test(text)));
   f.manager.close(); assert.equal(f.realtime.closed, true); assert.equal(f.connection.state.status, VoiceConnectionStatus.Destroyed);
 });
 test('only session owner in the original channel can end voice', async () => {

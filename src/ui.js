@@ -8,7 +8,7 @@ export function card(_title, description, { fields = [] } = {}) {
   const content = [description, ...fields.map(field => `${field.name}\n${field.value}`)]
     .filter(Boolean).join('\n\n');
   if (content.length <= 2000) return { content, embeds: [], allowedMentions: mentions };
-  return { content: 'The full response is attached.', embeds: [], allowedMentions: mentions,
+  return { content: 'That’s a bit long for one message, so I’ve attached the full reply below.', embeds: [], allowedMentions: mentions,
     files: [new AttachmentBuilder(Buffer.from(content), { name: 'kirmy-answer.md' })] };
 }
 
@@ -17,17 +17,27 @@ export function answerCard(text) {
 }
 
 export function helpCard(musicHelp) {
-  return card('A little of everything.', 'Ask a question. Create something. Put a song on.', {
-    section: 'Kirmy / Guide', fields: [
-      { name: 'Conversation', value: 'Use `/ask`, mention me, reply to me, or send a DM. I can search the web and X, calculate with sandboxed Python, understand images, and analyze attached PDF/text/code documents. `/ask` also has reasoning, web domain, X handle/date, and visual search options.' },
-      { name: 'Create & edit', value: 'Ask for images or videos and specify count, shape, resolution, or duration. Defaults are one medium-quality 1K image or six seconds of 720p video. Use up to five reference images, animate an image, or attach/reply to an MP4 to edit or extend it. Larger outputs can cost more. Save generated media before its link expires.' },
-      { name: 'Voice', value: '`/transcribe` converts a recording to text. `/speak` creates spoken audio. `/ask spoken:true` adds an MP3 reply. `/voice join` starts a ten-minute voice conversation using only your microphone; replies are audible to the channel. `/voice leave` ends it. Stop music before joining voice.' },
-      { name: 'Documents & exports', value: '`/knowledge add` saves a document at xAI until you forget or clear it. `/knowledge list` shows your private library here; `/ask library:true` includes it in a question. Ask for downloadable data or charts; `/ask output:json` returns validated JSON. `/integrations` lists read-only MCP choices for `/ask integrations:...`.' },
-      { name: 'Music', value: musicHelp },
-      { name: 'Your persona', value: '`/persona set description:...` sets your default persona (up to 120 characters). I use it automatically only for you, across servers and DMs. `/persona view` shows it privately; `/persona reset` restores Kirmy’s usual persona. Safety rules still apply.' },
-      { name: 'Your memory', value: 'I keep recent context, search older conversations, and save important facts you tell me. Memory stays scoped to your user and channel. `/memory view` shows saved notes privately; `/memory remember` saves or corrects a note; `/memory forget` deletes one. `/memory pause` stops reading and saving context until `/memory resume`. `/reset`, `!reset`, or `/memory clear` erases your history, archive, and notes here. Conversations default to 180 days / 1,000 exchanges; notes stay until deleted. Prompts, recalled context, and attachments are sent to xAI.' },
-    ], footer: 'Kirmy · Conversation / Creativity / Music',
-  });
+  const quickStart = [
+    'Hey, I’m Kirmy. Here’s how to get started.',
+    '**Chat with me**\nUse `/ask`, @ me, reply to me, or send a DM. Send a question, image, PDF, or code file. I can look things up on the web and X too.',
+    '**Make something**\nAsk for an image or video, or send one and tell me what to change. I’ll show you the prompt and settings to confirm before generating. Check `/jobs` for recent results.',
+    '**Talk or play music**\n`/voice join` lets us talk; `/voice leave` ends it. `/speak` reads text aloud, and `/transcribe` turns a recording into text. For music, join a voice channel and try `.music <song name>`. Use `.music help` for controls.',
+    '**Make it yours**\n`.language Hungarian` sets your reply language; `.language auto` lets me match your message. `/persona set description:...` changes how I talk to you. Both follow you across servers and DMs.',
+    '**Memory and files**\n`/memory view` shows what I’ve saved here. `/memory pause` pauses memory; `/reset` clears your history and notes here. `/knowledge add` saves a document for later; `/ask library:true` uses it.',
+    'Daily limits: 2 images and 1 video per person; 5 images and 3 videos per server. They reset at midnight Budapest time. The bot owner is exempt.',
+    'Messages, recalled context, and attachments go to xAI. The attached guide has more settings and privacy details.',
+  ].join('\n\n');
+  const guide = [
+    '# A little more about Kirmy',
+    '## Chat and search\nAsk naturally with /ask, a mention, a reply, or a DM. I can search the web and X, work through calculations with sandboxed Python, read images, and help with PDFs, text, or code. The /ask options let you adjust reasoning, filter websites or X handles and dates, and turn on visual search.',
+    '## Images and videos\nTell me what you want to make and any size, quality, count, or length you have in mind. If you leave those out, I use one medium-quality 1K image or a six-second 720p video. You can send up to five reference images, animate an image, or send/reply to an MP4 to edit or extend it. You’ll review the final prompt and settings before a paid request starts.\n\nEach person gets 2 images and 1 video a day across servers and DMs. Each server gets 5 images and 3 videos a day. Limits reset at midnight Budapest time; the bot owner is exempt. /jobs shows your recent results here and checks saved video jobs after a restart. Download anything you want to keep before the links expire.',
+    '## Voice\n/transcribe turns a recording into text. /speak reads text aloud, and /ask spoken:true adds an MP3 of my answer. /voice join starts a conversation for up to ten minutes. I listen only to the person who started it, but everyone in the channel can hear my replies. Use /voice leave to stop, and stop music before starting a voice conversation.',
+    `## Music\n${musicHelp}`,
+    '## Your language and style\nTry .language Hungarian or /language name:Hungarian. Use .language list to see supported languages, or .language auto to have me match your message again. Your choice follows you across servers and DMs, including new voice sessions. Some languages work better than others.\n\n/persona set description:... lets you describe how you’d like me to talk in up to 120 characters. It applies only to you, across servers and DMs. /persona view shows your choice privately; /persona reset brings back my usual style. Language and style choices still follow the same safety rules.',
+    '## Saved documents and downloads\n/knowledge add saves a document at xAI for later questions. /knowledge list shows your private library here; /ask library:true lets me use it. Files stay at xAI until you remove them with /knowledge forget or /knowledge clear. Library commands are private, but /ask answers in a server are visible in the channel.\n\nYou can also ask for downloadable data or charts. /ask output:json gives you a JSON file and can check it against a schema. /integrations lists the read-only connections you can choose with /ask integrations:... .',
+    '## What I remember\nI use recent context, look back through older conversations, and save useful facts you tell me. Your memories stay separate from other people’s and other channels. /memory view shows your notes privately; /memory remember saves or updates one; /memory forget removes one.\n\n/memory pause stops me reading and saving context here until /memory resume. /reset, !reset, or /memory clear erases your history, archive, and notes here. By default, conversation history is kept for up to 180 days and 1,000 exchanges; saved notes stay until you delete them. Your messages, recalled context, and attachments are sent to xAI so I can answer.',
+  ].join('\n\n');
+  return { ...card('', quickStart), files: [new AttachmentBuilder(Buffer.from(guide), { name: 'kirmy-guide.md' })] };
 }
 
 export function loadingCard(frame = 0, activity = 'thinking') {

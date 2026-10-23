@@ -39,7 +39,7 @@ function describeMemory(status, notes, page) {
   const parts = [
     `Memory for you in this channel: ${status.paused ? 'paused' : 'on'}.`,
     `Saved facts: ${status.notes}. Archived exchanges: ${status.turns}.`,
-    'Only your memories from this server and channel are used here. Your persona is managed separately.',
+    'I only use your memories from this server and channel here. Your persona has its own settings.',
   ];
   let shown = 0;
   for (const note of notes.slice(start, start + MAX_VISIBLE_NOTES)) {
@@ -56,11 +56,11 @@ function describeMemory(status, notes, page) {
     parts.push(entry);
     shown++;
   }
-  if (!status.notes) parts.push('No saved facts yet. Use /memory remember to save a fact or preference.');
+  if (!status.notes) parts.push('I haven’t saved any notes here yet. Tell me what to keep with /memory remember.');
   const range = shown ? ` (facts ${start + 1}–${start + shown})` : '';
   parts.push(`Page ${page} of ${pages}. Showing ${shown} of ${status.notes} saved facts${range}.`);
   if (pages > 1) parts.push(`Use /memory view page:1 through page:${pages} to browse your saved facts.`);
-  parts.push('Use the same key to replace a saved fact. /memory clear erases your history and saved facts here.');
+  parts.push('Save a note with the same key to update it. /memory clear erases your history and saved notes here.');
   return parts.join('\n\n');
 }
 
@@ -83,7 +83,7 @@ export async function handleMemoryCommand(interaction, store, { isActive = () =>
   if (!['remember', 'forget', 'clear', 'pause', 'resume'].includes(action)) {
     return reply('Use /memory view, remember, forget, clear, pause, or resume.');
   }
-  if (isActive(scope)) return reply('Please wait for your current request in this channel to finish before changing memory.');
+  if (isActive(scope)) return reply('Let me finish your current request here before you change my memory.');
   if (action === 'remember') {
     const key = interaction.options.getString('key', true);
     const text = interaction.options.getString('text', true);
@@ -99,22 +99,22 @@ export async function handleMemoryCommand(interaction, store, { isActive = () =>
       // Do not reflect rejected input, which may contain the secret that was refused.
       return reply('I couldn’t save that memory. Use a short fact without secrets and a key containing letters, numbers, spaces, dots, underscores, or hyphens.');
     }
-    return reply(`Saved memory #${note.id} for you in this channel. Using the same key updates that fact. Use /memory view to review it.`);
+    return reply(`Got it — saved as memory #${note.id} in this channel. Use the same key to update it, or /memory view to take a look.`);
   }
   if (action === 'forget') {
     const id = interaction.options.getInteger('id', true);
     if (!Number.isSafeInteger(id) || id < 1) return reply('Choose a valid positive memory ID from /memory view. Your memory was not changed.');
     return reply(store.forgetMemory(scope, id)
-      ? `Memory #${id} has been deleted from your saved facts in this channel. Earlier conversations may still mention it; use /memory clear to erase those too.`
-      : 'That saved fact was not found in your memory here. Use /memory view to check its ID.');
+      ? `I’ve deleted memory #${id} here. It might still come up in our old conversations; /memory clear removes those too.`
+      : 'I couldn’t find a saved note with that ID here. Check /memory view for the right number.');
   }
   if (action === 'clear') {
     store.clearMemory(scope);
-    return reply('Your recent history, archived exchanges, and saved facts in this channel have been cleared. Your persona and memory on/off setting are unchanged.');
+    return reply('Fresh start — I’ve cleared your history and saved notes in this channel. Your persona and memory on/off setting stay as they were.');
   }
   const paused = action === 'pause';
   store.pauseMemory(scope, paused);
   return reply(paused
-    ? 'Memory is paused for you in this channel. Existing saved data is kept. Use /memory resume to turn it back on.'
-    : 'Memory is back on for you in this channel. Your existing saved data is available again.');
+    ? 'Memory is paused here. I’ll keep your saved notes, but won’t read or add to your context until you use /memory resume.'
+    : 'Memory’s back on here. I can use your saved notes and context again.');
 }

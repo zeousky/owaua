@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_PERSONA, validatePersona } from './persona.js';
+import { validateLanguage } from './language.js';
 import { boundedHistory, memoryKey, memoryText, searchTerms } from './memory.js';
 
 function personaUserId(userId) {
@@ -26,6 +27,9 @@ export class ConversationStore {
       CREATE INDEX IF NOT EXISTS turns_scope ON turns(scope, id);
       CREATE TABLE IF NOT EXISTS personas (
         user_id TEXT PRIMARY KEY, settings TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS languages (
+        user_id TEXT PRIMARY KEY, code TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS memories (
         id INTEGER PRIMARY KEY, scope TEXT NOT NULL, user_id TEXT NOT NULL,
@@ -170,6 +174,17 @@ export class ConversationStore {
       if (notes.length >= 8) break;
     }
     return { scope: 'this user in this channel only', notes: notes.slice(0, 8).map(({ id,key,text,updated_at }) => ({ id,key,text,updated_at: new Date(updated_at).toISOString() })), conversations: recalled.conversations };
+  }
+  language(userId) {
+    const row = this.db.prepare('SELECT code FROM languages WHERE user_id = ?').get(personaUserId(userId));
+    try { return validateLanguage(row?.code ?? 'auto'); } catch { return 'auto'; }
+  }
+  setLanguage(userId, code) {
+    personaUserId(userId);
+    validateLanguage(code);
+    if (code === 'auto') this.db.prepare('DELETE FROM languages WHERE user_id = ?').run(userId);
+    else this.db.prepare('INSERT INTO languages(user_id, code) VALUES(?, ?) ON CONFLICT(user_id) DO UPDATE SET code = excluded.code').run(userId, code);
+    return code;
   }
   persona(userId) {
     const row = this.db.prepare('SELECT settings FROM personas WHERE user_id = ?').get(personaUserId(userId));

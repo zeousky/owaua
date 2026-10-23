@@ -5,7 +5,7 @@ import { MediaGenerator } from '../src/media.js';
 
 const response = body => ({ ok: true, json: async () => body });
 
-test('explicit media requests dispatch and deliver without a confirmation callback or second AI turn', async () => {
+test('media tool proposals reach the host without a second AI turn', async () => {
   for (const kind of ['image', 'edit_image', 'video', 'edit_video', 'extend_video']) {
     let aiCalls = 0;
     const submissions = [];
@@ -21,9 +21,7 @@ test('explicit media requests dispatch and deliver without a confirmation callba
     const ai = new AICore({ fetchImpl: async (_, request) => {
       aiCalls++;
       const body = JSON.parse(request.body);
-      assert.match(body.instructions, /call the appropriate tool immediately/);
-      assert.match(body.instructions, /Do not show a proposed prompt or settings for approval/);
-      assert.match(body.instructions, /even if older conversation history mentions a confirmation step/);
+      assert.match(body.instructions, /requires the requester to review and confirm/);
       return response({ output: [{ type: 'function_call',
         name: ['image', 'video'].includes(kind) ? `generate_${kind}` : kind,
         call_id: 'create', arguments: JSON.stringify({ prompt: 'A cat under blue light' }) }] });

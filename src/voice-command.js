@@ -35,9 +35,9 @@ export const voiceCommand = {
 export function voiceErrorMessage(error) {
   if (error instanceof SafetyError) return error.message;
   if (error instanceof VoiceInputError) return error.message;
-  if (error instanceof ProviderError && error.status === 429) return 'xAI is rate limiting voice requests. Please try again shortly.';
-  if (['AbortError', 'TimeoutError'].includes(error?.name)) return 'The voice request timed out or was stopped. Please try again shortly.';
-  return 'I couldn’t finish that voice request. Please try again shortly.';
+  if (error instanceof ProviderError && error.status === 429) return 'xAI is getting too many voice requests right now. Try again in a moment.';
+  if (['AbortError', 'TimeoutError'].includes(error?.name)) return 'That voice request stopped before it finished. Try again in a moment.';
+  return 'I couldn’t finish that voice request. Give it another try in a moment.';
 }
 export async function handleSpeakCommand(interaction, voice, { signal, onUsage = () => {} } = {}) {
   await interaction.deferReply();
@@ -50,7 +50,7 @@ export async function handleSpeakCommand(interaction, voice, { signal, onUsage =
     });
     const files = [{ attachment: result.attachment, name: result.name }];
     if (result.timing) files.push({ attachment: Buffer.from(JSON.stringify(result.timing, null, 2)), name: 'speech-timestamps.json' });
-    await interaction.editReply({ ...card('Generated speech', `AI-generated audio using xAI voice ${result.voice}.`), files });
+    await interaction.editReply({ ...card('Generated speech', `Here’s your audio, made with the xAI voice ${result.voice}.`), files });
     onUsage({ model: result.model, voice: result.voice, characters: result.characters });
   } catch (error) { await interaction.editReply(card('Voice request failed', voiceErrorMessage(error), { tone: 'error' })); }
 }
@@ -76,7 +76,7 @@ export async function handleVoiceCommand(interaction, manager, voice, { signal }
   try {
     if (action === 'voices') {
       const voices = await voice.voices({ signal });
-      return interaction.editReply(card('xAI voices', voices.map(v => `\`${v.id}\` — ${v.name}`).join('\n').slice(0, 3900) || 'No built-in voices were returned.'));
+      return interaction.editReply(card('xAI voices', voices.map(v => `\`${v.id}\` — ${v.name}`).join('\n').slice(0, 3900) || 'I couldn’t find any built-in voices just now. Try again in a moment.'));
     }
     return await manager.handle({ guild: interaction.guild, guildId: interaction.guildId, author: interaction.user,
       channel: interaction.channel, reply: payload => interaction.editReply(payload) },

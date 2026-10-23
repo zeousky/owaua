@@ -15,7 +15,7 @@ const exec = promisify(execFile);
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
 const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
   '--socket-timeout', '15', '--retries', '2'];
-export const musicHelp = 'Join a voice channel, then use `.music <song name or SoundCloud track link>` (for example `.music go away`). More songs go into the queue.\nControls: `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop`.';
+export const musicHelp = 'Hop into a voice channel and try `.music <song name>` or send a SoundCloud track link after `.music`. Request more songs to queue them up.\nSee what’s next with `.music queue`. You can also `.music skip`, `.music pause`, `.music resume`, or `.music stop`.';
 export function parseMusicCommand(content) {
   const match = /^\.music(?:\s+([\s\S]*))?$/i.exec(content.trim());
   if (!match) return null;
@@ -186,7 +186,7 @@ export class MusicManager {
         session.current ? `Now playing: **${session.current.title}**` : 'Nothing playing yet.',
         ...session.queue.map((track, i) => `${i + 1}. ${track.title}`),
       ].join('\n').slice(0, 1900));
-      if (['stop', 'leave'].includes(command.action)) { this.dispose(session); return reply('Stopped music and left the voice channel.'); }
+      if (['stop', 'leave'].includes(command.action)) { this.dispose(session); return reply('Music’s off — I’ve left the voice channel.'); }
       if (command.action === 'pause') {
         const paused = session.player.pause();
         return reply(paused ? 'Paused.' : 'Nothing is playing to pause.');
@@ -214,7 +214,7 @@ export class MusicManager {
     // Metadata fetches above can yield to a voice join or another music search.
     // Recheck immediately before reserving/joining, with no intervening await.
     if (this.closed) return reply('I’m restarting. Please try again shortly.');
-    if (this.isVoiceBusy(message.guildId)) return reply('End the voice conversation with /voice leave before using music.');
+    if (this.isVoiceBusy(message.guildId)) return reply('Use /voice leave to end our voice chat, then we can put some music on.');
     session = this.sessions.get(message.guildId);
     if (session && session.channelId !== channel.id) return reply('I’m playing in another voice channel. Join that channel to control the music.');
     if (session?.pending) return reply('I’m still finding the last song. Try again in a moment.');
@@ -249,7 +249,7 @@ export class MusicManager {
         this.wait(session.connection, VoiceConnectionStatus.Ready, 20000),
       ]);
       if (this.sessions.get(message.guildId) !== session) {
-        await progress.finish(card('Search cancelled', 'Playback was stopped.', { tone: 'music' })); return;
+        await progress.finish(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
       }
       // The requester must still be in the same channel after the asynchronous search.
       if (member.voice.channelId !== session.channelId) throw new Error('Stay in the voice channel while I find the song.');
@@ -261,7 +261,7 @@ export class MusicManager {
       if (!session.current) this.next(session);
     } catch (error) {
       if (this.sessions.get(message.guildId) !== session) {
-        await progress?.finish(card('Search cancelled', 'Playback was stopped.', { tone: 'music' })); return;
+        await progress?.finish(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
       }
       console.error(JSON.stringify({ event: 'music_error', type: error.name, code: error.code ?? null }));
       const safe = ['Choose a recorded song shorter than one hour.', 'No playable song found. Try adding the artist name.',

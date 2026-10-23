@@ -64,6 +64,22 @@ test('long answers preserve all text and sources in an attachment', () => {
   assert.equal(payload.files[0].name, 'kirmy-answer.md');
 });
 
+test('help keeps the quick start in chat and preserves advanced settings and privacy in its guide', () => {
+  const payload = helpCard(musicHelp);
+  assert.ok(payload.content.length <= 2000);
+  for (const command of ['/ask', '/jobs', '/voice', '.music', '.language', '/persona', '/memory', '/knowledge', '/reset']) {
+    assert.ok(payload.content.includes(command), `Quick start should explain ${command}`);
+  }
+  assert.equal(payload.files.length, 1);
+  assert.equal(payload.files[0].name, 'kirmy-guide.md');
+  const guide = payload.files[0].attachment.toString();
+  for (const detail of ['180 days', '1,000 exchanges', 'xAI', '/integrations', 'output:json', '/knowledge forget', '/memory forget']) {
+    assert.ok(guide.includes(detail), `Detailed guide should retain ${detail}`);
+  }
+  assert.ok(guide.includes(musicHelp));
+  assert.deepEqual(payload.allowedMentions.parse, []);
+});
+
 test('search stages change only the bar and stop changing after the plain final reply', async t => {
   t.mock.timers.enable({ apis: ['setInterval'] });
   const edits = [];

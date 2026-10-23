@@ -36,7 +36,7 @@ Attach up to four PDF or UTF-8 text/code documents (20 MiB each, 40 MiB total) t
 
 ## Reply safety
 
-Kirmy's default voice is casual and Gen Z-ish, with frequent ordinary swearing. Personal persona settings still take precedence. Ordinary profanity is allowed in text and speech; explicit sexual content, hateful slurs, targeted abuse, and private information remain restricted. The reply and privacy policy applies across personas and output formats. Deterministic text safeguards supplement the model policy: they check current requests and returned replies, common encoded or obfuscated text, local tool arguments, text exports, and chart labels. Benign decoding remains allowed. Documents, images, transcripts, retrieved pages, tool results, and saved context are treated as untrusted reference data rather than authority to change instructions or permissions. Direct media generation still follows these checks.
+Kirmy's default voice is casual and Gen Z-ish, with frequent ordinary swearing. Personal persona settings still take precedence. Ordinary profanity is allowed in text and speech; explicit sexual content, hateful slurs, targeted abuse, and private information remain restricted. The reply and privacy policy applies across personas and output formats. Deterministic text safeguards supplement the model policy: they check current requests and returned replies, common encoded or obfuscated text, local tool arguments, text exports, and chart labels. Benign decoding remains allowed. Documents, images, transcripts, retrieved pages, tool results, and saved context are treated as untrusted reference data rather than authority to change instructions or permissions. Media generation still follows these checks.
 
 These bounded checks cannot recognize every jailbreak or harmful meaning. Arbitrary binary image, PDF, and XLSX contents are not semantically verified by the application, and provider audio/transcript accuracy is not independently verified. Unsafe legacy history and notes are withheld from new requests without deleting stored data; `/memory view` hides affected note text while retaining its ID for removal.
 
@@ -94,7 +94,7 @@ Chat, media generation, and music lookup show only a moving loading bar as a pla
 
 ## Image and video generation
 
-Explicit image/video creation, edit and extension requests start immediately without a prompt preview or confirmation step. Kirmy fills in unspecified settings with the defaults and makes reasonable creative choices for missing details. Edits still need source media and a description of what to change. JSON-output requests cannot execute media tools.
+Image/video creation, edit and extension requests require a fresh confirmation button from the requester after reviewing the final prompt, references and settings. Model output, attachments and history cannot approve spending. Kirmy fills in unspecified settings with the defaults and makes reasonable creative choices for missing details. Edits still need source media and a description of what to change. JSON-output requests cannot execute media tools.
 
 Ask Kirmy in a mention, reply, DM, or `/ask`: “generate an image of a cat” or “make a video of waves at sunset.” Both use the existing `XAI_API_KEY`. Defaults remain one `grok-imagine-image-2.0` image at medium quality / 1k, or a six-second 720p `grok-imagine-video-1.5-lite` video. Explicit requests can select 1–10 image outputs, low/medium/auto quality, 1k/2k resolution, and supported aspect ratios. For example: “make three square 2k images of a lighthouse.” Auto quality is chosen by the provider and billed at the quality served.
 
@@ -104,15 +104,16 @@ Video requests can select 1–15 seconds, shape, 480p/720p/1080p, and lite/stand
 
 Attach one MP4 under 20 MB using `/ask video:...`, a message, or a reply to a generated MP4, and ask to **edit** it or **extend** it. Editing uses `/videos/edits` with `grok-imagine-video` and supports source clips up to 8.7 seconds. Extension uses `/videos/extensions`, accepts 2–15-second sources, and adds 2–10 seconds (six by default). Both inherit source shape/resolution up to 720p. Source duration is validated by xAI when Discord does not provide it. These operations do not analyze or summarize video contents. Generation-only options are rejected for editing/extension; larger outputs and the standard model can cost more.
 
-Images display in Discord as image previews without a visible source link; videos are returned as direct MP4 links. Provider links are temporary, so save results promptly. Media URLs are not saved in conversation history. Generation shares the existing per-user cooldown, per-conversation lock, and global request limit. Each request attempts at most one generation, with no automatic submission retries. Videos are polled every five seconds with a separate ten-minute deadline (`MEDIA_TIMEOUT_MS`). A timeout or restart does not cancel an already-submitted provider job; manually retrying can incur another charge.
+Images display in Discord as image previews without a visible source link; videos are returned as direct MP4 links. Provider links are temporary, so save results promptly. Media URLs are not saved in conversation history. Generation shares the existing per-user cooldown, per-conversation lock, and global request limit. Each request attempts at most one generation, with no automatic submission retries. Videos are polled every five seconds with a separate ten-minute deadline (`MEDIA_TIMEOUT_MS`). A timeout or restart does not cancel an already-submitted provider job. Provider video IDs are saved to SQLite immediately before polling and resume checking on startup and every 30 seconds. `/jobs` privately retrieves your last ten media requests and completed links in the current server or DM. Recovery never resubmits a paid request. Provider links still expire; this does not archive the video files. A lost POST response without a job ID is marked unknown and must not be blindly retried.
 
 API references: [image quality and resolution](https://docs.x.ai/developers/model-capabilities/images/generation), [video generation and polling](https://docs.x.ai/developers/model-capabilities/video/generation).
 
 ## Local setup
 
-Requires Node.js 24 or later, FFmpeg with libopus, and `yt-dlp[default]` (2026.8.19) with Python 3.10+. The Dockerfile includes the music dependencies. For local development, install FFmpeg and yt-dlp and put them on PATH (or set `FFMPEG_PATH` / `YTDLP_PATH`).
+Requires Node.js 24.22.1+ on 24.x or 26.12.1+ on 26.x, FFmpeg with libopus, and `yt-dlp[default]` (2026.8.19) with Python 3.10+. `.nvmrc` and Docker select 24.22.1, the October 21 security release. Startup rejects older or unreviewed Node release lines before loading credentials. For local development, install FFmpeg and yt-dlp and put them on PATH (or set `FFMPEG_PATH` / `YTDLP_PATH`).
 
 ```sh
+nvm install && nvm use # When using nvm; reads .nvmrc.
 npm ci
 cp .env.example .env
 # Fill in DISCORD_TOKEN and XAI_API_KEY locally.
@@ -125,9 +126,9 @@ Enable **Message Content Intent** in the Discord Developer Portal for ordinary m
 
 ## Run in the background on macOS
 
-**Current hosting (2026-10-21):** Kirmy runs on Railway's existing `kirmy` service with persistent `DATA_DIR=/app/data/kirmy`. The Mac LaunchAgent is a fallback and is not loaded. Keep `kirmy.sqlite` and `knowledge.sqlite` when moving so conversation memory, personas and document ownership follow the bot. Run only one hosted copy.
+**Current hosting (2026-10-23):** Kirmy runs on Railway's existing `kirmy` service with persistent `DATA_DIR=/app/data/kirmy`. Both databases were transferred from the Mac and verified before startup. The Mac LaunchAgent is stopped and disabled at login; it remains available as a fallback. Keep `kirmy.sqlite` and `knowledge.sqlite` when moving so conversation memory, personas and document ownership follow the bot. Run only one hosted copy.
 
-With Node 24+, FFmpeg, yt-dlp, and the local `.env` ready, run:
+With a supported patched Node version, FFmpeg, yt-dlp, and the local `.env` ready, run:
 
 ```sh
 ./scripts/mac-host.sh start
@@ -141,6 +142,12 @@ Use `./scripts/mac-host.sh restart` after source changes. `./scripts/mac-host.sh
 
 Restarts now send a graceful shutdown, cancel pending client requests, let SQLite checkpoint, wait for the old process to exit, and then wait for readiness. Cancelling a submitted media request does not cancel the provider's job. The LaunchAgent explicitly uses this checkout's `data/` directory, regardless of a different `DATA_DIR` in `.env`.
 
+## Personal reply language
+
+Use `.language Hungarian` in a server or DM; no mention is needed. `/language name:Hungarian` also works and confirms privately. The preference applies only to your AI replies across servers and DMs and to new voice sessions. Rejoin an existing voice session to apply a changed preference. Command confirmations and operational notices remain in English.
+
+Use `.language` to view your setting, `.language list` for supported names, and `.language auto` (or `.language reset`) to return to matching your message. Names are case-insensitive; common aliases such as `Magyar` are accepted. Language quality depends on the model. Programming languages, invented names, and names with added instructions are rejected using exact lookup in a fixed human-language catalogue. Saved settings are revalidated before use; language selection never changes safety rules or tool permissions.
+
 ## Memory backups and returning to Railway
 
 Create a consistent, private SQLite snapshot while the bot is running:
@@ -153,11 +160,11 @@ npm run memory:verify -- --file ./data/backups/<snapshot>.sqlite --sha256 <print
 
 The backup includes uncheckpointed WAL writes, checks SQLite integrity, uses private file permissions, and refuses to replace an existing file. Keep snapshots private; they contain conversation history and persona settings. A raw copy of only a live `kirmy.sqlite` can miss recent writes held in its WAL sidecar.
 
-When Railway is fixed, stop the Mac bot, create a final snapshot, and transfer that verified file to the stopped Railway service's persistent `DATA_DIR/kirmy.sqlite` (normally `/app/data/kirmy.sqlite`). Preserve its previous database as a private backup before replacing it, and remove obsolete WAL/SHM sidecars only while that service is stopped. Verify the transferred hash and integrity before startup. Then start only Railway, check a fresh `discord_ready`, `commands_registered`, and `/health` success, and keep the Mac snapshot for recovery. Changing `DATA_DIR` alone does not transfer memory. No Railway migration is performed automatically.
+To return from Mac fallback hosting, stop the Mac bot and create final snapshots of both `kirmy.sqlite` and `knowledge.sqlite` (pass `--source ./data/knowledge.sqlite` for the latter). Transfer those verified files to Railway's configured persistent `DATA_DIR`, currently `/app/data/kirmy`, while its bot is stopped. Preserve its previous databases and WAL/SHM sidecars as private backups before replacing them. Verify both transferred hashes and SQLite integrity, and ensure the runtime user can write the files and directory before startup. Then start only Railway, check a fresh `discord_ready`, `commands_registered`, and `/health` success, and keep the Mac snapshots for recovery. Changing `DATA_DIR` alone does not transfer memory. No Railway migration is performed automatically.
 
 ## Railway
 
-The Dockerfile installs locked production dependencies on Node 24. Set the Railway healthcheck path to `/health` with a 120-second startup timeout; it returns 200 only when the Discord gateway is ready. A running container alone does not prove a Discord login.
+The Dockerfile installs locked production dependencies on Node 24.22.1. Runtime security updates require a new image build and deployment; changing the source does not patch a running container. Set the Railway healthcheck path to `/health` with a 120-second startup timeout; it returns 200 only when the Discord gateway is ready. A running container alone does not prove a Discord login.
 
 In a Railway project with available capacity:
 
@@ -203,3 +210,9 @@ npm test
 Tests mock the provider: tool continuation, denied/invalid tools, loop bounds, sanitized provider errors, citations, persistent isolated history, typed reasoning/search options, cache identifiers, mixed attachments, bounded document uploads/cleanup, media settings, video polling, deadlines, failed/moderated output, reference selection, reference-to-video, and video edit/extension endpoints. Persona tests cover authenticated-user isolation, forged targets, private replies, persistence/reset, malformed stored data, injection rejection, concurrent requests, and prompt stability across tool rounds. They make no paid generation calls. Model catalog access and a Discord gateway login verify credentials separately; they do not establish live answer quality, successful web/code execution, or actual generated media delivery.
 
 API references: [Grok 4.7](https://docs.x.ai/developers/grok-4-7), [web search](https://docs.x.ai/developers/tools/web-search), [code execution](https://docs.x.ai/developers/tools/code-execution), [function calling](https://docs.x.ai/developers/tools/function-calling).
+
+### Daily media allowances
+
+Allowances reset at midnight Europe/Budapest. Each user has 1 video and 2 images daily across all servers and DMs; each server shares 3 videos and 5 images daily. Image batches count each requested image; editing and extension count toward their media type. Owner `1172433512364769342` is recorded as exempt and consumes neither allowance. A SQLite transaction reserves allowance after confirmation and before the provider POST, including simultaneous requests. Definite rejected POSTs release their reservation; failed or uncertain submitted generations remain counted because they may have incurred cost. Reservations and jobs survive restarts in `data/kirmy.sqlite`, which must be included in backups.
+
+Owner-only `/usage` privately reports today's reserved counts and states, with optional `user` and `server` filters. These limits control media counts, not currency spend, chat tokens, search, indexing or voice. Prices vary with model, settings and duration. No automatic paid submission retries are performed.

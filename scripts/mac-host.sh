@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
-export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+# Respect the caller's selected Node (for example, nvm use) before fallbacks.
+export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 label="org.kirmy.bot"
@@ -49,7 +50,7 @@ case "${1:-status}" in
       exit
     fi
     task_node="$(command -v node)"
-    "$task_node" -e 'if (Number(process.versions.node.split(".")[0]) < 24) process.exit(1)'
+    "$task_node" "$task_root/src/runtime.js"
     command -v ffmpeg >/dev/null
     command -v yt-dlp >/dev/null
     umask 077
@@ -91,6 +92,8 @@ PY
     echo 'Kirmy stopped and disabled at login. Use start to enable it again.'
     ;;
   restart)
+    # Reject an unsafe replacement runtime before stopping a healthy process.
+    node "$task_root/src/runtime.js"
     # bootout sends SIGTERM and allows ExitTimeOut for SQLite/request cleanup.
     # kickstart -k force-kills the process and bypasses that shutdown path.
     unload

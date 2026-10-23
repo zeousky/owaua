@@ -28,10 +28,10 @@ export async function handleKnowledgeCommand(interaction, library, { isActive = 
   if (action === 'list') {
     const documents = library.list(scope);
     const entries = documents.map(document => `#${document.id} · ${displayName(document.filename)} · ${size(document.bytes)}`);
-    return reply([`Your document library in this channel: ${documents.length} of 20 documents (${size(documents.reduce((sum, document) => sum + document.bytes, 0))} of 40 MiB).`,
-      ...entries, !documents.length ? 'Use /knowledge add with a PDF, text, or code attachment to save your first document.' : '',
-      'Use /ask library:true to search your saved documents in a question. All saved documents here are available to xAI’s document search. If configured, indexed collections provide semantic retrieval.',
-      'Documents are stored at xAI until you use /knowledge forget or clear. Library commands are private; /ask answers are visible in the channel.'].filter(Boolean).join('\n\n'));
+    return reply([`You’ve saved ${documents.length} of 20 documents here (${size(documents.reduce((sum, document) => sum + document.bytes, 0))} of 40 MiB used).`,
+      ...entries, !documents.length ? 'Want to save a document for later? Attach a PDF, text, or code file with /knowledge add.' : '',
+      'Use /ask library:true when you want me to look through these files for an answer. xAI’s document search can access every document you’ve saved here.',
+      'Your files stay at xAI until you remove them with /knowledge forget or clear. Only you see these library commands; /ask answers are visible in the channel.'].filter(Boolean).join('\n\n'));
   }
   if (!['add', 'forget', 'clear'].includes(action)) return reply('Use /knowledge add, list, forget, or clear.');
   if (isActive(scope) || library.isActive(scope)) return reply('Please wait for your current request in this channel to finish before changing your library.');
@@ -49,17 +49,17 @@ export async function handleKnowledgeCommand(interaction, library, { isActive = 
   try {
     if (action === 'add') {
       const document = await library.add(scope, attachment, { signal });
-      return finish(`Saved document #${document.id}: ${displayName(document.filename)} (${size(document.bytes)}). Use /ask library:true to ask about it. Your document stays at xAI until you remove it with /knowledge forget or clear.`);
+      return finish(`Saved **${displayName(document.filename)}** as document #${document.id} (${size(document.bytes)}). Ask about it with /ask library:true. It stays at xAI until you remove it with /knowledge forget or clear.`);
     }
     if (action === 'forget') {
       return finish(await library.forget(scope, id, { signal })
-        ? `Document #${id} has been deleted from your library and xAI. Previous answers may still contain information from it.`
-        : 'That document was not found in your library here. Use /knowledge list to check its ID.');
+        ? `I’ve removed document #${id} from your library and xAI. Our earlier answers may still include information from it.`
+        : 'I couldn’t find that document here. Check /knowledge list for the right ID.');
     }
     const result = await library.clear(scope, { signal });
     return finish(result.failed
-      ? `Deleted ${result.deleted} documents. ${result.failed} could not be deleted and remain listed; retry /knowledge clear to remove them.`
-      : `Deleted ${result.deleted} documents from your library and xAI. Previous answers may still contain information from them.`);
+      ? `Removed ${result.deleted} ${result.deleted === 1 ? 'document' : 'documents'}. I couldn’t remove ${result.failed}; they’re still in your list. Try /knowledge clear again for those.`
+      : `Removed ${result.deleted} ${result.deleted === 1 ? 'document' : 'documents'} from your library and xAI. Our earlier answers may still include information from them.`);
   } catch (error) {
     return finish(error instanceof KnowledgeError ? error.message
       : 'I couldn’t finish that library change. Use /knowledge list to check what is saved, then try again.');
