@@ -250,9 +250,9 @@ test('prompt preserves current input and keeps large histories and untrusted mem
   const memory = request.input.find(message => typeof message.content === 'string' && message.content.includes('conversation_memory'));
   assert.equal(memory.role, 'user');
   assert.equal(JSON.parse(memory.content).conversation_memory.notes[0].text, malicious);
-  const history = request.input.filter(message => message !== memory && message !== request.input.at(-1));
-  assert.ok(history.reduce((sum, message) => sum + message.content.length, 0) <= 32000);
-  assert.ok(history.some(message => message.content.includes('[Earlier message truncated]')));
+  const history = JSON.parse(request.input.find(message => message.content.includes('conversation_history')).content).conversation_history;
+  assert.ok(history.reduce((sum, exchange) => sum + exchange.user.length + exchange.assistant.length, 0) <= 32000);
+  assert.ok(history.some(exchange => exchange.user.includes('[Earlier message truncated]')));
   assert.ok(request.input.reduce((sum, message) => sum + message.content.length, 0) < 60000);
 });
 
@@ -458,7 +458,8 @@ test('AICore honors a configured history budget larger than the 32,000-character
     requests.push(JSON.parse(options.body)); return response(answer());
   } });
   await ai.respond({ input: 'Current question.', history });
-  assert.deepEqual(requests[0].input.slice(0, -1), history);
+  assert.deepEqual(JSON.parse(requests[0].input[0].content).conversation_history,
+    [0, 2, 4].map(index => ({ user: history[index].content, assistant: history[index + 1].content })));
   assert.equal(requests[0].input.at(-1).content, 'Current question.');
   assert.ok(!JSON.stringify(requests[0].input).includes('[Earlier message truncated]'));
 });

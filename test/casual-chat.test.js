@@ -36,7 +36,8 @@ test('rude user history stays available while abusive assistant history stays fi
     request = JSON.parse(options.body); return response('All good.');
   } });
   await ai.respond({ input: 'Just joking', history });
-  assert.deepEqual(request.input.slice(0, 2), history.slice(0, 2));
+  assert.deepEqual(JSON.parse(request.input[0].content).conversation_history,
+    [{ user: 'fuck you', assistant: 'Rough day?' }]);
   assert.equal(JSON.stringify(request.input).includes("You're an idiot"), false);
 });
 

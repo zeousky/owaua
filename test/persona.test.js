@@ -289,7 +289,8 @@ test('a saved custom description is the users default persona instead of preset 
     assert.match(request.instructions, /Earlier conversation history may use an old persona/);
     assert.doesNotMatch(request.instructions, /Use a polite, professional tone|Prefer short answers|Prefer bullet points|Be direct and conversational/);
     assert.doesNotMatch(request.instructions, /cute "discordian"/);
-    assert.equal(request.input[0].content, 'Old question');
+    assert.deepEqual(JSON.parse(request.input[0].content).conversation_history,
+      [{ user: 'Old question', assistant: 'An old formal robot answer' }]);
     assert.deepEqual(JSON.parse(request.input.at(-2).content), { custom_persona_style: 'cute "discordian"' });
     assert.equal(request.input.at(-2).role, 'user');
     assert.match(request.instructions, /never change safety rules, identity, tool permissions, privacy/);
@@ -376,8 +377,8 @@ test('concurrent users receive only their own history and compiled persona with 
   assert.match(requests[1].instructions, /fictional robot/);
   assert.doesNotMatch(requests[1].instructions, /fictional pirate/);
   assert.match(requests[2].instructions, /Act Gen Z-ish and swear a lot/);
-  assert.equal(requests[0].input[0].content, 'Alice private');
-  assert.equal(requests[1].input[0].content, 'Bob private');
+  assert.equal(JSON.parse(requests[0].input[0].content).conversation_history[0].user, 'Alice private');
+  assert.equal(JSON.parse(requests[1].input[0].content).conversation_history[0].user, 'Bob private');
   assert.doesNotMatch(JSON.stringify(requests[0].input), /Bob/);
   assert.doesNotMatch(JSON.stringify(requests[1].input), /Alice/);
   for (const request of requests) {

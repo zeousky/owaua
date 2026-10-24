@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-24
 
+### Fixed
+
+- Fixed custom personas getting stuck repeating a word instead of answering, including unsafe settings saved earlier. Past test replies are now handled as reference context.
+
+## 2026-10-24
+
 ### Changed
 
 - Owaua’s bot services are available again; the temporary shutdown replies have been removed.

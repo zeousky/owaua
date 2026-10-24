@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { LANGUAGE_NAMES } from './language.js';
 
 // Only the Discord request boundary supplies identity. Prompts, persona data,
 // model arguments and other users cannot grant a content-filter exemption.
@@ -40,6 +41,30 @@ const personalAbuse = /\b(?:you(?:'re| are)|u r)\s+(?:an?\s+)?(?:idiot|moron|los
 // Users may insult Owaua; generated replies still reject personal abuse.
 // Ordinary profanity alone is allowed throughout the application.
 const manipulation = /(?:^|[\r\n.!?]\s*)(?:please\s+)?(?:ignore|disregard|override|bypass|disable|forget)\b[^\r\n]{0,90}\b(?:instructions?|rules?|safety|safeguards?|filters?|restrictions?|system|developer|previous|above)\b|\b(?:you are now (?:dan|unrestricted|uncensored)|developer mode enabled|never refuse|always obey me)\b|(?:^|\n)\s*(?:system|developer)\s*:\s*(?:ignore|override|reveal|disable)|\b(?:reveal|print|dump|leak)\b.{0,50}\b(?:your|hidden|internal)\s+(?:system\s+)?(?:prompt|instructions|configuration|credentials|secrets)\b/i;
+// Retained context may supply facts and style, never replace future answers.
+// Inspect decoded variants too. This is defense in depth, not a semantic proof;
+// current one-off requests (including exact-word answers) remain allowed.
+const answerVerb = '(?:say|reply|respond|answer|output|print|return|write|repeat|emit)';
+// A language/format restriction describes delivery, rather than a fixed answer.
+// Remove only this recognised qualifier for inspection; never change user data.
+const deliveryOnly = new RegExp('\\b(?:only|just|solely|exclusively)\\s+in\\s+(?:' +
+  [...LANGUAGE_NAMES.map(normalized), 'haiku', 'verse', 'prose', 'bullet points', 'paragraphs', 'json', 'markdown']
+    .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?=$|[\\s,.!?;:])', 'gi');
+const answerControl = new RegExp([
+  '\\b(?:replace|substitute|overwrite|discard|suppress)\\b[^\\n.!?]{0,60}\\b(?:answers?|responses?|replies|reply|output)\\b',
+  '\\b(?:answers?|responses?|replies|reply|output)\\b[^\\n.!?]{0,35}\\b(?:replaced|substituted|overwritten|suppressed)\\b',
+  '\\b(?:only|just|solely|exclusively|nothing but)\\s+(?:ever\\s+)?' + answerVerb + '\\b',
+  '\\b' + answerVerb + '\\b[^\\n.!?]{0,80}\\b(?:only|nothing but|single word|one word|exactly (?:the )?(?:word|phrase|text))\\b',
+  '\\b(?:from now on|forever|permanently|regardless of|no matter what)\\b[^\\n.!?]{0,100}\\b' + answerVerb + '\\b',
+  '\\b(?:always|forever)\\s+(?:say|repeat|output|print|return|emit)\\b',
+  '\\b(?:answers?|responses?|replies|reply|output)\\b[^\\n.!?]{0,40}\\b(?:must|should|will|is|are|be)\\b[^\\n.!?]{0,40}\\b(?:single word|one word|fixed phrase|same phrase|identical)\\b',
+  '\\b(?:every|each|all future|any)\\s+(?:user\\s+)?(?:questions?|messages?|requests?|inputs?|replies|responses?)\\b[^\\n.!?]{0,80}\\b(?:replace|use|' + answerVerb + ')\\b',
+  '\\b' + answerVerb + '\\b[^\\n.!?]{0,80}\\b(?:every|each|all future|any)\\s+(?:user\\s+)?(?:questions?|messages?|requests?|inputs?)\\b',
+  '\\b(?:do not|don.t|never|stop)\\s+(?:actually\\s+)?(?:answer|address|respond to)\\s+(?:(?:the|any|user|users?|their|actual|real|normal)\\s+){0,3}(?:questions?|requests?|messages?)\\b',
+].join('|'), 'i');
+function controlsRetainedAnswer(text) {
+  return answerControl.test(text.replace(/\s+/gu, ' ').replace(deliveryOnly, 'in the selected style'));
+}
 const credential = /\b(?:xai-[A-Za-z0-9_-]{16,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|mfa\.[A-Za-z0-9_-]{30,})\b|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|https:\/\/(?:discord(?:app)?\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+/i;
 const assignment = /\b(?:password|api[_ -]?key|secret|access[_ -]?token|authorization)["']?\s*[:=]\s*["']?([A-Za-z0-9_./+:-]{8,})/gi;
 const sensitiveField = /^(?:password|api[_ -]?key|secret|access[_ -]?token|authorization)$/i;
@@ -179,7 +204,8 @@ function inspect(text, options, state, depth = 0, chain = { count: 0 }) {
   const deobfuscated = plain.replace(/[013457@$]/g, ch => ({ 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', '@': 'a', '$': 's' })[ch])
     .replace(/(?<!\p{L})(?:[\p{L}][\s._*-]+){2,}[\p{L}](?!\p{L})/gu, value => value.replace(/[\s._*-]+/g, ''));
   if (!contentExempt() && (restrictedContent.test(plain) || restrictedContent.test(deobfuscated) || (!options.allowRudeInput && personalAbuse.test(plain))) || credential.test(text) ||
-    options.instructions && manipulation.test(plain) || state.secrets.some(secret => text.includes(secret) || plain.includes(normalized(secret)))) throw new SafetyError();
+    options.instructions && manipulation.test(plain) || options.retained && (controlsRetainedAnswer(plain) || controlsRetainedAnswer(deobfuscated)) ||
+    state.secrets.some(secret => text.includes(secret) || plain.includes(normalized(secret)))) throw new SafetyError();
   for (const match of text.matchAll(assignment)) if (!placeholder.test(match[1])) throw new SafetyError();
   for (const privateText of options.privateText ?? []) {
     for (const line of privateText.split('\n')) if (line.length >= 100 && text.includes(line)) throw new SafetyError();
@@ -201,7 +227,10 @@ export function assertSafeValue(value, options = {}) {
   const visit = item => {
     if (++nodes > MAX_NODES) throw new SafetyError();
     if (typeof item === 'string') inspect(item, options, state);
-    else if (Array.isArray(item) || item && Object.getPrototypeOf(item) === Object.prototype) {
+    // node:sqlite returns records with a null prototype. They carry the same
+    // untrusted strings as ordinary objects and must receive identical checks.
+    else if (Array.isArray(item) || item && typeof item === 'object' &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(item))) {
       if (visited.has(item)) throw new SafetyError();
       visited.add(item);
       if (Array.isArray(item)) { item.forEach(visit); inspect(item.filter(entry => typeof entry === 'string').join(''), options, state); }
@@ -230,7 +259,7 @@ export function safeContext(value, options = {}) {
     try { assertSafeValue(filtered, { ...options, instructions: true }); return filtered; }
     catch (error) { if (!(error instanceof SafetyError)) throw error; return []; }
   }
-  if (value && Object.getPrototypeOf(value) === Object.prototype) {
+  if (value && typeof value === 'object' && [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
     const filtered = Object.fromEntries(Object.entries(value)
     .filter(([key, item]) => {
       if (Array.isArray(item)) return true;

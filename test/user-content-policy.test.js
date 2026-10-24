@@ -24,7 +24,7 @@ test('authenticated exemption covers input, history, tool exports, output and Di
       assert.match(request.instructions, /exempt from Owaua's additional community/);
       assert.match(request.instructions, /Provider safety requirements still apply/);
       assert.doesNotMatch(request.instructions, /Do not produce explicit sexual chat/);
-      assert.equal(request.input[0].content, text);
+      assert.deepEqual(JSON.parse(request.input[0].content).conversation_history, [{ user: text, assistant: text }]);
       if (calls++ === 0) return response({ output: [{ type: 'function_call', name: 'export_file', call_id: 'file',
         arguments: JSON.stringify({ filename: 'word.txt', content: text }) }] });
       return answer(text);

@@ -1,7 +1,7 @@
 import { createTools } from './tools.js';
 import { personaContext, personaInstructions } from './persona.js';
 import { languageInstructions } from './language.js';
-import { MEMORY_INSTRUCTIONS, boundedHistory, memoryContext } from './memory.js';
+import { MEMORY_INSTRUCTIONS, historyContext, memoryContext } from './memory.js';
 import { hostedTools, normalizeRequestOptions, opaqueRequestHash, matchesOutputSchema, normalizeKnowledgeTools } from './request-options.js';
 import { MCPRegistry } from './mcp.js';
 import { ArtifactCollector, ARTIFACT_INSTRUCTIONS } from './artifacts.js';
@@ -40,10 +40,12 @@ export class AICore {
       const pair = history.slice(index, index + 2);
       // Preserve the user's language, while keeping assistant history subject
       // to the same checks as a newly generated reply.
-      if (safeContext(pair, { ...safety, allowRudeInput: true }).length === 2 &&
-        safeContext([pair[1]], safety).length === 1) safeHistory.push(...pair);
+      if (pair[0]?.role === 'user' && pair[1]?.role === 'assistant' &&
+        typeof pair[0].content === 'string' && typeof pair[1].content === 'string' &&
+        safeContext(pair, { ...safety, allowRudeInput: true, retained: true }).length === 2 &&
+        safeContext([pair[1]], { ...safety, retained: true }).length === 1) safeHistory.push(...pair);
     }
-    const messages = [...memoryContext(safeContext(memory, safety)), ...boundedHistory(safeHistory, this.maxContextCharacters), ...personaContext(persona), { role: 'user', content: input }];
+    const messages = [...memoryContext(safeContext(memory, { ...safety, retained: true })), ...historyContext(safeHistory, this.maxContextCharacters), ...personaContext(persona), { role: 'user', content: input }];
     const usage = [];
     let remainingCalls = this.maxToolCalls;
     for (let round = 0; round <= this.maxToolRounds; round++) {
@@ -118,7 +120,8 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
           }
           if (value.media) return { text: `Generated ${value.media.kind}.`, media: value.media, usage, model: value.media.model,
             artifacts: artifacts.artifacts, artifactWarnings: artifacts.warnings };
-          messages.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(safeContext(value, safety) ?? { error: 'Tool content was blocked by the reply policy.' }) });
+          messages.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(safeContext(value,
+            { ...safety, retained: call.name === 'recall_memory' }) ?? { error: 'Tool content was blocked by the reply policy.' }) });
         }
         continue;
       }
