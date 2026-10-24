@@ -2,6 +2,12 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-10-24
+
+### Changed
+
+- Owaua’s bot services are available again; the temporary shutdown replies have been removed.
+
 ## 2026-10-23
 
 ### Changed

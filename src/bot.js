@@ -1,6 +1,5 @@
 import './runtime.js';
 import 'dotenv/config';
-import { maintenanceActive, replyDuringMaintenance, interactionDuringMaintenance } from './maintenance.js';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
@@ -61,7 +60,7 @@ mediaStore.recover();
 const mediaService = new MediaService({ media, store: mediaStore, confirm: confirmMedia });
 let recoveryTimer, recoveryTask;
 function recoverMedia() {
-  if (stopping || recoveryTask || maintenanceActive()) return;
+  if (stopping || recoveryTask) return;
   recoveryTask = mediaService.resume({ signal: shutdownController.signal })
     .catch(error => logError('media_recovery_error', error)).finally(() => { recoveryTask = undefined; });
 }
@@ -224,14 +223,12 @@ const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping
   standalone, active, help, client, answer, signal: shutdownController.signal, logError });
 client.on(Events.InteractionCreate, async interaction => {
   try {
-    if (await interactionDuringMaintenance(interaction)) return;
     if (interaction.isChatInputCommand()) await handleCommand(interaction);
   } catch (error) { logError('interaction_error', error); }
 });
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot) return;
   try {
-    if (await replyDuringMaintenance(message, client.user.id)) return;
     if (!allowed(message.guildId)) return;
     let command;
     try { command = parsePrefixCommand(message.content, { attachments: message.attachments }); }
