@@ -8,10 +8,10 @@ ENV PATH="/opt/music/bin:${PATH}"
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev \
-    && groupadd --gid 10001 kirmy \
-    && useradd --uid 10001 --gid kirmy --home-dir /app kirmy \
-    && mkdir /app/data && chown kirmy:kirmy /app/data
-COPY --chown=kirmy:kirmy src ./src
-USER kirmy
+    && groupadd --gid 10001 owaua \
+    && useradd --uid 10001 --gid owaua --home-dir /app owaua \
+    && mkdir /app/data && chown owaua:owaua /app/data
+COPY --chown=owaua:owaua src ./src
+USER owaua
 ENV NODE_ENV=production DATA_DIR=/app/data
 CMD ["node", "src/bot.js"]

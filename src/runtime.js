@@ -8,7 +8,7 @@ export function assertSupportedNode(version = process.versions.node) {
   const minimumMinor = major === 24 ? 22 : major === 26 ? 12 : undefined;
   if (minimumMinor === undefined || ![major, minor, patch].every(Number.isSafeInteger) ||
     minor < minimumMinor || minor === minimumMinor && patch < 1) {
-    throw new Error(`Unsupported Node.js ${version}. Kirmy requires ${SUPPORTED_NODE}; select the version in .nvmrc before starting.`);
+    throw new Error(`Unsupported Node.js ${version}. Owaua requires ${SUPPORTED_NODE}; select the version in .nvmrc before starting.`);
   }
 }
 

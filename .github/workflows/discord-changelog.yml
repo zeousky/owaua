@@ -45,17 +45,17 @@ jobs:
           title = lines[0].strip()
           description = "\n".join(lines[1:]).strip()
           if not description:
-              description = "A new Kirmy changelog entry is available."
+              description = "A new Owaua changelog entry is available."
           if len(description) > 4000:
               description = description[:3997] + "..."
 
           if len(title) > 256:
               title = title[:253] + "..."
           embed = {
-              "title": f"Kirmy changelog — {title}",
+              "title": f"Owaua changelog — {title}",
               "description": description,
               "color": 0x8B5CF6,
-              "footer": {"text": "Kirmy changelog"},
+              "footer": {"text": "Owaua changelog"},
           }
 
           payload = json.dumps({

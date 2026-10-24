@@ -39,7 +39,7 @@ export async function backupMemory(source, destination) {
   const sourcePath = resolve(source);
   regularFile(sourcePath);
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const temporary = mkdtempSync(join(dirname(path), '.kirmy-backup-'));
+  const temporary = mkdtempSync(join(dirname(path), '.owaua-backup-'));
   const staged = join(temporary, 'memory.sqlite');
   let db;
   try {
@@ -90,7 +90,7 @@ export async function main(args = process.argv.slice(2)) {
   const data = resolve(process.env.DATA_DIR || join(root, 'data'));
   const source = values.get('--source') || join(data, 'kirmy.sqlite');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const output = values.get('--output') || join(data, 'backups', `kirmy-${timestamp}-${randomUUID().slice(0, 8)}.sqlite`);
+  const output = values.get('--output') || join(data, 'backups', `owaua-${timestamp}-${randomUUID().slice(0, 8)}.sqlite`);
   return backupMemory(source, output);
 }
 

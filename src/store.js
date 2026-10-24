@@ -15,6 +15,7 @@ export class ConversationStore {
     if (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 100 || !Number.isInteger(archiveTurns) || archiveTurns < maxTurns || archiveTurns > 10000 ||
       !Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 3650 || !Number.isInteger(maxContextCharacters) || maxContextCharacters < 1000 || maxContextCharacters > 100000) throw new Error('Invalid memory limits');
     mkdirSync(directory, { recursive: true });
+    // Retain the historical filename so existing conversations and settings load.
     this.db = new DatabaseSync(join(directory, 'kirmy.sqlite'));
     this.maxTurns = maxTurns;
     Object.assign(this, { archiveTurns, retentionDays, maxContextCharacters });

@@ -9,7 +9,7 @@ export const personaCommand = {
       })), { type: 3, name: 'description', description: 'Custom character or speaking style for you only (max 120 characters)',
         min_length: 1, max_length: MAX_CUSTOM_PERSONA_LENGTH }] },
     { type: 1, name: 'view', description: 'Privately view your personal style' },
-    { type: 1, name: 'reset', description: 'Restore Kirmy’s default style for yourself' },
+    { type: 1, name: 'reset', description: 'Restore Owaua’s default style for yourself' },
   ],
 };
 

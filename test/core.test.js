@@ -23,6 +23,8 @@ test('custom tool loop submits output and retains model context', async () => {
   } });
   assert.equal((await ai.respond({ input: 'Time?' })).text, 'Done');
   assert.equal(requests[0].model, 'grok-4.7');
+  assert.match(requests[0].instructions, /^You are Owaua,/);
+  assert.doesNotMatch(requests[0].instructions, /Kirmy/i);
   assert.equal(requests[0].store, false);
   assert.deepEqual(requests[0].tools.slice(0, 3).map(t => t.type), ['web_search', 'x_search', 'code_interpreter']);
   const output = requests[1].input.at(-1);
@@ -54,7 +56,7 @@ test('citations are kept as usable source links', async () => {
   assert.match((await ai.respond({ input: 'hi' })).text, /https:\/\/example.com\/source/);
 });
 test('history is bounded, isolated, persistent, and resettable', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-test-'));
   let store;
   try {
     store = new ConversationStore(directory, 2);

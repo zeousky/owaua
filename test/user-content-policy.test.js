@@ -21,7 +21,7 @@ test('authenticated exemption covers input, history, tool exports, output and Di
     let calls = 0;
     const ai = new AICore({ fetchImpl: async (_, options) => {
       const request = JSON.parse(options.body);
-      assert.match(request.instructions, /exempt from Kirmy's additional community/);
+      assert.match(request.instructions, /exempt from Owaua's additional community/);
       assert.match(request.instructions, /Provider safety requirements still apply/);
       assert.doesNotMatch(request.instructions, /Do not produce explicit sexual chat/);
       assert.equal(request.input[0].content, text);

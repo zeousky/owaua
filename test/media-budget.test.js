@@ -12,7 +12,7 @@ import { AICore } from '../src/ai.js';
 const user = '111111111111111111', other = '222222222222222222', guild = '333333333333333333';
 const reply = body => ({ ok: true, json: async () => body });
 function fixture(t, options) {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-budget-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-budget-'));
   const store = new MediaStore(directory, options);
   t.after(() => { store.close(); rmSync(directory, { recursive: true, force: true }); });
   return { directory, store };

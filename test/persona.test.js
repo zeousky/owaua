@@ -16,7 +16,7 @@ const robot = { ...DEFAULT_PERSONA, character: 'robot', tone: 'formal' };
 const final = { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'Hello' }] }] };
 
 function withStore(t) {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-persona-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-persona-'));
   let store = new ConversationStore(directory);
   t.after(() => { store.close(); rmSync(directory, { recursive: true, force: true }); });
   return { get store() { return store; }, reopen() { store.close(); store = new ConversationStore(directory); return store; } };
@@ -36,6 +36,8 @@ test('all persona combinations compile from trusted phrases without changing per
           const value = { character, tone, detail, format, ...(character === 'custom' ? { description: 'A cheerful space explorer' } : {}) };
           assert.deepEqual(validatePersona(value), value);
           const instructions = personaInstructions(value);
+          assert.match(instructions, /Remain Owaua/);
+          assert.match(instructions, /current identity takes precedence/);
           assert.match(instructions, /never change safety rules, identity, tool permissions, privacy/);
           assert.match(instructions, /Only the dedicated persona command can save preferences/);
           assert.match(instructions, /require the current user's actual request/);

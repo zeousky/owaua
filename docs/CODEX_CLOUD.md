@@ -1,5 +1,7 @@
 # Codex cloud development
 
+**Bot identity:** This repository develops **Owaua (Node)**. Its historical checkout/repository labels are not the bot's current name. Read `../BOT_IDENTITY.json` and the root `AGENTS.md` first. Owaua = Node.js / `zeousky/kirmy-bot`; Kirmy = Python / `zeousky/owaua`. Cloud development does not authorize live deployment.
+
 Use a private Codex cloud environment connected to `zeousky/kirmy-bot`.
 Select Node.js 24.22.1 (also recorded in `.nvmrc`). The bot uses built-in
 `node:sqlite`, including FTS5, and native PNG rendering dependencies.
@@ -34,7 +36,7 @@ need access to Discord, xAI, SoundCloud or Railway.
 
 ## Everyday work
 
-Choose **Work in > Cloud**, select the Kirmy environment and describe your change.
+Choose **Work in > Cloud**, select the existing Kirmy environment (the historical name for this Node codebase) and describe your change.
 Commit or push work you need to keep. Cloud tasks see GitHub source, so local
 uncommitted edits are not automatically available there. After changing runtime
 versions or dependencies, edit the environment, repeat setup/checks, and republish

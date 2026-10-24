@@ -115,7 +115,7 @@ test('labelled credential values remain protected in JSON and structured objects
 });
 
 test('unsafe completed answer cannot commit staged notes or an exchange', async t => {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-safety-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-safety-'));
   const store = new ConversationStore(directory); t.after(() => { store.close(); rmSync(directory, { recursive: true }); });
   const userId = '111111111111111111'; const scope = conversationScope('g', 'c', userId);
   const memory = createMemorySession(store, { scope, userId, input: 'I prefer blue.' });
@@ -166,7 +166,7 @@ test('text/JSON/base64 exports, Python envelopes, chart labels and delivery cann
   assert.throws(() => exportChart({ title: decoded, series: [{ name: 'Series', points: [{ x: 'A', y: 1 }] }] }), SafetyError);
   const collector = new ArtifactCollector();
   collector.collectPython([{ type: 'code_interpreter_call', status: 'completed', outputs: [{ type: 'logs', logs: JSON.stringify({
-    exit_code: 0, stdout: 'KIRMY_ARTIFACT:' + JSON.stringify({ filename: 'data.txt', mime_type: 'text/plain', base64: b64(decoded) }),
+    exit_code: 0, stdout: 'OWAUA_ARTIFACT:' + JSON.stringify({ filename: 'data.txt', mime_type: 'text/plain', base64: b64(decoded) }),
   }) }] }]);
   assert.equal(collector.artifacts.length, 0);
   assert.throws(() => resultReply({ text: 'Clean answer', artifacts: [{ name: 'data.csv', attachment: Buffer.from(decoded) }] }), SafetyError);

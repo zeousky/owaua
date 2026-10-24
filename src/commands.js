@@ -7,7 +7,7 @@ import { speakCommand, transcribeCommand, voiceCommand } from './voice-command.j
 
 // One registry for Discord registration and dot-prefix parsing.
 export const commands = [
-  { name: 'ask', description: 'Ask Kirmy anything', options: [
+  { name: 'ask', description: 'Ask Owaua anything', options: [
     { type: 3, name: 'prompt', description: 'Your question', required: true, max_length: 6000 },
     { type: 11, name: 'image', description: 'Optional image to understand' },
     { type: 11, name: 'file', description: 'Optional PDF, text, or code document to analyze' },
@@ -26,8 +26,8 @@ export const commands = [
     { type: 3, name: 'to_date', description: 'Search X posts before this date (YYYY-MM-DD, exclusive)', max_length: 10 },
     { type: 5, name: 'visual_search', description: 'Allow web image search and search image/video understanding' },
   ] },
-  { name: 'reset', description: 'Clear your Kirmy history and saved memories in this channel' },
-  { name: 'help', description: 'Show what Kirmy can do' },
+  { name: 'reset', description: 'Clear your Owaua history and saved memories in this channel' },
+  { name: 'help', description: 'Show what Owaua can do' },
   personaCommand,
   languageCommand,
   memoryCommand,

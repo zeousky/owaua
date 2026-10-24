@@ -64,7 +64,7 @@ test('JSON output, chart files, speech and warnings remain separate downloadable
   const speech = { name: 'speech.mp3', attachment: Buffer.from('audio') };
   const payload = resultReply({ text: json, outputFormat: 'json', artifacts: [artifact], artifactWarnings: ['One file was too large.'] },
     { notices: ['Memory could not be saved.'], speech });
-  assert.equal(payload.files[0].name, 'kirmy-answer.json');
+  assert.equal(payload.files[0].name, 'owaua-answer.json');
   assert.deepEqual(JSON.parse(payload.files[0].attachment.toString()), JSON.parse(json));
   assert.deepEqual(payload.files.slice(1), [artifact, speech]);
   assert.match(payload.content, /Memory could not be saved/);

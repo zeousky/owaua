@@ -10,7 +10,7 @@ const attachment = (name = 'guide.txt', extras = {}) => ({ name, contentType: 't
   url: `https://cdn.discordapp.com/attachments/111/222/${encodeURIComponent(name)}`, ...extras });
 
 function setup(t, settings = {}) {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-knowledge-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-knowledge-'));
   let id = 0;
   const calls = [];
   const fetchImpl = async (url, options = {}) => {

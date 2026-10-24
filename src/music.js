@@ -64,7 +64,7 @@ export function audioDiagnostic(text) {
 export function streamTrack(track, onError, launch = spawn) {
   // Native HLS downloads still write --Frag*.part files when output is stdout.
   // /app is read-only to the runtime user; isolate fragments for every playback.
-  const workDir = mkdtempSync(joinPath(tmpdir(), 'kirmy-music-'));
+  const workDir = mkdtempSync(joinPath(tmpdir(), 'owaua-music-'));
   const children = new Set();
   const cleanup = () => { if (!children.size) rmSync(workDir, { recursive: true, force: true }); };
   const start = (file, args, stdio) => {
@@ -133,7 +133,7 @@ export class MusicManager {
   }
   close() { this.closed = true; for (const session of this.sessions.values()) this.dispose(session); }
   notify(session, text) { return session.text.send(typeof text === 'string'
-    ? card('Music update', text, { tone: 'music', section: 'Kirmy / Music' }) : text).catch(() => {}); }
+    ? card('Music update', text, { tone: 'music', section: 'Owaua / Music' }) : text).catch(() => {}); }
   async showPlayback(session, track) {
     await this.notify(session, trackCard(track));
   }
@@ -171,7 +171,7 @@ export class MusicManager {
   }
   async handle(message, command) {
     const reply = content => message.reply(typeof content === 'string'
-      ? card('Music', content, { tone: 'music', section: 'Kirmy / Music' }) : content);
+      ? card('Music', content, { tone: 'music', section: 'Owaua / Music' }) : content);
     if (!message.guild) return reply('Music works in server voice channels.');
     if (this.closed) return reply('I’m restarting. Please try again shortly.');
     if (command.action === 'help') return reply(musicHelp);
@@ -256,7 +256,7 @@ export class MusicManager {
       session.text = message.channel;
       session.queue.push(track);
       await progress.finish(card('Added to your queue', `**[${track.title}](${track.url})**`, {
-        tone: 'music', section: 'Kirmy / Music', footer: `Kirmy · Position ${session.queue.length} in queue`,
+        tone: 'music', section: 'Owaua / Music', footer: `Owaua · Position ${session.queue.length} in queue`,
       }));
       if (!session.current) this.next(session);
     } catch (error) {
@@ -266,7 +266,7 @@ export class MusicManager {
       console.error(JSON.stringify({ event: 'music_error', type: error.name, code: error.code ?? null }));
       const safe = ['Choose a recorded song shorter than one hour.', 'No playable song found. Try adding the artist name.',
         'Stay in the voice channel while I find the song.'];
-      const payload = card('Couldn’t load your song', safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.', { tone: 'error', section: 'Kirmy / Music' });
+      const payload = card('Couldn’t load your song', safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.', { tone: 'error', section: 'Owaua / Music' });
       await (progress ? progress.finish(payload) : reply(payload));
     } finally {
       await progress?.stop();

@@ -7,7 +7,7 @@ const MAX_VISIBLE_NOTES = 20;
 const MAX_ESCAPED_TEXT = 1200;
 
 export const memoryCommand = {
-  name: 'memory', description: 'Manage what Kirmy remembers about you in this channel', options: [
+  name: 'memory', description: 'Manage what Owaua remembers about you in this channel', options: [
     { type: 1, name: 'view', description: 'Privately view your saved facts and memory status here', options: [
       { type: 4, name: 'page', description: 'Show another page of saved facts (20 per page)', min_value: 1, max_value: 10 },
     ] },

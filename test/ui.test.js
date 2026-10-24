@@ -47,7 +47,7 @@ test('finished replies contain only their content and clear the loading embed', 
     const message = { ...loadingCard(), ...payload };
     assert.deepEqual(message.embeds, []);
     assert.ok(message.content.length <= 2000);
-    assert.ok(!message.content.includes('Kirmy /'));
+    assert.ok(!message.content.includes('Owaua /'));
     assert.ok(!message.content.includes('Made for your conversation'));
     assert.ok(!message.content.includes('─'));
     assert.deepEqual(message.allowedMentions.parse, []);
@@ -61,17 +61,19 @@ test('long answers preserve all text and sources in an attachment', () => {
   const text = '```js\n' + 'const value = 1;\n'.repeat(400) + '```\nhttps://example.com/source';
   const payload = answerCard(text);
   assert.equal(payload.files[0].attachment.toString(), text);
-  assert.equal(payload.files[0].name, 'kirmy-answer.md');
+  assert.equal(payload.files[0].name, 'owaua-answer.md');
 });
 
 test('help keeps the quick start in chat and preserves advanced settings and privacy in its guide', () => {
   const payload = helpCard(musicHelp);
+  assert.match(payload.content, /I’m Owaua/);
+  assert.doesNotMatch(JSON.stringify(payload), /Kirmy/i);
   assert.ok(payload.content.length <= 2000);
   for (const command of ['/ask', '/jobs', '/voice', '.music', '.language', '/persona', '/memory', '/knowledge', '/reset']) {
     assert.ok(payload.content.includes(command), `Quick start should explain ${command}`);
   }
   assert.equal(payload.files.length, 1);
-  assert.equal(payload.files[0].name, 'kirmy-guide.md');
+  assert.equal(payload.files[0].name, 'owaua-guide.md');
   const guide = payload.files[0].attachment.toString();
   for (const detail of ['180 days', '1,000 exchanges', 'xAI', '/integrations', 'output:json', '/knowledge forget', '/memory forget']) {
     assert.ok(guide.includes(detail), `Detailed guide should retain ${detail}`);

@@ -11,7 +11,7 @@ import { AICore } from '../src/ai.js';
 const alice = '111111111111111111', bob = '222222222222222222';
 const final = { output: [{ type: 'message', content: [{ type: 'output_text', text: 'Szia!' }] }] };
 function fixture(t) {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-language-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-language-'));
   let store = new ConversationStore(directory);
   t.after(() => { store.close(); rmSync(directory, { recursive: true, force: true }); });
   return { get store() { return store; }, reopen() { store.close(); store = new ConversationStore(directory); return store; } };

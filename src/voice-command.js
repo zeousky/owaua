@@ -23,7 +23,7 @@ export const transcribeCommand = {
   ],
 };
 export const voiceCommand = {
-  name: 'voice', description: 'Talk with Kirmy using xAI realtime voice', options: [
+  name: 'voice', description: 'Talk with Owaua using xAI realtime voice', options: [
     { type: 1, name: 'join', description: 'Start a ten-minute conversation using only your microphone audio', options: [
       { type: 3, name: 'voice', description: 'Built-in or custom xAI voice ID (default: eve)', max_length: 100 },
     ] },

@@ -1,4 +1,4 @@
-# Kirmy Changelog
+# Owaua Changelog
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
@@ -13,6 +13,18 @@ Add each user-facing update as a new dated section at the top. The first dated s
 ### Changed
 
 - Owaua replies with a service shutdown notice until October 24 at 9:00 AM CEST.
+
+## 2026-10-23
+
+### Fixed
+
+- Owaua now uses its own name throughout chat and voice prompts, help, commands, personas, and downloads.
+
+## 2026-10-23
+
+### Changed
+
+- Owaua now runs Kirmy's features and commands, while Kirmy runs Owaua's. Existing memories and settings stay with their respective code.
 
 ## 2026-10-23
 

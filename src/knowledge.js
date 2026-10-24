@@ -145,7 +145,7 @@ export class KnowledgeLibrary {
     const existing = this.db.prepare('SELECT collection_id FROM knowledge_collections WHERE scope = ?').get(scope);
     if (existing) return existing.collection_id;
     const label = createHash('sha256').update(scope).digest('hex').slice(0, 20);
-    const result = await this.#request('/collections', { method: 'POST', body: { collection_name: `Kirmy ${label}` }, management: true, signal });
+    const result = await this.#request('/collections', { method: 'POST', body: { collection_name: `Owaua ${label}` }, management: true, signal });
     const id = result.collection_id;
     if (typeof id !== 'string' || !COLLECTION_ID.test(id)) throw new ProviderError(502, 'invalid_knowledge_collection');
     try {

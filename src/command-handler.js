@@ -14,7 +14,7 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, k
   return async function handleCommand(interaction) {
     const stopping = isStopping();
     try {
-      if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Kirmy', 'Kirmy is not enabled in this server.', { tone: 'warning' }), flags: 64 });
+      if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Owaua', 'Owaua is not enabled in this server.', { tone: 'warning' }), flags: 64 });
       if (stopping) return await interaction.reply({ ...card('', 'I’m restarting — give me a moment, then try again.'), flags: 64 });
       if (interaction.commandName === 'language') return await handleLanguageCommand(interaction, store, interaction.options.getString('name') ?? '');
       if (['jobs', 'usage'].includes(interaction.commandName)) return await handleMediaCommand(interaction, mediaStore);
@@ -41,7 +41,7 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, k
       const scope = conversationScope(interaction.guildId, interaction.channelId, interaction.user.id);
       if (interaction.commandName === 'help') return await interaction.reply({ ...help, flags: 64 });
       if (interaction.commandName === 'reset') {
-        if (active.has(scope)) return await interaction.reply({ ...card('Kirmy', 'Let me finish your current request, then you can reset our chat.', { tone: 'warning' }), flags: 64 });
+        if (active.has(scope)) return await interaction.reply({ ...card('Owaua', 'Let me finish your current request, then you can reset our chat.', { tone: 'warning' }), flags: 64 });
         store.reset(scope);
         return await interaction.reply({ ...card('A fresh start', 'Fresh start — I’ve cleared your conversation history and saved notes in this channel.', { tone: 'success' }), flags: 64 });
       }
@@ -51,7 +51,7 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, k
         const supplied = ['image', 'file', 'video', 'audio'].map(name => interaction.options.getAttachment(name)).filter(Boolean);
         attachments = requestAttachments({ attachments: new Map(supplied.map((a, i) => [i, a])) }, undefined, client.user.id);
       } catch (error) {
-        return await interaction.reply({ ...card('Kirmy', error.message, { tone: 'warning' }), flags: 64 });
+        return await interaction.reply({ ...card('Owaua', error.message, { tone: 'warning' }), flags: 64 });
       }
       await interaction.deferReply();
       await answer({ scope, userId: interaction.user.id, guildId: interaction.guildId, text: interaction.options.getString('prompt', true),

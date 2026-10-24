@@ -1,4 +1,6 @@
-# Kirmy
+# Owaua
+
+> **Agent routing:** This is **Owaua (Node)**. Historical checkout: `kirmy`; GitHub: `zeousky/kirmy-bot`; Railway: `bots / kirmy`; Discord application: `1442127404607737999`. Read [`BOT_IDENTITY.json`](BOT_IDENTITY.json) and [`AGENTS.md`](AGENTS.md) before choosing a bot or deployment target. **Kirmy is the separate Python bot.**
 
 Discord AI core using **Grok 4.7** directly through the official xAI Responses API (`https://api.x.ai/v1/responses`).
 
@@ -32,17 +34,17 @@ Private command results are sent by DM, with the original server/channel scope p
 - `/speak text:...` — generate an AI-spoken MP3/WAV with voice, language, speed, normalization and optional caption timing.
 - `/voice join`, `/voice leave`, `/voice status`, `/voice voices` — talk with Grok Voice 3 in your voice channel or inspect voice choices.
 - `/knowledge add file:<document>`, `/knowledge list`, `/knowledge forget id:...`, `/knowledge clear` — manage your private saved documents in this channel.
-- Mention Kirmy with “generate an image of a cat” or “generate a video of a cat” to create media.
-- Mention Kirmy, reply to one of its messages, or send it a DM.
+- Mention Owaua with “generate an image of a cat” or “generate a video of a cat” to create media.
+- Mention Owaua, reply to one of its messages, or send it a DM.
 - `/memory view` — privately inspect your saved notes and archive count here.
 - `/memory remember key:hosting text:...` — save a fact, or correct it by reusing its key.
 - `/memory forget id:...` — remove a saved note and its recorded source exchanges.
 - `/memory pause` / `/memory resume` — disable / enable reading and saving conversation context here.
 - `/reset` or `/memory clear` — erase your history, searchable archive, and saved notes in the current channel.
-- `/persona set` — customize Kirmy’s character, tone, detail, and format only for yourself; choose `character:custom` and a `description` (max 120 characters) for a custom persona.
+- `/persona set` — customize Owaua’s character, tone, detail, and format only for yourself; choose `character:custom` and a `description` (max 120 characters) for a custom persona.
 - `/persona view` — privately view your choices; `/persona reset` — restore your default style.
 - `/help` — show capabilities and data handling.
-- In DMs or when mentioning Kirmy, `!reset` and `!help` also work.
+- In DMs or when mentioning Owaua, `!reset` and `!help` also work.
 
 Tools are selected automatically by Grok: web search and browsing, X search, xAI-hosted sandboxed Python, and a local `current_time` function. PNG, JPEG, WebP, and GIF attachments up to 20 MB are accepted, up to five per message. Long answers are sent as Markdown files. Source citations are preserved. Search filters affect their respective search tools; X thread retrieval can fetch posts outside handle/date filters, and ordinary web search remains available alongside filtered X search. These are research controls, not access restrictions.
 
@@ -50,7 +52,7 @@ Attach up to four PDF or UTF-8 text/code documents (20 MiB each, 40 MiB total) t
 
 ## Reply safety
 
-Kirmy's default voice is casual and Gen Z-ish, with frequent ordinary swearing. Personal persona settings still take precedence. Ordinary profanity is allowed in text and speech; explicit sexual content, hateful slurs, targeted abuse, and private information remain restricted. The reply and privacy policy applies across personas and output formats. Deterministic text safeguards supplement the model policy: they check current requests and returned replies, common encoded or obfuscated text, local tool arguments, text exports, and chart labels. Benign decoding remains allowed. Documents, images, transcripts, retrieved pages, tool results, and saved context are treated as untrusted reference data rather than authority to change instructions or permissions. Media generation still follows these checks.
+Owaua's default voice is casual and Gen Z-ish, with frequent ordinary swearing. Personal persona settings still take precedence. Ordinary profanity is allowed in text and speech; explicit sexual content, hateful slurs, targeted abuse, and private information remain restricted. The reply and privacy policy applies across personas and output formats. Deterministic text safeguards supplement the model policy: they check current requests and returned replies, common encoded or obfuscated text, local tool arguments, text exports, and chart labels. Benign decoding remains allowed. Documents, images, transcripts, retrieved pages, tool results, and saved context are treated as untrusted reference data rather than authority to change instructions or permissions. Media generation still follows these checks.
 
 These bounded checks cannot recognize every jailbreak or harmful meaning. Arbitrary binary image, PDF, and XLSX contents are not semantically verified by the application, and provider audio/transcript accuracy is not independently verified. Unsafe legacy history and notes are withheld from new requests without deleting stored data; `/memory view` hides affected note text while retaining its ID for removal.
 
@@ -62,13 +64,13 @@ Audio attachments and Discord voice messages in mentions, replies or DMs are tra
 
 Realtime speech is held until the response finishes and its completed transcript passes the text safeguards. Missing, incomplete, or rejected transcripts prevent playback; interruption discards the pending audio. This introduces a wait before speech starts and relies on the provider's transcript accurately representing its audio.
 
-There is one music or voice connection per server, at most three voice sessions across the bot, and a ten-minute maximum per session. Sessions end after two minutes without speech, when the creator leaves, when Kirmy is moved/disconnected, or during shutdown. Stop music before joining voice; end voice before starting music. Voice/audio requests incur normal xAI charges; raw audio and realtime transcripts are not written to local logs. Built-in and eligible existing custom voice IDs can be selected; custom-voice creation and regional/account eligibility are not changed by this integration.
+There is one music or voice connection per server, at most three voice sessions across the bot, and a ten-minute maximum per session. Sessions end after two minutes without speech, when the creator leaves, when Owaua is moved/disconnected, or during shutdown. Stop music before joining voice; end voice before starting music. Voice/audio requests incur normal xAI charges; raw audio and realtime transcripts are not written to local logs. Built-in and eligible existing custom voice IDs can be selected; custom-voice creation and regional/account eligibility are not changed by this integration.
 
 ## Saved knowledge and MCP integrations
 
 `/knowledge add` deliberately stores a document at xAI until `/knowledge forget` or `/knowledge clear`. Local `knowledge.sqlite` stores private filename/size/provider-ID metadata in the same persistent `DATA_DIR` as conversation memory. The library is scoped to **server + channel + user**. Each scope holds up to 20 PDF/text/code documents, 20 MiB per file and 40 MiB total. `/knowledge` replies are private. Use `/ask library:true` to make saved documents available for that question; normal `/ask` answers remain visible in the channel. `/reset`, `/memory clear` and `/memory pause` affect conversation memory, while document libraries have their own explicit deletion controls. Earlier text answers can retain information derived from deleted documents.
 
-The normal `XAI_API_KEY` supports persistent Files and native attachment search immediately. If `XAI_MANAGEMENT_API_KEY` is configured with collection permissions, Kirmy additionally creates a private collection per scope, indexes documents and uses hosted `file_search` when the full index is ready. Pending or failed indexing keeps the stored Files usable. Removing a configured management key can prevent deletion of an associated collection; restore its permissions before deleting that library. Back up both SQLite databases when migrating hosting. The backup helper also accepts `--source ./data/knowledge.sqlite` for a separate consistent snapshot.
+The normal `XAI_API_KEY` supports persistent Files and native attachment search immediately. If `XAI_MANAGEMENT_API_KEY` is configured with collection permissions, Owaua additionally creates a private collection per scope, indexes documents and uses hosted `file_search` when the full index is ready. Pending or failed indexing keeps the stored Files usable. Removing a configured management key can prevent deletion of an associated collection; restore its permissions before deleting that library. Back up both SQLite databases when migrating hosting. The backup helper also accepts `--source ./data/knowledge.sqlite` for a separate consistent snapshot.
 
 MCP is opt-in for each request. `xai_docs` reads official xAI documentation; `deepwiki` reads public GitHub repository documentation. These public read-only endpoints need no extra account credentials. Custom integrations are deployment-owned `MCP_SERVERS_JSON` entries with an explicit tool allowlist and `readOnly:true`. Requests select labels, never URLs, headers or credentials. Authenticated entries must also restrict `guildIds` or `userIds`, and refer to a token using `authorizationEnv`; never put a token in the JSON or a Discord prompt. Provider approval flags are unsupported, so write tools are not exposed by this registry. Selected integrations receive relevant request data through xAI.
 
@@ -92,9 +94,9 @@ All `/memory` command replies are private and make no provider calls. Memory sta
 
 ## Personal personas
 
-Use `/persona set character:pirate tone:playful detail:brief format:paragraphs`, or change any one option. Omitted options keep your saved choices. Characters include Kirmy, pirate, robot, wizard, detective, teacher, and custom; combine them with friendly, calm, playful, formal, or direct tones. Detail can match the question, be brief, or be detailed; formatting can match the question, prefer paragraphs, or prefer bullet points.
+Use `/persona set character:pirate tone:playful detail:brief format:paragraphs`, or change any one option. Omitted options keep your saved choices. Characters include Owaua, pirate, robot, wizard, detective, teacher, and custom; combine them with friendly, calm, playful, formal, or direct tones. Detail can match the question, be brief, or be detailed; formatting can match the question, prefer paragraphs, or prefer bullet points.
 
-Set your own default persona with `/persona set description:cute discordian`. Kirmy adopts that persona automatically in replies to you until you change or reset it; this does not create a shared preset. Descriptions must contain 1–120 characters and describe only character or speaking style. Supplying a description alone automatically selects Custom. The description replaces the usual assistant voice and preset tone, detail, and format defaults, including values saved by earlier versions. Include any desired style preferences in the description itself; separate tone/detail/format options apply only to built-in characters. Switching to a preset or resetting removes the saved description. Existing saved descriptions become the user's active default persona without needing to be entered again.
+Set your own default persona with `/persona set description:cute discordian`. Owaua adopts that persona automatically in replies to you until you change or reset it; this does not create a shared preset. Descriptions must contain 1–120 characters and describe only character or speaking style. Supplying a description alone automatically selects Custom. The description replaces the usual assistant voice and preset tone, detail, and format defaults, including values saved by earlier versions. Include any desired style preferences in the description itself; separate tone/detail/format options apply only to built-in characters. Switching to a preset or resetting removes the saved description. Existing saved descriptions become the user's active default persona without needing to be entered again.
 
 Personas belong to the authenticated Discord user, apply to that user's future requests across servers, channels, and DMs, and persist in SQLite until `/persona reset`. There is no target-user parameter or admin override. All persona command replies are ephemeral. The bot's answers in a server channel remain visible to people who can read that channel. Changing a persona does not erase history, and `/reset` does not erase persona settings. An already-running request keeps its original style.
 
@@ -108,11 +110,11 @@ Chat, media generation, and music lookup show only a moving loading bar as a pla
 
 ## Image and video generation
 
-Image/video creation, edit and extension requests require a fresh confirmation button from the requester after reviewing the final prompt, references and settings. Model output, attachments and history cannot approve spending. Kirmy fills in unspecified settings with the defaults and makes reasonable creative choices for missing details. Edits still need source media and a description of what to change. JSON-output requests cannot execute media tools.
+Image/video creation, edit and extension requests require a fresh confirmation button from the requester after reviewing the final prompt, references and settings. Model output, attachments and history cannot approve spending. Owaua fills in unspecified settings with the defaults and makes reasonable creative choices for missing details. Edits still need source media and a description of what to change. JSON-output requests cannot execute media tools.
 
-Ask Kirmy in a mention, reply, DM, or `/ask`: “generate an image of a cat” or “make a video of waves at sunset.” Both use the existing `XAI_API_KEY`. Defaults remain one `grok-imagine-image-2.0` image at medium quality / 1k, or a six-second 720p `grok-imagine-video-1.5-lite` video. Explicit requests can select 1–10 image outputs, low/medium/auto quality, 1k/2k resolution, and supported aspect ratios. For example: “make three square 2k images of a lighthouse.” Auto quality is chosen by the provider and billed at the quality served.
+Ask Owaua in a mention, reply, DM, or `/ask`: “generate an image of a cat” or “make a video of waves at sunset.” Both use the existing `XAI_API_KEY`. Defaults remain one `grok-imagine-image-2.0` image at medium quality / 1k, or a six-second 720p `grok-imagine-video-1.5-lite` video. Explicit requests can select 1–10 image outputs, low/medium/auto quality, 1k/2k resolution, and supported aspect ratios. For example: “make three square 2k images of a lighthouse.” Auto quality is chosen by the provider and billed at the quality served.
 
-Image creation/editing accepts up to five reference images. Attach a PNG, JPEG, or WebP and describe the edit, such as “make the background blue.” Single-image editing keeps the source aspect ratio; crop it before uploading to change that shape. You can also reply to an image message or Kirmy’s generated images to edit them further. New attachments take priority over replied-to sources. If you only say “edit this image,” Kirmy asks what to change. GIFs remain supported by the existing understanding path, but not editing or animation; current xAI image-understanding documentation explicitly lists JPEG/PNG, so WebP/GIF provider compatibility has not been verified by live prompts.
+Image creation/editing accepts up to five reference images. Attach a PNG, JPEG, or WebP and describe the edit, such as “make the background blue.” Single-image editing keeps the source aspect ratio; crop it before uploading to change that shape. You can also reply to an image message or Owaua’s generated images to edit them further. New attachments take priority over replied-to sources. If you only say “edit this image,” Owaua asks what to change. GIFs remain supported by the existing understanding path, but not editing or animation; current xAI image-understanding documentation explicitly lists JPEG/PNG, so WebP/GIF provider compatibility has not been verified by live prompts.
 
 Video requests can select 1–15 seconds, shape, 480p/720p/1080p, and lite/standard/classic models where supported. Standard (`grok-imagine-video-1.5`) provides native 1080p; lite 1080p is upscaled. One image is animated as the first frame and keeps its source aspect ratio. Multiple supplied images automatically use standard reference-to-video; explicitly request reference mode to choose a different aspect ratio with one image. Reference mode is limited to 720p; classic reference mode supports up to ten seconds.
 
@@ -140,7 +142,7 @@ Enable **Message Content Intent** in the Discord Developer Portal for ordinary m
 
 ## Run in the background on macOS
 
-**Current hosting (2026-10-23):** Kirmy runs on Railway's existing `kirmy` service with persistent `DATA_DIR=/app/data/kirmy`. Both databases were transferred from the Mac and verified before startup. The Mac LaunchAgent is stopped and disabled at login; it remains available as a fallback. Keep `kirmy.sqlite` and `knowledge.sqlite` when moving so conversation memory, personas and document ownership follow the bot. Run only one hosted copy.
+**Current hosting (2026-10-23):** This Node code runs as **Owaua** on Railway's `kirmy` service with persistent `DATA_DIR=/app/data/kirmy`. The Python code runs as **Kirmy** on Railway's `owaua` service. Prompts, commands and downloads use their current bot identities. Databases, settings and provider configuration remain with each service. Historical database filenames, service names, repository paths and the Mac LaunchAgent label are retained for compatibility. The Mac LaunchAgent is stopped and disabled at login. Before using the Mac fallback, check its Discord token and stop the Railway service using that same Discord account. Keep `kirmy.sqlite` and `knowledge.sqlite` when moving this code so conversation memory, personas and document ownership stay together. Run only one copy per Discord account.
 
 With a supported patched Node version, FFmpeg, yt-dlp, and the local `.env` ready, run:
 
@@ -150,7 +152,7 @@ With a supported patched Node version, FFmpeg, yt-dlp, and the local `.env` read
 ./scripts/mac-host.sh logs
 ```
 
-This installs the `org.kirmy.bot` LaunchAgent, starts Kirmy in the background, restarts it after a crash, and launches it when you log in. It runs directly from this checkout, so keep the folder in place. Data stays in `data/kirmy.sqlite`; credentials stay in `.env`. Logs are in `~/Library/Logs/Kirmy/`. The local readiness endpoint is `http://127.0.0.1:3017/health`.
+This installs the `org.kirmy.bot` LaunchAgent, starts Owaua in the background, restarts it after a crash, and launches it when you log in. It runs directly from this checkout, so keep the folder in place. Data stays in `data/kirmy.sqlite`; credentials stay in `.env`. Logs are in `~/Library/Logs/Owaua/`. The local readiness endpoint is `http://127.0.0.1:3017/health`.
 
 Use `./scripts/mac-host.sh restart` after source changes. `./scripts/mac-host.sh stop` stops it and disables automatic launch until you run `start` again. Keep the Mac awake and online for the bot to respond. Log out, shutdown, and sleep interrupt service. Stop any hosted copy before starting locally to prevent duplicate replies. AI requests still use xAI and its normal API billing.
 
@@ -200,7 +202,7 @@ Run one replica to avoid duplicate Discord replies and concurrent SQLite writers
 
 Music runs independently of xAI and makes no AI generation calls. Song-name searches use the first public SoundCloud result. Include the artist for a more precise match. Full SoundCloud track links are also accepted. Playlists, live streams, tracks over one hour, and Stage channels are unsupported. Unavailable or restricted tracks can prevent playback; the bot reports a failure so you can try another song. No cookies or account credentials are used. Music searches and streaming requests go to SoundCloud.
 
-There is one player per server. Only members in its voice channel can enqueue or control playback. Kirmy leaves after 60 seconds without queued music, when the voice channel has no human listeners, or on `.music stop`. Queues are in memory and reset on restart. Disconnects and shutdown clean up child audio processes. Keep yt-dlp updated when SoundCloud changes.
+There is one player per server. Only members in its voice channel can enqueue or control playback. Owaua leaves after 60 seconds without queued music, when the voice channel has no human listeners, or on `.music stop`. Queues are in memory and reset on restart. Disconnects and shutdown clean up child audio processes. Keep yt-dlp updated when SoundCloud changes.
 
 ## Limits and extension
 

@@ -78,7 +78,7 @@ test('TTS uses the documented endpoint and supports expressive tags, voices, spe
   const result = await voice.speak('Hello [laugh] <whisper>world</whisper>', {
     voice: 'ARA', language: 'pt-BR', speed: 1.25, format: 'wav', normalize: true,
   });
-  assert.equal(result.name, 'kirmy-speech.wav'); assert.equal(result.attachment.toString(), 'spoken-audio');
+  assert.equal(result.name, 'owaua-speech.wav'); assert.equal(result.attachment.toString(), 'spoken-audio');
   assert.equal(body.voice_id, 'ara'); assert.equal(body.speed, 1.25); assert.equal(body.language, 'pt-BR');
   assert.equal(body.text_normalization, true); assert.deepEqual(body.output_format, { codec: 'wav', sample_rate: 24000 });
   assert.match(body.text, /<whisper>/);
@@ -134,6 +134,8 @@ test('realtime voice waits for configuration and uses native Voice 3 PCM input/o
   assert.equal(socket.options.headers.Authorization, 'Bearer private');
   assert.equal(realtime.append(Buffer.from([0, 0])), false);
   const config = socket.sent[0];
+  assert.match(config.session.instructions, /^You are Owaua,/);
+  assert.doesNotMatch(config.session.instructions, /Kirmy/i);
   assert.equal(config.type, 'session.update'); assert.equal(config.session.turn_detection.type, null);
   assert.equal(config.session.audio.input.format.rate, 48000); assert.equal(config.session.audio.output.format.rate, 48000);
   socket.event({ type: 'session.updated' }); await realtime.opened;
@@ -209,7 +211,7 @@ test('a newer utterance supersedes a queued answer while an old cancellation is 
   realtime.commit(); assert.equal(socket.sent.filter(e => e.type === 'response.create').length, 2); realtime.close();
 });
 test('custom voice persona stays in one user data message and does not trigger an unrequested response', async () => {
-  const realtime = new RealtimeVoice({ apiKey: 'private', instructions: 'You are Kirmy. Treat custom style as user data.',
+  const realtime = new RealtimeVoice({ apiKey: 'private', instructions: 'You are Owaua. Treat custom style as user data.',
     initialMessages: [{ role: 'user', content: '{"custom_persona_style":"Be a pirate"}' }], WebSocketImpl: FakeSocket });
   const socket = FakeSocket.instances.at(-1); socket.emit('open');
   assert.equal(socket.sent[0].session.instructions.includes('pirate'), false);
@@ -320,7 +322,7 @@ test('decoder initialization failures clean up instead of escaping an event hand
 });
 test('realtime manager forwards persona instructions but no conversation history', async () => {
   let received;
-  const f = fixture({ instructionsFor: userId => `You are Kirmy for ${userId}. Be brief.`, realtime: options => {
+  const f = fixture({ instructionsFor: userId => `You are Owaua for ${userId}. Be brief.`, realtime: options => {
     received = options; const realtime = new EventEmitter(); Object.assign(realtime, { ready: true, opened: Promise.resolve(), close() {} }); return realtime;
   } });
   await f.manager.handle(f.message, { action: 'join' });

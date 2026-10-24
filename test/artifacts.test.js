@@ -6,7 +6,7 @@ import { AICore } from '../src/ai.js';
 
 const pythonCall = (stdout, { status = 'completed', exit_code = 0 } = {}) => ({ type: 'code_interpreter_call', status,
   outputs: [{ type: 'logs', logs: JSON.stringify({ stdout, stderr: '', exit_code }) }] });
-const envelope = (name, type, data) => `KIRMY_ARTIFACT:${JSON.stringify({ filename: name, mime_type: type, base64: Buffer.from(data).toString('base64') })}`;
+const envelope = (name, type, data) => `OWAUA_ARTIFACT:${JSON.stringify({ filename: name, mime_type: type, base64: Buffer.from(data).toString('base64') })}`;
 
 test('safe exports create actual file bytes while rejecting paths, malformed data and unsupported files', () => {
   assert.equal(exportFile({ filename: 'data.csv', content: 'x,y\n1,2\n' }).attachment.toString(), 'x,y\n1,2\n');
@@ -81,7 +81,7 @@ test('AI attaches local and Python exports and sends only metadata through funct
   assert.match(replayedLogs.stdout, /Computed total: 3\r\n/);
   assert.match(replayedLogs.stdout, /\r\nOrdinary stdout remains\.$/);
   assert.match(replayedLogs.stdout, /"filename":"python.csv","bytes":7,"attached":true/);
-  assert.doesNotMatch(replayed.outputs[0].logs, /KIRMY_ARTIFACT:|eCx5CjEsMg==/);
+  assert.doesNotMatch(replayed.outputs[0].logs, /OWAUA_ARTIFACT:|eCx5CjEsMg==/);
   assert.equal(JSON.stringify(requests[1]).includes(Buffer.from(fileContent).toString('base64')), false);
   assert.deepEqual(code, originalCode);
 });
@@ -93,8 +93,8 @@ test('unvalidated Python envelopes are removed from replay without claiming succ
   const replay = collector.replayOutput([failed]);
   assert.equal(collector.artifacts.length, 0);
   assert.match(JSON.parse(replay[0].outputs[0].logs).stdout, /"attached":false/);
-  assert.doesNotMatch(JSON.stringify(replay), /YWJj|KIRMY_ARTIFACT:/);
-  assert.match(JSON.parse(failed.outputs[0].logs).stdout, /KIRMY_ARTIFACT:/);
+  assert.doesNotMatch(JSON.stringify(replay), /YWJj|OWAUA_ARTIFACT:/);
+  assert.match(JSON.parse(failed.outputs[0].logs).stdout, /OWAUA_ARTIFACT:/);
 });
 
 test('successful large UTF-8 and base64 export arguments are replayed as metadata while small content stays meaningful', async () => {

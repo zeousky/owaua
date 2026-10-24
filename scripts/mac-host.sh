@@ -4,23 +4,24 @@ set -euo pipefail
 export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
+# Keep the historical label so stop/restart controls existing installations.
 label="org.kirmy.bot"
 domain="gui/$(id -u)"
 target="$domain/$label"
 plist="$HOME/Library/LaunchAgents/$label.plist"
-logs="$HOME/Library/Logs/Kirmy"
+logs="$HOME/Library/Logs/Owaua"
 health_url="http://127.0.0.1:3017/health"
 
 wait_ready() {
   local deadline=$((SECONDS + 120))
   while (( SECONDS < deadline )); do
     if curl --fail --silent --connect-timeout 2 --max-time 3 "$health_url" >/dev/null; then
-      echo "Kirmy is ready. Health: $health_url"
+      echo "Owaua is ready. Health: $health_url"
       return 0
     fi
     sleep 1
   done
-  echo 'Kirmy did not become ready within 120 seconds. Check scripts/mac-host.sh logs.' >&2
+  echo 'Owaua did not become ready within 120 seconds. Check scripts/mac-host.sh logs.' >&2
   return 1
 }
 
@@ -34,7 +35,7 @@ unload() {
     deadline=$((SECONDS + 35))
     while kill -0 "$task_pid" 2>/dev/null; do
       if (( SECONDS >= deadline )); then
-        echo 'Kirmy has not exited after 35 seconds. Check its logs before restarting.' >&2
+        echo 'Owaua has not exited after 35 seconds. Check its logs before restarting.' >&2
         return 1
       fi
       sleep 1
@@ -45,7 +46,7 @@ unload() {
 case "${1:-status}" in
   start)
     if launchctl print "$target" >/dev/null 2>&1; then
-      echo 'Kirmy is already loaded. Use restart to restart it.'
+      echo 'Owaua is already loaded. Use restart to restart it.'
       wait_ready
       exit
     fi
@@ -55,10 +56,10 @@ case "${1:-status}" in
     command -v yt-dlp >/dev/null
     umask 077
     mkdir -p "$HOME/Library/LaunchAgents" "$logs"
-    KIRMY_ROOT="$task_root" KIRMY_NODE="$task_node" KIRMY_PLIST="$plist" KIRMY_LOGS="$logs" python3 - <<'PY'
+    OWAUA_ROOT="$task_root" OWAUA_NODE="$task_node" OWAUA_PLIST="$plist" OWAUA_LOGS="$logs" python3 - <<'PY'
 import os, plistlib
 from pathlib import Path
-root, node, logs = (os.environ[k] for k in ('KIRMY_ROOT', 'KIRMY_NODE', 'KIRMY_LOGS'))
+root, node, logs = (os.environ[k] for k in ('OWAUA_ROOT', 'OWAUA_NODE', 'OWAUA_LOGS'))
 config = {
     'Label': 'org.kirmy.bot',
     'ProgramArguments': [node, root + '/src/bot.js'],
@@ -77,9 +78,9 @@ config = {
     'StandardOutPath': logs + '/bot.log',
     'StandardErrorPath': logs + '/error.log',
 }
-with open(os.environ['KIRMY_PLIST'], 'wb') as file:
+with open(os.environ['OWAUA_PLIST'], 'wb') as file:
     plistlib.dump(config, file)
-Path(os.environ['KIRMY_PLIST']).chmod(0o600)
+Path(os.environ['OWAUA_PLIST']).chmod(0o600)
 PY
     plutil -lint "$plist"
     launchctl enable "$target"
@@ -89,7 +90,7 @@ PY
   stop)
     launchctl disable "$target"
     unload
-    echo 'Kirmy stopped and disabled at login. Use start to enable it again.'
+    echo 'Owaua stopped and disabled at login. Use start to enable it again.'
     ;;
   restart)
     # Reject an unsafe replacement runtime before stopping a healthy process.

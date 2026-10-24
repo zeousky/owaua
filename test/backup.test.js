@@ -13,7 +13,7 @@ import { backupMemory, main, verifyBackup } from '../scripts/backup-memory.js';
 const exec = promisify(execFile);
 
 function fixture(t) {
-  const directory = mkdtempSync(join(tmpdir(), 'kirmy-backup-test-'));
+  const directory = mkdtempSync(join(tmpdir(), 'owaua-backup-test-'));
   const source = join(directory, 'source.sqlite');
   const db = new DatabaseSync(source);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;
@@ -53,7 +53,7 @@ test('backup refuses to clobber files, source, or symlinks and cleans temporary 
   symlinkSync(existing, link);
   await assert.rejects(backupMemory(source, link), { code: 'EEXIST' });
   assert.equal(readFileSync(existing, 'utf8'), 'must stay');
-  assert.ok(!readdirSync(directory).some(name => name.startsWith('.kirmy-backup-')));
+  assert.ok(!readdirSync(directory).some(name => name.startsWith('.owaua-backup-')));
 });
 
 test('verify rejects corruption, missing files, and mismatched or malformed hashes', async t => {

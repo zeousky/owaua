@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "botName": "Owaua",
+  "runtime": "node",
+  "discordApplicationId": "1442127404607737999",
+  "entrypoint": "src/bot.js",
+  "githubRepository": "zeousky/kirmy-bot",
+  "legacyCheckoutName": "kirmy",
+  "railway": {
+    "projectName": "bots",
+    "projectId": "f9819aec-de3b-460b-850a-ff3f97ddbbd3",
+    "environment": "production",
+    "environmentId": "9ae72159-bdbf-40c6-9c3e-613e381ef6b7",
+    "serviceName": "kirmy",
+    "serviceId": "1e0cac45-0cea-4cf9-ac0d-b886764e8887"
+  }
+}

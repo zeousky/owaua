@@ -15,6 +15,7 @@ export class MediaStore {
   constructor(directory, { now = Date.now } = {}) {
     mkdirSync(directory, { recursive: true });
     this.now = now;
+    // Share the historical conversation database, including existing media jobs.
     this.db = new DatabaseSync(join(directory, 'kirmy.sqlite'));
     this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS media_requests (
