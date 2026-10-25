@@ -26,6 +26,8 @@ import { personaContext, personaInstructions } from './persona.js';
 import { prepareRequestInput } from './request-input.js';
 import { resultReply } from './reply.js';
 import { assertSafeValue, assertSafeChatInput, SafetyError, withRequestUser } from './safety.js';
+import { loadLocalExtension } from './local-extension.js';
+import { MEDIA_OWNER } from './media-store.js';
 
 function integer(name, fallback, min, max) {
   const value = Number(process.env[name] ?? fallback);
@@ -98,6 +100,8 @@ function allowed(guildId) { return !guildId || !allowedGuilds.size || allowedGui
 function logError(event, error) {
   console.error(JSON.stringify({ event, type: error?.name ?? 'Error', status: error?.status ?? null, code: error?.code ?? null }));
 }
+const localExtension = await loadLocalExtension({ card, assertSafeChatInput, assertSafeValue,
+  ownerId: MEDIA_OWNER, signal: shutdownController.signal, isStopping: () => stopping, logError });
 function answer(request) {
   return withRequestUser(request.userId, () => answerForUser(request));
 }
@@ -230,6 +234,7 @@ client.on(Events.MessageCreate, async message => {
   if (message.author.bot) return;
   try {
     if (!allowed(message.guildId)) return;
+    if (await localExtension?.handleMessage?.(message)) return;
     let command;
     try { command = parsePrefixCommand(message.content, { attachments: message.attachments }); }
     catch (error) {
@@ -280,7 +285,15 @@ client.on(Events.MessageCreate, async message => {
 });
 client.on(Events.VoiceStateUpdate, (oldState, newState) => { music.voiceStateUpdate(oldState, newState); voiceManager.voiceStateUpdate(oldState, newState); });
 client.on(Events.Error, error => logError('discord_error', error));
-const server = createServer((request, response) => {
+const server = createServer(async (request, response) => {
+  try {
+    if (await localExtension?.handleHttp?.(request, response)) return;
+  } catch (error) {
+    logError('local_http_error', error);
+    if (!response.headersSent) response.writeHead(500, { 'Content-Type': 'application/json' });
+    if (!response.writableEnded) response.end(JSON.stringify({ error: 'Request failed' }));
+    return;
+  }
   if (request.url !== '/health') { response.writeHead(404); return response.end(); }
   const ready = client.isReady() && !stopping;
   response.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json' });
@@ -296,6 +309,7 @@ async function shutdown(exitCode = 0) {
   music.close();
   voiceManager.close();
   shutdownController.abort(new DOMException('Bot is restarting', 'AbortError'));
+  try { await localExtension?.close?.(); } catch (error) { logError('local_close_error', error); exitCode = 1; }
   const deadline = Date.now() + 20000;
   while (active.size && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
   await recoveryTask;

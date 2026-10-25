@@ -6,3 +6,5 @@ data/
 .railway/
 *.log
 .DS_Store
+src/local/
+test/local/
