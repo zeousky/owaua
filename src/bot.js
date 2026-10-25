@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
 import { MusicManager, parseMusicCommand, musicHelp } from './music.js';
+import { SongDownloads, SongInputError, parseSongRequest, songResult } from './song-download.js';
 import { AICore, ProviderError } from './ai.js';
 import { MediaGenerator, MediaInputError } from './media.js';
 import { MediaStore } from './media-store.js';
@@ -83,6 +84,7 @@ const client = new Client({
   partials: [Partials.Channel], allowedMentions: { parse: [], repliedUser: false },
 });
 const music = new MusicManager({ isVoiceBusy: guildId => voiceManager.sessions.has(guildId) });
+const songs = new SongDownloads();
 const voiceManager = new VoiceManager({ apiKey: process.env.XAI_API_KEY,
   isMusicBusy: guildId => music.sessions.has(guildId),
   onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })),
@@ -128,6 +130,13 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
     if (spoken && options.outputFormat === 'json') throw new RequestOptionsError('Choose text output for a spoken answer. JSON output is delivered as a file.');
     const persona = store.persona(userId);
     progress = await animate(send);
+    const songRequest = parseSongRequest(text);
+    if (songRequest && options.outputFormat !== 'json') {
+      const song = await songs.download(songRequest.query, { signal: shutdownController.signal });
+      await progress.finish(resultReply(songResult(song)));
+      console.log(JSON.stringify({ event: 'song_attachment', bytes: song.file.attachment.length }));
+      return;
+    }
     prepared = await prepareRequestInput({ text, images, documents: documentAttachments, videos, audio, useLibrary, scope,
       voice: voiceAPI, documentInputs: documents, knowledge, signal: shutdownController.signal });
     assertSafeChatInput(prepared.userText);
@@ -143,8 +152,14 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
           return send(payload);
         }, options, signal: shutdownController.signal });
     };
+    let songStarted = false;
+    const downloadSong = async (query, { signal } = {}) => {
+      if (songStarted) throw new SongInputError('Please request one MP3 at a time.');
+      songStarted = true;
+      return songs.download(query, { signal: signal ?? shutdownController.signal });
+    };
     const result = await ai.respond({ input: prepared.input, history: store.history(scope), memory: store.context(scope, prepared.userText), persona, language: store.language(userId),
-      context: { userId, guildId, generateMedia, memory }, signal: shutdownController.signal,
+      context: { userId, guildId, generateMedia, downloadSong, memory }, signal: shutdownController.signal,
       requestOptions: options,
       knowledgeTools: prepared.knowledgeTools,
       cacheKey: createHash('sha256').update(scope).digest('hex'),
@@ -179,7 +194,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
     logError('ai_error', error);
     const message = stopping ? 'I’m restarting. Check /jobs before retrying media; saved video jobs resume automatically.'
       : error instanceof SafetyError || error instanceof MediaInputError || error instanceof DocumentInputError || error instanceof RequestOptionsError ||
-        error instanceof VoiceInputError || error instanceof KnowledgeError ? error.message
+        error instanceof VoiceInputError || error instanceof KnowledgeError || error instanceof SongInputError ? error.message
       : error instanceof ProviderError && ['invalid_structured_output', 'incomplete_structured_output'].includes(error.code)
         ? 'xAI did not return a complete answer matching your JSON schema. Try a simpler schema or a larger output limit.'
       : error instanceof ProviderError && error.status === 429
@@ -254,7 +269,7 @@ client.on(Events.MessageCreate, async message => {
       reference = await message.fetchReference().catch(() => null);
       replyToBot = reference?.author.id === client.user.id;
     }
-    if (message.guildId && !message.mentions.users.has(client.user.id) && !replyToBot) return;
+    if (message.guildId && !message.mentions.users.has(client.user.id) && !replyToBot && !/^\.mp3(?:\s|$)/i.test(message.content)) return;
     const text = message.content.replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '').trim();
     const scope = conversationScope(message.guildId, message.channelId, message.author.id);
     if (stopping) return message.reply(card('', 'I’m restarting — give me a moment, then try again.'));

@@ -2,6 +2,12 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-10-25
+
+### Added
+
+- Ask Owaua to send a song as an MP3, or use `.mp3 <song name and artist>`, to get an audio attachment in chat. SoundCloud track links work too; songs can be up to 10 minutes long.
+
 ## 2026-10-24
 
 ### Fixed

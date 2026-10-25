@@ -13,9 +13,9 @@ import { card, animate, trackCard } from './ui.js';
 
 const exec = promisify(execFile);
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
-const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
+export const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
   '--socket-timeout', '15', '--retries', '2'];
-export const musicHelp = 'Hop into a voice channel and try `.music <song name>` or send a SoundCloud track link after `.music`. Request more songs to queue them up.\nSee what’s next with `.music queue`. You can also `.music skip`, `.music pause`, `.music resume`, or `.music stop`.';
+export const musicHelp = 'Want an MP3 attachment? Use `.mp3 <song name and artist>` or ask me to send a song as an MP3. You can also use a SoundCloud track link. Downloads support songs up to 10 minutes.\n\nHop into a voice channel and try `.music <song name>` or send a SoundCloud track link after `.music`. Request more songs to queue them up.\nSee what’s next with `.music queue`. You can also `.music skip`, `.music pause`, `.music resume`, or `.music stop`.';
 export function parseMusicCommand(content) {
   const match = /^\.music(?:\s+([\s\S]*))?$/i.exec(content.trim());
   if (!match) return null;
@@ -40,7 +40,7 @@ export function searchTarget(query) {
   // Always search plain input; never let yt-dlp interpret user text as options or another URL scheme.
   return `scsearch1:${query}`;
 }
-export async function resolveTrack(query, signal, run = exec) {
+export async function resolveTrack(query, signal, run = exec, { includeDownloadInfo = false } = {}) {
   const target = searchTarget(query);
   const { stdout } = await run(ytdlp, [...commonArgs, '--dump-single-json', '--skip-download', '-f', 'bestaudio/best', '--', target],
     { timeout: 45000, maxBuffer: 4 * 1024 * 1024, signal });
@@ -52,7 +52,7 @@ export async function resolveTrack(query, signal, run = exec) {
   const url = searchTarget(info.webpage_url);
   if (!url.startsWith('https://soundcloud.com/')) throw new Error('Invalid track source');
   return { title: String(info.title || 'Untitled').replace(/[@*_`~|<>\[\]\\]/g, '').slice(0, 160),
-    url, source: 'SoundCloud', duration: info.duration };
+    url, source: 'SoundCloud', duration: info.duration, ...(includeDownloadInfo ? { downloadInfo: info } : {}) };
 }
 export function audioDiagnostic(text) {
   let result = String(text).replace(/https?:\/\/\S+/gi, '[URL]').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');

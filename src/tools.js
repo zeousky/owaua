@@ -60,6 +60,14 @@ export function createTools() {
       return { saved: false, error: error.message };
     }
   });
+  registry.register({
+    name: 'download_song',
+    description: 'Find a song by title and artist (or a SoundCloud track link) and attach it as a real MP3. Use when the current user asks you to send a song/audio file or MP3. Does not require a voice channel. Ask for the song title if missing. Never claim a file is attached before success.',
+    parameters: { type: 'object', properties: { query: { type: 'string', minLength: 1, maxLength: 300 } }, required: ['query'], additionalProperties: false },
+  }, async ({ query, ...extra }, context) => {
+    if (Object.keys(extra).length || typeof query !== 'string' || !query.trim() || query.length > 300 || !context?.downloadSong) throw new Error('Invalid song request');
+    return { song: await context.downloadSong(query, { signal: context.signal }) };
+  }, { propagateErrors: true });
   const imageOptions = {
     count: { type: 'integer', minimum: 1, maximum: 10, description: 'Number of images, only when requested; default 1.' },
     quality: { type: 'string', enum: ['low', 'medium', 'auto'], description: 'Default medium. Use another quality only if requested.' },

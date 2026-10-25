@@ -20,6 +20,7 @@ For `.ask` and `.speak`, put free text first, then named options. Quote values c
 
 Private command results are sent by DM, with the original server/channel scope preserved. Enable DMs or use slash commands if DMs are blocked. Your prefix command message remains visible in its channel; use slash commands for private input.
 
+- `.mp3 <song name and artist or SoundCloud track link>` — get an MP3 attachment in chat, without joining voice. You can also mention Owaua and ask “can you attach an MP3 of this song: ...”.
 - `.music <song name or SoundCloud track link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
 - `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
 - `/ask prompt:...` — ask a question, optionally with an image, a PDF/text/code document (`file`), or an MP4 (`video`) to edit or extend.
@@ -201,6 +202,8 @@ Run one replica to avoid duplicate Discord replies and concurrent SQLite writers
 ## Music
 
 Music runs independently of xAI and makes no AI generation calls. Song-name searches use the first public SoundCloud result. Include the artist for a more precise match. Full SoundCloud track links are also accepted. Playlists, live streams, tracks over one hour, and Stage channels are unsupported. Unavailable or restricted tracks can prevent playback; the bot reports a failure so you can try another song. No cookies or account credentials are used. Music searches and streaming requests go to SoundCloud.
+
+MP3 downloads use the same public SoundCloud search. `.mp3` and explicit “attach an MP3 of ...” requests download directly; other natural song-file requests can use the AI's `download_song` tool. Downloads accept recorded tracks up to 10 minutes, encode an actual MP3 capped at 9 MiB, and include the track's source link. Each request has a two-minute deadline; up to three downloads can run at once, within normal chat admission limits. Partial or failed encodes are never attached. Temporary metadata/fragments are removed after conversion; MP3 bytes are held in memory for Discord delivery. Binary music content is not transcribed or semantically checked.
 
 There is one player per server. Only members in its voice channel can enqueue or control playback. Owaua leaves after 60 seconds without queued music, when the voice channel has no human listeners, or on `.music stop`. Queues are in memory and reset on restart. Disconnects and shutdown clean up child audio processes. Keep yt-dlp updated when SoundCloud changes.
 
