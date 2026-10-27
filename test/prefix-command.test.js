@@ -105,6 +105,7 @@ test('message adapter keeps authenticated scope and routes private results and e
   await interaction.editReply({ content: 'private fact', flags: 68 });
   assert.equal(interaction.sourceMessage.publicReplies.length, 0);
   assert.equal(interaction.sourceMessage.privateReplies.length, 1);
+  assert.equal(interaction.sourceMessage.privateReplies[0].content, 'Working on it…');
   assert.equal(interaction.sourceMessage.privateReplies[0].flags, undefined);
   assert.equal(interaction.sourceMessage.edits[0].content, 'private fact');
   assert.equal(interaction.sourceMessage.edits[0].flags, 4);

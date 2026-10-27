@@ -3,7 +3,6 @@ import { AttachmentBuilder, MessageFlags } from 'discord.js';
 const mentions = { parse: [], repliedUser: false };
 
 // Keep the existing reply helpers, but render finished messages as plain text.
-// Explicitly clear embeds when replacing the loading bar in the same message.
 export function card(_title, description, { fields = [] } = {}) {
   const content = [description, ...fields.map(field => `${field.name}\n${field.value}`)]
     .filter(Boolean).join('\n\n');
@@ -39,50 +38,6 @@ export function helpCard(musicHelp) {
     '## What I remember\nI use recent context, look back through older conversations, and save useful facts you tell me. Your memories stay separate from other people’s and other channels. /memory view shows your notes privately; /memory remember saves or updates one; /memory forget removes one.\n\n/memory pause stops me reading and saving context here until /memory resume. /reset, !reset, or /memory clear erases your history, archive, and notes here. By default, conversation history is kept for up to 180 days and 1,000 exchanges; saved notes stay until you delete them. Your messages, recalled context, and attachments are sent to xAI so I can answer.',
   ].join('\n\n');
   return { ...card('', quickStart), files: [new AttachmentBuilder(Buffer.from(guide), { name: 'owaua-guide.md' })] };
-}
-
-export function loadingCard(frame = 0, activity = 'thinking') {
-  const marker = activity === 'x' ? '×' : activity === 'web' || activity === 'web_x' ? '═' : '━';
-  const label = { web: ' WEB', x: ' X', web_x: ' WEB+X' }[activity] ?? '';
-  const width = 18 - label.length;
-  // Bounce at either end without hiding the slider behind the search label.
-  const distance = width - 3;
-  const phase = frame % (distance * 2);
-  const position = phase <= distance ? phase : distance * 2 - phase;
-  const parts = Array.from({ length: width }, (_, i) => i >= position && i < position + 3 ? marker : '─');
-  parts.push(...label);
-  const bar = parts.join('');
-  return { content: `\`${bar}\``, embeds: [], allowedMentions: mentions };
-}
-
-// Serialize edits and drain any pending frame before the final result is sent.
-// Failed/deleted messages stop animation; they never cancel the underlying work.
-export async function animate(send, { intervalMs = 1000, maxMs = 720000 } = {}) {
-  const started = Date.now();
-  let frame = 0, activity = 'thinking', stopped = false, busy = false, pending = Promise.resolve();
-  const message = await send(loadingCard(frame));
-  const update = () => {
-    if (stopped || Date.now() - started >= maxMs) { clearInterval(timer); return; }
-    if (!message?.edit) return;
-    // Don't queue animation frames behind a slow Discord request.
-    if (busy) return;
-    busy = true;
-    pending = Promise.resolve().then(() => message.edit(loadingCard(++frame, activity)))
-      .catch(() => { stopped = true; clearInterval(timer); }).finally(() => { busy = false; });
-  };
-  const timer = setInterval(update, intervalMs);
-  timer.unref?.();
-  return {
-    setActivity(next) {
-      if (stopped || !['thinking', 'web', 'x', 'web_x'].includes(next) || activity === next) return;
-      activity = next;
-    },
-    async finish(payload) {
-      stopped = true; clearInterval(timer); await pending;
-      return message?.edit ? message.edit(payload) : send(payload);
-    },
-    async stop() { stopped = true; clearInterval(timer); await pending; },
-  };
 }
 
 export function clock(seconds) {

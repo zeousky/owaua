@@ -1,7 +1,7 @@
 import { commands } from './commands.js';
 import { isDocumentAttachment } from './files.js';
 import { isAudioAttachment } from './voice.js';
-import { loadingCard } from './ui.js';
+import { card } from './ui.js';
 
 export class PrefixCommandError extends Error {}
 export class PrefixPrivateReplyError extends Error {}
@@ -167,6 +167,6 @@ export function createPrefixInteraction(message, command) {
     options: { getSubcommand: () => command.subcommand,
       getString: read, getBoolean: read, getInteger: read, getNumber: read, getAttachment: read, getUser: read },
     reply: send, editReply: send,
-    deferReply: async (options = {}) => { await send({ ...loadingCard(), ...options }); },
+    deferReply: async (options = {}) => { await send({ ...card('', 'Working on it…'), ...options }); },
   };
 }

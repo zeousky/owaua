@@ -9,7 +9,7 @@ import {
   AudioPlayerStatus, VoiceConnectionStatus, NoSubscriberBehavior, StreamType,
 } from '@discordjs/voice';
 
-import { card, animate, trackCard } from './ui.js';
+import { card, trackCard } from './ui.js';
 
 const exec = promisify(execFile);
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
@@ -241,35 +241,32 @@ export class MusicManager {
       connection.on(VoiceConnectionStatus.Destroyed, () => this.dispose(session));
     }
     session.pending = true; clearTimeout(session.idle);
-    let progress;
     try {
-      progress = await animate(reply);
       const [track] = await Promise.all([
         this.resolve(command.query, session.abort.signal),
         this.wait(session.connection, VoiceConnectionStatus.Ready, 20000),
       ]);
       if (this.sessions.get(message.guildId) !== session) {
-        await progress.finish(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
+        await reply(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
       }
       // The requester must still be in the same channel after the asynchronous search.
       if (member.voice.channelId !== session.channelId) throw new Error('Stay in the voice channel while I find the song.');
       session.text = message.channel;
       session.queue.push(track);
-      await progress.finish(card('Added to your queue', `**[${track.title}](${track.url})**`, {
+      await reply(card('Added to your queue', `**[${track.title}](${track.url})**`, {
         tone: 'music', section: 'Owaua / Music', footer: `Owaua · Position ${session.queue.length} in queue`,
       }));
       if (!session.current) this.next(session);
     } catch (error) {
       if (this.sessions.get(message.guildId) !== session) {
-        await progress?.finish(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
+        await reply(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
       }
       console.error(JSON.stringify({ event: 'music_error', type: error.name, code: error.code ?? null }));
       const safe = ['Choose a recorded song shorter than one hour.', 'No playable song found. Try adding the artist name.',
         'Stay in the voice channel while I find the song.'];
       const payload = card('Couldn’t load your song', safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.', { tone: 'error', section: 'Owaua / Music' });
-      await (progress ? progress.finish(payload) : reply(payload));
+      await reply(payload);
     } finally {
-      await progress?.stop();
       session.pending = false;
       if (!session.current && this.sessions.get(message.guildId) === session) this.next(session);
     }

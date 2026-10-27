@@ -81,6 +81,7 @@ test('stop during a search aborts it and prevents late playback', async () => {
   const f = fixture((query, abort) => { signal = abort; return new Promise(resolve => { finish = resolve; }); });
   const search = f.manager.handle(f.message, { action: 'play', query: 'first' });
   await tick();
+  assert.deepEqual(f.sent, [], 'searching must not post a progress message');
   await f.manager.handle(f.message, { action: 'play', query: 'second' });
   assert.match(f.sent.at(-1), /still finding/);
   await f.manager.handle(f.message, { action: 'stop' });

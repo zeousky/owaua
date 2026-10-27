@@ -16,7 +16,7 @@ import { parsePrefixCommand, createPrefixInteraction, PrefixCommandError } from 
 import { requestAttachments } from './attachments.js';
 import { DocumentInputs, DocumentInputError } from './files.js';
 import { RequestOptionsError, normalizeRequestOptions } from './request-options.js';
-import { card, helpCard, animate } from './ui.js';
+import { card, helpCard } from './ui.js';
 import { ConversationStore, conversationScope } from './store.js';
 import { languageInstructions } from './language.js';
 import { createMemorySession } from './memory.js';
@@ -117,7 +117,6 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
   if (text.length > 16000 || images.length > 5 || documentAttachments.length > 4 || videos.length > 1 || audio.length > 1) {
     return send(card('One moment', 'Please use at most 16,000 characters, five images, four documents, one audio recording, and one MP4 per request.', { tone: 'warning' }));
   }
-  let progress;
   let prepared, release;
   try {
     assertSafeChatInput(text);
@@ -126,11 +125,10 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
     if (spoken && options.outputFormat === 'json') throw new RequestOptionsError('Choose text output for a spoken answer. JSON output is delivered as a file.');
     release = limiter.acquire({ scope, userId, guildId });
     const persona = store.persona(userId);
-    progress = await animate(send);
     const songRequest = parseSongRequest(text);
     if (songRequest && options.outputFormat !== 'json') {
       const song = await songs.download(songRequest.query, { signal: shutdownController.signal });
-      await progress.finish(resultReply(songResult(song)));
+      await send(resultReply(songResult(song)));
       console.log(JSON.stringify({ event: 'song_attachment', bytes: song.file.attachment.length }));
       return;
     }
@@ -143,11 +141,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       if (generationStarted) throw new Error('Only one generation attempt per request');
       generationStarted = true;
       return mediaService.generate(type, prompt, { images: useReference ? images : [], videos: useReference ? videos : [],
-        userId, guildId, send: async payload => {
-          // Drain the animation before showing buttons in the shared reply.
-          await progress.stop();
-          return send(payload);
-        }, options, signal: shutdownController.signal });
+        userId, guildId, send, options, signal: shutdownController.signal });
     };
     let songStarted = false;
     const downloadSong = async (query, { signal } = {}) => {
@@ -160,8 +154,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       requestOptions: options,
       knowledgeTools: prepared.knowledgeTools,
       cacheKey: createHash('sha256').update(scope).digest('hex'),
-      safetyIdentifier: createHash('sha256').update(userId).digest('hex'),
-      onActivity: activity => progress?.setActivity(activity) });
+      safetyIdentifier: createHash('sha256').update(userId).digest('hex') });
     // Keep text history only; Discord attachment links expire.
     assertSafeValue({ text: result.text, warnings: result.artifactWarnings });
     const notices = [...prepared.notices];
@@ -183,7 +176,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       }
     }
     const payload = resultReply(result, { notices, speech });
-    await progress.finish(payload);
+    await send(payload);
     console.log(JSON.stringify({ event: 'ai_response', model: result.media ? ai.model : result.model, usage: result.usage,
       ...(result.media ? { mediaModel: result.media.model, mediaUsage: result.media.usage ?? null,
         mediaRequestId: result.media.requestId ?? null } : {}) }));
@@ -200,14 +193,10 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
         ? 'That request timed out. Check /jobs before retrying media; a submitted job may still complete.'
         : 'I couldn’t finish that one. Give it another try in a moment.';
     const payload = card('Couldn’t complete your request', message, { tone: 'error' });
-    await (progress ? progress.finish(payload) : send(payload)).catch(error => logError('send_error', error));
+    await send(payload).catch(error => logError('send_error', error));
   } finally {
-    try {
-      await progress?.stop();
-    } finally {
-      try { if (prepared) await prepared.cleanup().catch(error => logError('file_cleanup_error', error)); }
-      finally { release?.(); }
-    }
+    try { if (prepared) await prepared.cleanup().catch(error => logError('file_cleanup_error', error)); }
+    finally { release?.(); }
   }
 }
 
