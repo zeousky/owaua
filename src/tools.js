@@ -91,7 +91,7 @@ export function createTools() {
   };
   for (const kind of ['image', 'video', 'edit_image', 'edit_video', 'extend_video']) registry.register({
     name: ['image', 'video'].includes(kind) ? `generate_${kind}` : kind,
-    description: `${mediaDescriptions[kind]} Only set options to fulfill an explicit user preference; otherwise preserve defaults. Reference media comes from the current request automatically. Set use_reference=false only for unrelated creation. Never invent media URLs.`,
+    description: `${mediaDescriptions[kind]} Start immediately for a clear request; choose missing creative details yourself without asking about settings or permission. Only set options to fulfill an explicit user preference; otherwise preserve defaults. Reference media comes from the current request automatically. Set use_reference=false only for unrelated creation. Never invent media URLs.`,
     parameters: { type: 'object', properties: { prompt: { type: 'string', minLength: 1, maxLength: 6000 },
       use_reference: { type: 'boolean', description: 'Use supplied reference media; defaults to true. Always true for edits/extensions.' },
       options: { type: 'object', additionalProperties: false, properties:

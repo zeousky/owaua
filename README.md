@@ -111,7 +111,7 @@ Chat, media generation, and music lookup show only a moving loading bar as a pla
 
 ## Image and video generation
 
-Image/video creation, edit and extension requests require a fresh confirmation button from the requester after reviewing the final prompt, references and settings. Model output, attachments and history cannot approve spending. Owaua fills in unspecified settings with the defaults and makes reasonable creative choices for missing details. Edits still need source media and a description of what to change. JSON-output requests cannot execute media tools.
+Clear image/video creation, edit and extension requests start immediately using defaults and reasonable creative choices for missing details. Owaua does not ask about optional settings or show a confirmation button for recognized direct requests. Ambiguous proposals still require requester confirmation; model output, attachments and history cannot approve spending. Edits still need source media and a description of what to change. JSON-output requests cannot execute media tools.
 
 Ask Owaua in a mention, reply, DM, or `/ask`: “generate an image of a cat” or “make a video of waves at sunset.” Both use the existing `XAI_API_KEY`. Defaults remain one `grok-imagine-image-2.0` image at medium quality / 1k, or a six-second 720p `grok-imagine-video-1.5-lite` video. Explicit requests can select 1–10 image outputs, low/medium/auto quality, 1k/2k resolution, and supported aspect ratios. For example: “make three square 2k images of a lighthouse.” Auto quality is chosen by the provider and billed at the quality served.
 
@@ -232,7 +232,7 @@ API references: [Grok 4.7](https://docs.x.ai/developers/grok-4-7), [web search](
 
 ### Daily media allowances
 
-Allowances reset at midnight Europe/Budapest. Each user has 1 video and 2 images daily across all servers and DMs; each server shares 3 videos and 5 images daily. Image batches count each requested image; editing and extension count toward their media type. Owner `1172433512364769342` is recorded as exempt and consumes neither allowance. A SQLite transaction reserves allowance after confirmation and before the provider POST, including simultaneous requests. Definite rejected POSTs release their reservation; failed or uncertain submitted generations remain counted because they may have incurred cost. Reservations and jobs survive restarts in `data/kirmy.sqlite`, which must be included in backups.
+Allowances reset at midnight Europe/Budapest. Each user has 1 video and 2 images daily across all servers and DMs; each server shares 3 videos and 5 images daily. Image batches count each requested image; editing and extension count toward their media type. Owner `1172433512364769342` is recorded as exempt and consumes neither allowance. A SQLite transaction reserves allowance after authorization and before the provider POST, including simultaneous requests. Definite rejected POSTs release their reservation; failed or uncertain submitted generations remain counted because they may have incurred cost. Reservations and jobs survive restarts in `data/kirmy.sqlite`, which must be included in backups.
 
 `/usage` privately shows your daily request, voice session and media allowances. Only the owner can use the `user` and `server` filters to inspect other users/servers. General request limits also apply to the owner; the existing owner exemption applies only to image/video quotas.
 

@@ -140,7 +140,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       if (generationStarted) throw new Error('Only one generation attempt per request');
       generationStarted = true;
       return mediaService.generate(type, prompt, { images: useReference ? images : [], videos: useReference ? videos : [],
-        userId, guildId, send, options, signal: shutdownController.signal });
+        userId, guildId, send, options, currentRequest: text, signal: shutdownController.signal });
     };
     let songStarted = false;
     const downloadSong = async (query, { signal } = {}) => {

@@ -1,15 +1,17 @@
 import { MediaInputError } from './media.js';
+import { requestsMedia } from './media-request.js';
 
 export class MediaService {
   constructor({ media, store, confirm }) { Object.assign(this, { media, store, confirm }); this.active = new Set(); }
-  async generate(kind, prompt, { userId, guildId, send, signal, ...options }) {
+  async generate(kind, prompt, { userId, guildId, send, signal, currentRequest, ...options }) {
     let id, posted = false, accepted = false;
     try {
       return await this.media.generate(kind, prompt, { ...options, signal,
         authorize: async proposal => {
-          // Every paid action needs a fresh actor-bound button approval of the
-          // final payload, including actions proposed from untrusted content.
-          if (await this.confirm({ userId, send, proposal, signal }) !== true) return false;
+          // A clear current request authorizes this media type immediately.
+          // Ambiguous/model-proposed actions still require actor-bound review.
+          if (!requestsMedia(kind, currentRequest, options) &&
+            await this.confirm({ userId, send, proposal, signal }) !== true) return false;
           signal?.throwIfAborted();
           id = this.store.reserve({ userId, guildId, kind: kind.includes('image') ? 'image' : 'video',
             units: proposal.body.n ?? 1, model: proposal.body.model });

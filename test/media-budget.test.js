@@ -59,10 +59,10 @@ test('cancellation of every action submits nothing and reserves nothing', async 
   assert.deepEqual(store.usage().rows, []);
 });
 
-test('simultaneously approved requests cannot bypass allowance and reserve before POST', async t => {
+test('immediate requests cannot bypass allowance and reserve before POST without asking for confirmation', async t => {
   const { store } = fixture(t);
   let posts = 0;
-  const service = new MediaService({ store, confirm: async () => true,
+  const service = new MediaService({ store, confirm: async () => assert.fail('A clear request must start immediately'),
     media: new MediaGenerator({ fetchImpl: async (_, request) => {
       posts++;
       assert.equal(store.count('user_id', user, 'image', mediaDay()), 2);
@@ -70,11 +70,32 @@ test('simultaneously approved requests cannot bypass allowance and reserve befor
       return reply({ data: [{ url: 'https://example.com/a.png' }, { url: 'https://example.com/b.png' }] });
     } }) });
   const results = await Promise.allSettled([1,2].map(() => service.generate('image', 'A cat', {
-    userId: user, guildId: guild, options: { count: 2 },
+    userId: user, guildId: guild, currentRequest: 'make two images of a cat', options: { count: 2 },
   })));
   assert.equal(posts, 1);
   assert.deepEqual(results.map(r => r.status).sort(), ['fulfilled','rejected']);
   assert.equal(store.jobs(user, guild)[0].state, 'completed');
+});
+
+test('clear media requests submit all five actions without a Discord confirmation', async t => {
+  const { store } = fixture(t);
+  let posts = 0;
+  const service = new MediaService({ store, confirm: async () => assert.fail('No confirmation'),
+    media: new MediaGenerator({ fetchImpl: async (_, { method }) => {
+      if (method === 'POST') { posts++; return reply({ data: [{ url: 'https://example.com/cat.png' }], request_id: 'job' }); }
+      return reply({ status: 'done', video: { url: 'https://example.com/cat.mp4' } });
+    } }) });
+  for (const [kind, currentRequest] of [['image', 'make an image'], ['video', 'make a video'],
+    ['edit_image', 'make the background blue'], ['edit_video', 'remove the background'],
+    ['extend_video', 'continue this clip']]) {
+    const result = await service.generate(kind, 'A cat in a sunny garden', {
+      userId: MEDIA_OWNER, guildId: guild, currentRequest,
+      images: kind === 'edit_image' ? ['https://example.com/cat.png'] : [],
+      videos: kind.includes('_video') ? ['https://example.com/cat.mp4'] : [],
+    });
+    assert.equal(result.kind, kind.includes('image') ? 'image' : 'video');
+  }
+  assert.equal(posts, 5);
 });
 
 test('video ID is durable before first poll; restart resumes via GET only and retains failed/uncertain charges', async t => {

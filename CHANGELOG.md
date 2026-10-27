@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-27
 
+### Changed
+
+- Clear image and video requests now start straight away with sensible defaults, without extra settings questions or a confirmation button. Edits only need a follow-up if the source or requested change is missing.
+
+## 2026-10-27
+
 ### Fixed
 
 - Mentioning Owaua without a question now gets a short reply. Requested help guides stay private instead of filling the server channel.

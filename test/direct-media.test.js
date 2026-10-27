@@ -21,7 +21,8 @@ test('media tool proposals reach the host without a second AI turn', async () =>
     const ai = new AICore({ fetchImpl: async (_, request) => {
       aiCalls++;
       const body = JSON.parse(request.body);
-      assert.match(body.instructions, /requires the requester to review and confirm/);
+      assert.match(body.instructions, /call the appropriate tool immediately in this turn/);
+      assert.match(body.instructions, /Choose sensible creative details when unspecified/);
       return response({ output: [{ type: 'function_call',
         name: ['image', 'video'].includes(kind) ? `generate_${kind}` : kind,
         call_id: 'create', arguments: JSON.stringify({ prompt: 'A cat under blue light' }) }] });
