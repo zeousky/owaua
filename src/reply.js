@@ -20,7 +20,7 @@ export function resultReply(result, { notices = [], speech } = {}) {
     payload = { ...card('', 'Here’s your answer as a JSON file.'), files: [
       { attachment: Buffer.from(result.text), name: 'owaua-answer.json' },
     ] };
-  } else payload = answerCard(result.text);
+  } else payload = answerCard(result.text, { fullMode: result.fullMode === true });
   if (warnings.length) {
     const note = warnings.join('\n\n');
     if ((payload.content ?? '').length + note.length + 2 <= 2000) payload.content = [payload.content, note].filter(Boolean).join('\n\n');

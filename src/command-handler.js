@@ -1,6 +1,7 @@
 import { handleMediaCommand } from './media-command.js';
 import { handlePersonaCommand } from './persona-command.js';
 import { handleLanguageCommand } from './language-command.js';
+import { handleFullCommand } from './full-command.js';
 import { handleMemoryCommand } from './memory-command.js';
 import { handleSpeakCommand, handleTranscribeCommand, handleVoiceCommand } from './voice-command.js';
 import { handleKnowledgeCommand } from './knowledge-command.js';
@@ -17,6 +18,7 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, u
       if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Owaua', 'Owaua is not enabled in this server.', { tone: 'warning' }), flags: 64 });
       if (stopping) return await interaction.reply({ ...card('', 'I’m restarting — give me a moment, then try again.'), flags: 64 });
       if (interaction.commandName === 'language') return await handleLanguageCommand(interaction, store, interaction.options.getString('name') ?? '');
+      if (interaction.commandName === 'full') return await handleFullCommand(interaction, store);
       if (['jobs', 'usage'].includes(interaction.commandName)) return await handleMediaCommand(interaction, mediaStore, usageStore);
       if (interaction.commandName === 'knowledge') {
         const run = () => handleKnowledgeCommand(interaction, knowledge, { isActive: () => false, stopping, signal });

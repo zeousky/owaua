@@ -1,5 +1,6 @@
 import { personaCommand } from './persona-command.js';
 import { languageCommand } from './language-command.js';
+import { fullCommand } from './full-command.js';
 import { memoryCommand } from './memory-command.js';
 import { jobsCommand, usageCommand } from './media-command.js';
 import { knowledgeCommand } from './knowledge-command.js';
@@ -30,6 +31,7 @@ export const commands = [
   { name: 'help', description: 'Show what Owaua can do' },
   personaCommand,
   languageCommand,
+  fullCommand,
   memoryCommand,
   jobsCommand, usageCommand,
   knowledgeCommand, speakCommand, transcribeCommand, voiceCommand,

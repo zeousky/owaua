@@ -32,6 +32,9 @@ export class ConversationStore {
       CREATE TABLE IF NOT EXISTS languages (
         user_id TEXT PRIMARY KEY, code TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS reply_settings (
+        user_id TEXT PRIMARY KEY, full_mode INTEGER NOT NULL CHECK(full_mode IN (0,1))
+      );
       CREATE TABLE IF NOT EXISTS memories (
         id INTEGER PRIMARY KEY, scope TEXT NOT NULL, user_id TEXT NOT NULL,
         key TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL,
@@ -175,6 +178,16 @@ export class ConversationStore {
       if (notes.length >= 8) break;
     }
     return { scope: 'this user in this channel only', notes: notes.slice(0, 8).map(({ id,key,text,updated_at }) => ({ id,key,text,updated_at: new Date(updated_at).toISOString() })), conversations: recalled.conversations };
+  }
+  fullMode(userId) {
+    return this.db.prepare('SELECT full_mode FROM reply_settings WHERE user_id = ?').get(personaUserId(userId))?.full_mode === 1;
+  }
+  setFullMode(userId, enabled) {
+    personaUserId(userId);
+    if (typeof enabled !== 'boolean') throw new TypeError('Invalid full mode setting');
+    if (enabled) this.db.prepare('INSERT INTO reply_settings(user_id, full_mode) VALUES(?, 1) ON CONFLICT(user_id) DO UPDATE SET full_mode = 1').run(userId);
+    else this.db.prepare('DELETE FROM reply_settings WHERE user_id = ?').run(userId);
+    return enabled;
   }
   language(userId) {
     const row = this.db.prepare('SELECT code FROM languages WHERE user_id = ?').get(personaUserId(userId));

@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-27
 
+### Added
+
+- Use `.full on` or `/full mode:on` for replies without the 600-character cap, and `.full off` to restore short replies. Your choice is saved across servers and DMs; long answers arrive as complete files.
+
+## 2026-10-27
+
 ### Changed
 
 - Owaua’s default persona is now exactly “act gen z ish, swear alot”.

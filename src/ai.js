@@ -21,8 +21,9 @@ export class AICore {
     maxToolRounds = 4, timeoutMs = 180000, maxContextCharacters = 32000, fetchImpl = fetch, tools = createTools(), mcpRegistry = new MCPRegistry() }) {
     Object.assign(this, { apiKey, model, maxOutputTokens, maxToolCalls, maxToolRounds, timeoutMs, maxContextCharacters, fetchImpl, tools, mcpRegistry });
   }
-  async respond({ input, history = [], memory, context = {}, persona, language = 'auto', onActivity, signal: callerSignal,
+  async respond({ input, history = [], memory, context = {}, persona, language = 'auto', fullMode = false, onActivity, signal: callerSignal,
     requestOptions = {}, cacheKey, safetyIdentifier, knowledgeTools = [] }) {
+    if (typeof fullMode !== 'boolean') throw new TypeError('Invalid full mode setting');
     const safety = { secrets: [this.apiKey] };
     assertSafeChatInput(input, safety);
     const options = normalizeRequestOptions(requestOptions, { model: this.model });
@@ -33,7 +34,7 @@ export class AICore {
     const safetyId = opaqueRequestHash(safetyIdentifier, 'Safety identifier');
     // Snapshot the style once. Custom text stays in a user message, separate
     // from both privileged instructions and the current request, on every round.
-    const style = personaInstructions(persona);
+    const style = personaInstructions(persona, { fullMode });
     const replyLanguage = languageInstructions(language);
     const deadline = AbortSignal.timeout(this.timeoutMs);
     const signal = callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline;
@@ -152,9 +153,9 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
       const missing = urls.filter(url => !text.includes(url)).slice(0, 8);
       if (missing.length) text += '\n\nSources:\n' + missing.map((url, i) => `[${i + 1}](<${url}>)`).join(' · ');
       if (result.status === 'incomplete') text += '\n\n*(Response reached its output limit.)*';
-      text = limitReplyLength(stripEmojis(text)) || 'I couldn’t produce a text reply. Please try again.';
+      text = limitReplyLength(stripEmojis(text), { fullMode }) || 'I couldn’t produce a text reply. Please try again.';
       assertSafeText(text, outputSafety);
-      return { text, usage, model: result.model ?? this.model, artifacts: artifacts.artifacts, artifactWarnings: artifacts.warnings };
+      return { text, fullMode, usage, model: result.model ?? this.model, artifacts: artifacts.artifacts, artifactWarnings: artifacts.warnings };
     }
     throw new Error('Tool round limit reached');
   }

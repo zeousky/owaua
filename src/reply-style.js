@@ -6,10 +6,11 @@ export const REPLY_STYLE_INSTRUCTIONS = 'Never use emojis in any reply, includin
 
 export const MAX_REPLY_CHARACTERS = 600;
 export const REPLY_LENGTH_INSTRUCTIONS = `Keep chat answers to 1–3 short sentences and at most ${MAX_REPLY_CHARACTERS} characters, including Markdown and source links. Answer directly; skip repeated slang, filler, and unsolicited follow-up questions. This limit takes precedence over persona detail preferences and requests for longer chat replies. Put requested long code, reports, or data in an exported file and keep the chat summary short. JSON output and exported file contents are exempt from this chat limit.`;
+export const FULL_REPLY_INSTRUCTIONS = 'Full mode is on. No chat character or sentence limit applies. Match the detail to the current question and give a complete answer when needed. Use this current mode even if older history mentions short replies. Avoid filler and repetition.';
 
-export function limitReplyLength(text) {
+export function limitReplyLength(text, { fullMode = false } = {}) {
   const value = text.trim();
-  if (value.length <= MAX_REPLY_CHARACTERS) return value;
+  if (fullMode === true || value.length <= MAX_REPLY_CHARACTERS) return value;
   // Prefer a complete sentence; otherwise end at a word/grapheme boundary.
   // Reserve one character for an ellipsis and never split a Unicode grapheme.
   let end = 0;

@@ -64,3 +64,51 @@ test('large JSON answers and requested file contents remain intact', async () =>
   assert.deepEqual(JSON.parse(payload.files[0].attachment.toString()), JSON.parse(text));
   assert.equal(payload.files[1], artifact);
 });
+
+test('full mode removes both the prompt limit and delivery cap, including for custom personas', async () => {
+  for (const persona of [DEFAULT_PERSONA, { ...DEFAULT_PERSONA, character: 'custom', description: 'A dramatic storyteller' }]) {
+    for (const text of ['Useful answer. '.repeat(80).trim(), 'Useful answer. '.repeat(220).trim()]) {
+      const ai = new AICore({ fetchImpl: async (_url, options) => {
+        const instructions = JSON.parse(options.body).instructions;
+        assert.match(instructions, /Full mode is on/);
+        assert.doesNotMatch(instructions, /1–3 short sentences|at most 600 characters/);
+        return response(text);
+      } });
+      const result = await ai.respond({ input: 'Explain fully.', persona, fullMode: true });
+      assert.equal(result.text, text);
+      assert.equal(result.fullMode, true);
+      const payload = resultReply(result);
+      if (text.length <= 2000) assert.equal(payload.content, text);
+      else {
+        assert.equal(payload.files[0].attachment.toString(), text);
+        assert.equal(payload.files[0].name, 'owaua-answer.md');
+      }
+    }
+  }
+});
+
+test('full mode is isolated between concurrent requests and survives tool continuations', async () => {
+  const text = 'More context. '.repeat(100).trim();
+  const ai = new AICore({ fetchImpl: async (_url, options) => {
+    const request = JSON.parse(options.body);
+    const full = request.instructions.includes('Full mode is on');
+    await new Promise(resolve => setImmediate(resolve));
+    if (full && !request.input.some(item => item.type === 'function_call_output')) {
+      return { ok: true, json: async () => ({ output: [{ type: 'function_call', name: 'current_time',
+        arguments: '{"timezone":"UTC"}', call_id: 'clock' }] }) };
+    }
+    return response(text);
+  } });
+  const [full, short] = await Promise.all([
+    ai.respond({ input: 'Explain fully.', fullMode: true }),
+    ai.respond({ input: 'Answer briefly.' }),
+  ]);
+  assert.equal(full.text, text);
+  assert.equal(resultReply(full).content, text);
+  assert.ok(short.text.length <= MAX_REPLY_CHARACTERS);
+  assert.equal(short.fullMode, false);
+  for (const value of ['true', 1, {}]) {
+    await assert.rejects(ai.respond({ input: 'Hello', fullMode: value }), /Invalid full mode setting/);
+    assert.ok(limitReplyLength(text, { fullMode: value }).length <= MAX_REPLY_CHARACTERS);
+  }
+});

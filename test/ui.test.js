@@ -31,7 +31,7 @@ test('help keeps the quick start in chat and preserves advanced settings and pri
   assert.match(payload.content, /I’m Owaua/);
   assert.doesNotMatch(JSON.stringify(payload), /Kirmy/i);
   assert.ok(payload.content.length <= 2000);
-  for (const command of ['/ask', '/jobs', '/voice', '.music', '.language', '/persona', '/memory', '/knowledge', '/reset']) {
+  for (const command of ['/ask', '/jobs', '/voice', '.music', '.language', '.full on', '.full off', '/persona', '/memory', '/knowledge', '/reset']) {
     assert.ok(payload.content.includes(command), `Quick start should explain ${command}`);
   }
   assert.equal(payload.files.length, 1);
