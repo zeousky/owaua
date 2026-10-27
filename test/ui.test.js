@@ -19,11 +19,11 @@ test('replies contain plain content without a progress bar', () => {
   }
 });
 
-test('long answers preserve all text and sources in an attachment', () => {
+test('long chat answers stay short without an automatic full-answer attachment', () => {
   const text = '```js\n' + 'const value = 1;\n'.repeat(400) + '```\nhttps://example.com/source';
   const payload = answerCard(text);
-  assert.equal(payload.files[0].attachment.toString(), text);
-  assert.equal(payload.files[0].name, 'owaua-answer.md');
+  assert.ok(payload.content.length <= 600);
+  assert.equal(payload.files, undefined);
 });
 
 test('help keeps the quick start in chat and preserves advanced settings and privacy in its guide', () => {

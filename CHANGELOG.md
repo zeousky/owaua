@@ -6,6 +6,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ### Changed
 
+- Chat replies now stay within 600 characters, with shorter, more direct answers. Requested files and JSON downloads keep their full contents.
+
+## 2026-10-27
+
+### Changed
+
 - Clear image and video requests now start straight away with sensible defaults, without extra settings questions or a confirmation button. Edits only need a follow-up if the source or requested change is missing.
 
 ## 2026-10-27

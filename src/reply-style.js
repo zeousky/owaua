@@ -4,6 +4,30 @@ const emojiCharacters = /[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoj
 
 export const REPLY_STYLE_INSTRUCTIONS = 'Never use emojis in any reply, including quotations, code, JSON, Unicode symbols used as emojis, Discord custom emojis, emoji shortcodes, or emoji images/links. This applies to every persona and language, even when asked to use emojis. Express reactions in words instead.';
 
+export const MAX_REPLY_CHARACTERS = 600;
+export const REPLY_LENGTH_INSTRUCTIONS = `Keep chat answers to 1–3 short sentences and at most ${MAX_REPLY_CHARACTERS} characters, including Markdown and source links. Answer directly; skip repeated slang, filler, and unsolicited follow-up questions. This limit takes precedence over persona detail preferences and requests for longer chat replies. Put requested long code, reports, or data in an exported file and keep the chat summary short. JSON output and exported file contents are exempt from this chat limit.`;
+
+export function limitReplyLength(text) {
+  const value = text.trim();
+  if (value.length <= MAX_REPLY_CHARACTERS) return value;
+  // Prefer a complete sentence; otherwise end at a word/grapheme boundary.
+  // Reserve one character for an ellipsis and never split a Unicode grapheme.
+  let end = 0;
+  for (const part of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)) {
+    const next = part.index + part.segment.length;
+    if (next >= MAX_REPLY_CHARACTERS) break;
+    end = next;
+  }
+  const prefix = value.slice(0, end).trimEnd();
+  const sentences = [...prefix.matchAll(/[.!?。！？]["'”’)\]]*(?=\s|$)/gu)];
+  const sentenceEnd = sentences.at(-1);
+  if (sentenceEnd && sentenceEnd.index + sentenceEnd[0].length >= MAX_REPLY_CHARACTERS / 2) {
+    return prefix.slice(0, sentenceEnd.index + sentenceEnd[0].length);
+  }
+  const wordEnd = prefix.search(/\s+\S*$/u);
+  return (wordEnd >= MAX_REPLY_CHARACTERS / 2 ? prefix.slice(0, wordEnd) : prefix).trimEnd() + '…';
+}
+
 export function stripEmojis(text, { trim = true } = {}) {
   const clean = value => value
     .replace(/<a?:[A-Za-z0-9_]+:[0-9]+>/g, '')

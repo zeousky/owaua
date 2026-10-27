@@ -70,8 +70,9 @@ test('JSON output, chart files, speech and warnings remain separate downloadable
   assert.match(payload.content, /Memory could not be saved/);
 });
 
-test('long answers retain their Markdown attachment alongside generated files', () => {
+test('long chat answers stay short while requested files remain attached', () => {
   const payload = resultReply({ text: 'x'.repeat(4000), artifacts: [{ name: 'data.csv', attachment: Buffer.from('a,b') }] });
-  assert.equal(payload.files.length, 2);
-  assert.equal(payload.files[1].name, 'data.csv');
+  assert.ok(payload.content.length <= 600);
+  assert.equal(payload.files.length, 1);
+  assert.equal(payload.files[0].name, 'data.csv');
 });

@@ -99,7 +99,11 @@ test('ordinary structured responses and exports do not exhaust the decoding budg
   assert.equal(assertSafeText(text), text); assert.equal(assertSafeValue(value), value);
   assert.equal(exportFile({ filename: 'entries.json', content: text }).attachment.toString(), text);
   const ai = new AICore({ fetchImpl: async () => response(text) });
-  assert.equal((await ai.respond({ input: 'List the entries.' })).text, text);
+  const result = await ai.respond({ input: 'List the entries as JSON.', requestOptions: {
+    outputFormat: 'json', schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } },
+      required: ['items'], additionalProperties: false },
+  } });
+  assert.deepEqual(JSON.parse(result.text), value);
 });
 
 test('labelled credential values remain protected in JSON and structured objects', () => {

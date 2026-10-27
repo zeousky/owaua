@@ -45,7 +45,9 @@ test('final delivery strips reflected command text, tracks, long answers and not
     'Saved \n\nStyle \n Casual');
   assert.doesNotMatch(trackCard({ title: '🔥 Song', duration: 60, url: 'https://example.com' }).content, /🔥/);
   const long = answerCard('🔥Hello\n'.repeat(500));
-  assert.doesNotMatch(long.files[0].attachment.toString(), /🔥/);
+  assert.doesNotMatch(long.content, /🔥/);
+  assert.ok(long.content.length <= 600);
+  assert.equal(long.files, undefined);
   assert.equal(resultReply({ text: 'Hello 👀', artifactWarnings: ['Ready 🔥'] }, { notices: [':fire: Note'] }).content,
     'Hello\n\nNote\n\nReady');
   assert.match(answerCard('🔥').content, /couldn’t produce a text reply/);

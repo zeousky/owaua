@@ -1,5 +1,5 @@
 import { AttachmentBuilder, MessageFlags } from 'discord.js';
-import { stripEmojis } from './reply-style.js';
+import { stripEmojis, limitReplyLength } from './reply-style.js';
 
 const mentions = { parse: [], repliedUser: false };
 
@@ -14,7 +14,8 @@ export function card(_title, description, { fields = [] } = {}) {
 }
 
 export function answerCard(text) {
-  return { ...card('', text), flags: MessageFlags.SuppressEmbeds };
+  const content = limitReplyLength(stripEmojis(text)) || (text.trim() ? 'I couldn’t produce a text reply. Please try again.' : '');
+  return { ...card('', content), flags: MessageFlags.SuppressEmbeds };
 }
 
 export function helpCard(musicHelp) {
