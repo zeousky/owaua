@@ -1,11 +1,13 @@
 import { AttachmentBuilder, MessageFlags } from 'discord.js';
+import { stripEmojis } from './reply-style.js';
 
 const mentions = { parse: [], repliedUser: false };
 
 // Keep the existing reply helpers, but render finished messages as plain text.
 export function card(_title, description, { fields = [] } = {}) {
-  const content = [description, ...fields.map(field => `${field.name}\n${field.value}`)]
+  const original = [description, ...fields.map(field => `${field.name}\n${field.value}`)]
     .filter(Boolean).join('\n\n');
+  const content = stripEmojis(original) || (original.trim() ? 'I couldn’t produce a text reply. Please try again.' : '');
   if (content.length <= 2000) return { content, embeds: [], allowedMentions: mentions };
   return { content: 'That’s a bit long for one message, so I’ve attached the full reply below.', embeds: [], allowedMentions: mentions,
     files: [new AttachmentBuilder(Buffer.from(content), { name: 'owaua-answer.md' })] };

@@ -6,6 +6,13 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ### Changed
 
+- Replies now remove emojis, including linked and custom Discord emojis.
+- Owaua keeps its casual slang and swearing with a more mature tone and less forced hype or flattery.
+
+## 2026-10-27
+
+### Changed
+
 - Removed the message-processing progress bar and its repeated updates from chat, dot commands, and music searches.
 
 ## 2026-10-27

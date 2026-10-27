@@ -1,6 +1,7 @@
 import { createTools } from './tools.js';
 import { songResult } from './song-download.js';
 import { personaContext, personaInstructions } from './persona.js';
+import { stripEmojis, stripJsonEmojis } from './reply-style.js';
 import { languageInstructions } from './language.js';
 import { MEMORY_INSTRUCTIONS, historyContext, memoryContext } from './memory.js';
 import { hostedTools, normalizeRequestOptions, opaqueRequestHash, matchesOutputSchema, normalizeKnowledgeTools } from './request-options.js';
@@ -140,7 +141,7 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
       if (options.outputFormat === 'json') {
         if (result.status === 'incomplete') throw new ProviderError(502, 'incomplete_structured_output');
         let value;
-        try { value = JSON.parse(text); } catch { throw new ProviderError(502, 'invalid_structured_output'); }
+        try { value = stripJsonEmojis(JSON.parse(text)); } catch { throw new ProviderError(502, 'invalid_structured_output'); }
         if (!matchesOutputSchema(value, options.schema)) throw new ProviderError(502, 'invalid_structured_output');
         assertSafeValue(value, outputSafety);
         return { text: JSON.stringify(value, null, 2), outputFormat: 'json', usage, model: result.model ?? this.model,
@@ -151,6 +152,7 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
       const missing = urls.filter(url => !text.includes(url)).slice(0, 8);
       if (missing.length) text += '\n\nSources:\n' + missing.map((url, i) => `[${i + 1}](<${url}>)`).join(' · ');
       if (result.status === 'incomplete') text += '\n\n*(Response reached its output limit.)*';
+      text = stripEmojis(text) || 'I couldn’t produce a text reply. Please try again.';
       assertSafeText(text, outputSafety);
       return { text, usage, model: result.model ?? this.model, artifacts: artifacts.artifacts, artifactWarnings: artifacts.warnings };
     }

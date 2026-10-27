@@ -1,6 +1,7 @@
 import { card, answerCard } from './ui.js';
 import { mediaReply } from './media.js';
 import { assertSafeText, assertSafeValue } from './safety.js';
+import { stripEmojis } from './reply-style.js';
 
 export function resultReply(result, { notices = [], speech } = {}) {
   assertSafeValue({ text: result.text, notices, warnings: result.artifactWarnings });
@@ -10,7 +11,7 @@ export function resultReply(result, { notices = [], speech } = {}) {
       assertSafeText(new TextDecoder('utf-8', { fatal: true }).decode(artifact.attachment));
     }
   }
-  const warnings = [...notices, ...(result.artifactWarnings ?? [])].filter(Boolean);
+  const warnings = [...notices, ...(result.artifactWarnings ?? [])].filter(Boolean).map(stripEmojis).filter(Boolean);
   let payload;
   if (result.media) payload = mediaReply(result.media);
   else if (result.outputFormat === 'json') {
