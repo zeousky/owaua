@@ -2,6 +2,7 @@ import { card, answerCard } from './ui.js';
 import { ProviderError } from './ai.js';
 import { VoiceInputError } from './voice.js';
 import { SafetyError } from './safety.js';
+import { fullModeActive } from './full-mode.js';
 
 export const speakCommand = {
   name: 'speak', description: 'Turn your text into an AI-generated spoken audio file', options: [
@@ -65,8 +66,9 @@ export async function handleTranscribeCommand(interaction, voice, { signal, onUs
       { attachment: Buffer.from(result.text), name: 'transcript.txt' },
       { attachment: Buffer.from(JSON.stringify({ language: result.language, duration: result.duration, words: result.words }, null, 2)), name: 'transcript-timestamps.json' },
     ];
-    const preview = result.text.length > 12000 ? `${result.text.slice(0, 11900)}\n\nFull transcript attached.` : result.text;
-    await interaction.editReply({ ...answerCard(preview), files });
+    const preview = !fullModeActive() && result.text.length > 12000 ? `${result.text.slice(0, 11900)}\n\nFull transcript attached.` : result.text;
+    const payload = answerCard(preview, { fullMode: fullModeActive() });
+    await interaction.editReply({ ...payload, files: [...(payload.files ?? []), ...files] });
     onUsage({ model: result.model, duration: result.duration });
   } catch (error) { await interaction.editReply(card('Transcription failed', voiceErrorMessage(error), { tone: 'error' })); }
 }

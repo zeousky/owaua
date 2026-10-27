@@ -9,10 +9,12 @@ import { card } from './ui.js';
 import { conversationScope } from './store.js';
 import { requestAttachments } from './attachments.js';
 import { PrefixPrivateReplyError } from './prefix-command.js';
+import { withFullMode } from './full-mode.js';
 
 export function createCommandHandler({ allowed, isStopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
   standalone, active, help, client, answer, signal, logError }) {
-  return async function handleCommand(interaction) {
+  return function handleCommand(interaction) {
+    return withFullMode(interaction.user.id, store.fullMode?.(interaction.user.id), async () => {
     const stopping = isStopping();
     try {
       if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Owaua', 'Owaua is not enabled in this server.', { tone: 'warning' }), flags: 64 });
@@ -71,5 +73,6 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, u
       }
       logError('interaction_error', error);
     }
+    });
   };
 }

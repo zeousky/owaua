@@ -8,6 +8,7 @@ import prism from 'prism-media';
 import { VoiceAPI, VoiceManager, RealtimeVoice, MonoToStereo, VoiceInputError, isAudioAttachment, audioAttachmentUrl } from '../src/voice.js';
 import { voiceErrorMessage, handleSpeakCommand, handleTranscribeCommand } from '../src/voice-command.js';
 import { ProviderError } from '../src/ai.js';
+import { withFullMode, FULL_MODE_OWNER } from '../src/full-mode.js';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const attachment = { name: 'voice-message.ogg', contentType: 'audio/ogg', size: 5,
@@ -256,6 +257,29 @@ test('voice sessions exclusively receive consenting creator and commit completed
   assert.equal(f.realtime.appended.length, 1); assert.equal(f.realtime.commits, 1);
   assert.ok(f.sent.some(text => /won’t record anyone else/.test(text)));
   f.manager.close(); assert.equal(f.realtime.closed, true); assert.equal(f.connection.state.status, VoiceConnectionStatus.Destroyed);
+});
+
+test('owner full mode bypasses shared voice capacity, session and idle caps while preserving creator consent', async () => {
+  const f = fixture({ maxSessions: 0, maxSessionMs: 1, idleMs: 1 });
+  f.message.author.id = FULL_MODE_OWNER;
+  try {
+    await withFullMode(FULL_MODE_OWNER, true, () => f.manager.handle(f.message, { action: 'join' }));
+    const session = f.manager.sessions.get('guild');
+    assert.equal(session.fullMode, true);
+    assert.equal(session.timeout, undefined);
+    assert.equal(session.idle, undefined);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(f.manager.sessions.size, 1);
+    f.connection.receiver.speaking.emit('start', 'someone-else');
+    assert.equal(f.subscriptions.length, 0);
+    await f.manager.handle(f.message, { action: 'leave' });
+    assert.equal(f.manager.sessions.size, 0);
+  } finally { f.manager.close(); }
+  const normal = fixture({ maxSessions: 0 });
+  try {
+    await withFullMode('someone-else', true, () => normal.manager.handle(normal.message, { action: 'join' }));
+    assert.equal(normal.manager.sessions.size, 0);
+  } finally { normal.manager.close(); }
 });
 test('only session owner in the original channel can end voice', async () => {
   const f = fixture(); await f.manager.handle(f.message, { action: 'join' });

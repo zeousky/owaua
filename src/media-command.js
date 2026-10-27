@@ -1,5 +1,6 @@
 import { card } from './ui.js';
 import { MEDIA_OWNER, MEDIA_LIMITS } from './media-store.js';
+import { fullModeActive } from './full-mode.js';
 
 export const jobsCommand = { name: 'jobs', description: 'Find your recent images and videos here (only you can see them)' };
 export const usageCommand = { name: 'usage', description: 'Privately check your daily requests, voice and media allowances', options: [
@@ -29,7 +30,8 @@ export async function handleMediaCommand(interaction, store, usageStore) {
       `${scope === 'user' ? selectedUser ? 'Selected user' : 'You (across servers and DMs)' : scope === 'server' ? 'Server (shared)' : 'Bot (shared)'}: ${used.requests}/${usage.limits.daily[scope]} requests; ${used.voice}/${usage.limits.voice[scope]} voice sessions.`).join('\n') : '';
     const totals = rows.map(row => `• ${mediaCount(row.kind, row.units)} — ${states[row.state] ?? 'status unavailable'}${row.exempt ? ' (owner request, doesn’t use the allowance)' : ''}`);
     return interaction.reply({ ...card('', [
-      allowances ? `**Daily allowance · ${day}**\n${allowances}\nRequests include chat, MP3 downloads, speech, transcription, document uploads and voice session starts. Voice sessions also have their own daily cap and last up to ten minutes. Admitted attempts count even if they fail. No owner exemption for these request limits.\nLimits reset at midnight Europe/Budapest. Use /help, /jobs, status and cleanup commands even after reaching a daily limit.` : '',
+      allowances ? `**Daily allowance · ${day}**\n${allowances}\nRequests include chat, MP3 downloads, speech, transcription, document uploads and voice session starts. Voice sessions normally have their own daily cap and last up to ten minutes. Admitted attempts count even if they fail. Owner full-mode requests bypass these caps and do not use shared allowances.\nLimits reset at midnight Europe/Budapest. Use /help, /jobs, status and cleanup commands even after reaching a daily limit.` : '',
+      fullModeActive() ? 'Your full mode is on: bot usage caps are bypassed. Your own request count still includes exempt attempts.' : '',
       `**Images & videos · ${dateLabel(`${day}T12:00:00Z`)}**${userId ? `\nFor user ${userId}` : ''}${guildId ? `\nIn server ${guildId}` : ''}`,
       totals.join('\n') || `No images or videos requested today${userId || guildId ? ' for this selection' : ''}.`,
       `Each person gets ${MEDIA_LIMITS.user.image} images and ${MEDIA_LIMITS.user.video} video a day, shared across servers and DMs. Each server gets ${MEDIA_LIMITS.server.image} images and ${MEDIA_LIMITS.server.video} videos. Everything resets at midnight Budapest time; the bot owner doesn’t use up these allowances.`,

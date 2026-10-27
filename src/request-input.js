@@ -1,5 +1,6 @@
 import { VoiceInputError } from './voice.js';
 import { assertSafeChatInput } from './safety.js';
+import { fullModeActive } from './full-mode.js';
 
 // Keep temporary uploads separate from borrowed library Files. Cleanup must
 // never delete a document that the requester explicitly saved for future use.
@@ -10,10 +11,12 @@ export async function prepareRequestInput({ text, images = [], documents = [], v
     assertSafeChatInput(text);
     let userText = text;
     if (audio.length) {
-      if (audio.length !== 1) throw new VoiceInputError('Please attach one audio recording per question.');
-      const transcript = await voice.transcribe(audio[0], { signal });
-      if (transcript.text.length > 24000) throw new VoiceInputError('That recording is too long for a chat question. Use /transcribe to download its full transcript.');
-      userText += `\n\n[Transcript of your attached audio]\n${transcript.text}`;
+      if (!fullModeActive() && audio.length !== 1) throw new VoiceInputError('Please attach one audio recording per question.');
+      for (const recording of audio) {
+        const transcript = await voice.transcribe(recording, { signal });
+        if (!fullModeActive() && transcript.text.length > 24000) throw new VoiceInputError('That recording is too long for a chat question. Use /transcribe to download its full transcript.');
+        userText += `\n\n[Transcript of your attached audio]\n${transcript.text}`;
+      }
     }
     assertSafeChatInput(userText);
     uploaded = await documentInputs.upload(documents, { signal });

@@ -10,6 +10,7 @@ import {
 import { ProviderError } from './ai.js';
 import { card } from './ui.js';
 import { assertSafeText, assertSafeValue, SAFETY_INSTRUCTIONS, SafetyError } from './safety.js';
+import { fullModeActive } from './full-mode.js';
 
 const MiB = 1024 * 1024;
 const DISCORD_HOSTS = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
@@ -73,6 +74,7 @@ function voiceId(value = 'eve') {
   return value.toLowerCase();
 }
 function requestSignal(callerSignal, timeoutMs) {
+  if (fullModeActive()) return callerSignal ?? new AbortController().signal;
   return callerSignal ? AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
 }
 
@@ -406,6 +408,7 @@ export class VoiceManager {
   }
   resetIdle(session) {
     clearTimeout(session.idle);
+    if (session.fullMode) return;
     session.idle = setTimeout(() => { this.dispose(session); this.notify(session, 'The voice session ended after two minutes without speech.'); }, this.idleMs);
     session.idle.unref?.();
   }
@@ -450,7 +453,7 @@ export class VoiceManager {
     if (!message.guild) return reply('Voice conversations work in server voice channels.');
     let session = this.sessions.get(message.guildId);
     if (action === 'status') return reply(session
-      ? `A voice session is ${session.realtime?.ready ? 'connected' : 'connecting'}. Only its creator’s audio is sent to xAI. Sessions end after ten minutes or two minutes without speech.`
+      ? `A voice session is ${session.realtime?.ready ? 'connected' : 'connecting'}. Only its creator’s audio is sent to xAI. ${session.fullMode ? 'Owner full mode has no session or idle time cap.' : 'Sessions end after ten minutes or two minutes without speech.'}`
       : 'We’re not in a voice chat right now. Use /voice join from a voice channel.');
     const member = await message.guild.members.fetch(message.author.id);
     if (this.closed) return reply('I’m restarting. Please try again shortly.');
@@ -468,14 +471,14 @@ export class VoiceManager {
     if (session) return reply('Your voice conversation is already running. Use /voice leave to end it.');
     if (!channel || channel.type !== ChannelType.GuildVoice) return reply('Join a regular voice channel first.');
     if (this.isMusicBusy(message.guildId)) return reply('Stop the music with `.music stop` before starting a voice conversation.');
-    if (this.sessions.size >= this.maxSessions) return reply('I’m in a few voice chats already. Try me again in a moment.');
+    if (!fullModeActive(message.author.id) && this.sessions.size >= this.maxSessions) return reply('I’m in a few voice chats already. Try me again in a moment.');
     const permissions = channel.permissionsFor(message.guild.members.me);
     if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) {
       return reply('I need View Channel, Connect, and Speak permissions in that voice channel.');
     }
     voiceId(voice);
     session = { guildId: message.guildId, channelId: channel.id, ownerId: message.author.id,
-      text: message.channel, abort: new AbortController() };
+      fullMode: fullModeActive(message.author.id), text: message.channel, abort: new AbortController() };
     // Reserve synchronously so concurrent joins cannot replace the connection.
     this.sessions.set(message.guildId, session);
     try {
@@ -515,8 +518,11 @@ export class VoiceManager {
         catch { this.dispose(session); this.notify(session, 'Voice audio failed. Use /voice join to try again.'); }
       };
       session.connection.receiver.speaking.on('start', session.onStart);
-      session.timeout = setTimeout(() => { this.dispose(session); this.notify(session, 'The ten-minute voice session ended. Use /voice join to continue.'); }, this.maxSessionMs);
-      session.timeout.unref?.(); this.resetIdle(session);
+      if (!session.fullMode) {
+        session.timeout = setTimeout(() => { this.dispose(session); this.notify(session, 'The ten-minute voice session ended. Use /voice join to continue.'); }, this.maxSessionMs);
+        session.timeout.unref?.();
+      }
+      this.resetIdle(session);
       await this.notify(session, 'Voice is ready. Speak naturally, and pause for a reply. Only the session creator’s speech is sent to xAI.');
     } catch (error) {
       const wasCurrent = this.sessions.get(session.guildId) === session;

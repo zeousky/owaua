@@ -1,6 +1,7 @@
 import { requestImages } from './images.js';
 import { isDocumentAttachment } from './files.js';
 import { isAudioAttachment } from './voice.js';
+import { fullModeActive } from './full-mode.js';
 
 export class AttachmentInputError extends Error {}
 
@@ -26,7 +27,7 @@ export function requestAttachments(message, reference, botId) {
     else if (isDocumentAttachment(attachment)) documents.push(attachment);
     else throw new AttachmentInputError('Please attach images, audio, an MP4 video, or PDF/text/code documents.');
   }
-  if (pictures.length > 5 || documents.length > 4 || videos.length > 1 || audio.length > 1) {
+  if ((!fullModeActive() && (pictures.length > 5 || documents.length > 4 || audio.length > 1)) || videos.length > 1) {
     throw new AttachmentInputError('Please use at most five images, four documents, one audio recording, and one MP4 per request.');
   }
   // New documents/videos suppress old image references just as new images do.

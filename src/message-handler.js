@@ -3,10 +3,12 @@ import { parsePrefixCommand, createPrefixInteraction, PrefixCommandError } from 
 import { requestAttachments } from './attachments.js';
 import { conversationScope } from './store.js';
 import { card } from './ui.js';
+import { withFullMode } from './full-mode.js';
 
 export function createMessageHandler({ allowed, localExtension, handleCommand, client, isStopping,
   voiceManager, music, active, store, answer, logError }) {
-  return async function handleMessage(message) {
+  return function handleMessage(message) {
+    return withFullMode(message.author.id, store.fullMode?.(message.author.id), async () => {
     if (message.author.bot) return;
     try {
       if (!allowed(message.guildId)) return;
@@ -58,5 +60,6 @@ export function createMessageHandler({ allowed, localExtension, handleCommand, c
         await answer({ scope, userId: message.author.id, guildId: message.guildId, text, ...attachments, send });
       } finally { clearInterval(typing); }
     } catch (error) { logError('message_error', error); }
+    });
   };
 }

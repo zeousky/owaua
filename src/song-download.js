@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { commonArgs, resolveTrack, searchTarget } from './music.js';
 import { assertSafeText } from './safety.js';
+import { fullModeActive } from './full-mode.js';
 
 export const MAX_SONG_BYTES = 9 * 1024 * 1024;
 export class SongInputError extends Error {}
@@ -103,7 +104,7 @@ export class SongDownloads {
     assertSafeText(query);
     try { searchTarget(query); } catch (error) { throw new SongInputError(error.message); }
     if (this.active >= 3) throw new SongInputError('I’m preparing a few songs. Please try again in a moment.');
-    const deadline = AbortSignal.timeout(120000);
+    const deadline = fullModeActive() ? new AbortController().signal : AbortSignal.timeout(120000);
     const signal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
     this.active++;
     try {

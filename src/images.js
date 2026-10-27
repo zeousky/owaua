@@ -1,3 +1,5 @@
+import { fullModeActive } from './full-mode.js';
+
 // Current attachments take priority over images in the replied-to message.
 export function requestImages(message, reference, botId) {
   const current = [...message.attachments.values()];
@@ -11,6 +13,6 @@ export function requestImages(message, reference, botId) {
     images = (reference.embeds ?? []).map(embed => embed.image?.url).filter(Boolean);
   }
   images = [...new Set(images)];
-  if (images.length > 5) throw new Error('Please use at most five reference images.');
+  if (!fullModeActive() && images.length > 5) throw new Error('Please use at most five reference images.');
   return images;
 }

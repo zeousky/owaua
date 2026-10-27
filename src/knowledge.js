@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { isDocumentAttachment } from './files.js';
 import { ProviderError } from './ai.js';
+import { fullModeActive } from './full-mode.js';
 
 const MiB = 1024 * 1024;
 const FILE_ID = /^file[-_][A-Za-z0-9_-]{1,200}$/;
@@ -110,6 +111,7 @@ export class KnowledgeLibrary {
   }
 
   #signal(caller) {
+    if (fullModeActive()) return caller ?? new AbortController().signal;
     const deadline = AbortSignal.timeout(this.timeoutMs);
     return caller ? AbortSignal.any([deadline, caller]) : deadline;
   }
@@ -199,10 +201,10 @@ export class KnowledgeLibrary {
       if (!isDocumentAttachment(attachment)) throw new KnowledgeError('Attach a PDF, text, or code document directly to Discord.');
       const url = attachmentUrl(attachment);
       const existing = this.#rows(scope);
-      if (existing.length >= this.maxDocuments) throw new KnowledgeError(`Your library here is full (${this.maxDocuments} documents). Use /knowledge forget or clear first.`);
+      if (!fullModeActive() && existing.length >= this.maxDocuments) throw new KnowledgeError(`Your library here is full (${this.maxDocuments} documents). Use /knowledge forget or clear first.`);
       const storedBytes = existing.reduce((sum, row) => sum + row.bytes, 0);
       if (Number.isFinite(attachment.size) && attachment.size > this.maxFileBytes) throw new KnowledgeError('Each library document must be no larger than 20 MiB.');
-      if (Number.isFinite(attachment.size) && storedBytes + attachment.size > this.maxLibraryBytes) throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
+      if (!fullModeActive() && Number.isFinite(attachment.size) && storedBytes + attachment.size > this.maxLibraryBytes) throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
       const signal = this.#signal(callerSignal);
       const response = await this.fetchImpl(url, { redirect: 'error', signal });
       if (!response.ok) {
@@ -210,7 +212,7 @@ export class KnowledgeLibrary {
         throw new KnowledgeError('I could not download that document. Please attach it again.');
       }
       const { blob, bytes } = await downloadBody(response, this.maxFileBytes, signal);
-      if (storedBytes + bytes > this.maxLibraryBytes) throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
+      if (!fullModeActive() && storedBytes + bytes > this.maxLibraryBytes) throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
       const filename = knowledgeFilename(attachment.name ?? attachment.filename);
       const mime = filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain';
       const body = new FormData();
@@ -307,8 +309,8 @@ export class KnowledgeLibrary {
       const selected = [];
       let bytes = 0;
       for (const row of rows) {
-        if (selected.length >= this.maxInputFiles) break;
-        if (bytes + row.bytes > this.maxInputBytes) continue;
+        if (!fullModeActive() && selected.length >= this.maxInputFiles) break;
+        if (!fullModeActive() && bytes + row.bytes > this.maxInputBytes) continue;
         bytes += row.bytes; selected.push(row);
       }
       return { input: selected.map(row => ({ type: 'input_file', file_id: row.file_id })), tools: [],

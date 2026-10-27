@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-27
 
+### Changed
+
+- Full mode is now available only to the bot owner and bypasses bot usage quotas, cooldowns, request/tool budgets, and voice session time caps. Other users keep the normal limits.
+
+## 2026-10-27
+
 ### Added
 
 - Use `.full on` or `/full mode:on` for replies without the 600-character cap, and `.full off` to restore short replies. Your choice is saved across servers and DMs; long answers arrive as complete files.

@@ -1,6 +1,7 @@
 import { conversationScope } from './store.js';
 import { card } from './ui.js';
 import { KnowledgeError, knowledgeFilename } from './knowledge.js';
+import { fullModeActive } from './full-mode.js';
 
 export const knowledgeCommand = {
   name: 'knowledge', description: 'Manage your private document library for this channel', options: [
@@ -28,7 +29,7 @@ export async function handleKnowledgeCommand(interaction, library, { isActive = 
   if (action === 'list') {
     const documents = library.list(scope);
     const entries = documents.map(document => `#${document.id} · ${displayName(document.filename)} · ${size(document.bytes)}`);
-    return reply([`You’ve saved ${documents.length} of 20 documents here (${size(documents.reduce((sum, document) => sum + document.bytes, 0))} of 40 MiB used).`,
+    return reply([fullModeActive() ? `You’ve saved ${documents.length} documents here (${size(documents.reduce((sum, document) => sum + document.bytes, 0))}). Full mode bypasses library count and total-size caps.` : `You’ve saved ${documents.length} of 20 documents here (${size(documents.reduce((sum, document) => sum + document.bytes, 0))} of 40 MiB used).`,
       ...entries, !documents.length ? 'Want to save a document for later? Attach a PDF, text, or code file with /knowledge add.' : '',
       'Use /ask library:true when you want me to look through these files for an answer. xAI’s document search can access every document you’ve saved here.',
       'Your files stay at xAI until you remove them with /knowledge forget or clear. Only you see these library commands; /ask answers are visible in the channel.'].filter(Boolean).join('\n\n'));

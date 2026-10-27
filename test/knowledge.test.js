@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { KnowledgeLibrary, KnowledgeError, knowledgeFilename } from '../src/knowledge.js';
+import { withFullMode, FULL_MODE_OWNER } from '../src/full-mode.js';
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 const attachment = (name = 'guide.txt', extras = {}) => ({ name, contentType: 'text/plain', size: 5,
@@ -24,6 +25,21 @@ function setup(t, settings = {}) {
   t.after(async () => { await library.close(); rmSync(directory, { recursive: true, force: true }); });
   return { library, calls, directory };
 }
+
+test('owner full mode bypasses library counts and combined budgets without relaxing file validation', async t => {
+  const { library } = setup(t, { maxDocuments: 1, maxLibraryBytes: 5, maxInputFiles: 1, maxInputBytes: 5 });
+  const scope = `g:c:${FULL_MODE_OWNER}`;
+  await library.add(scope, attachment('first.txt'));
+  await assert.rejects(library.add(scope, attachment('second.txt')), /full/);
+  await withFullMode(FULL_MODE_OWNER, true, async () => {
+    await library.add(scope, attachment('second.txt'));
+    await library.add(scope, attachment('third.txt'));
+    assert.equal((await library.context(scope)).selected, 3);
+    await assert.rejects(library.add(scope, attachment('bad.txt', { url: 'https://example.com/bad.txt' })), KnowledgeError);
+  });
+  assert.equal((await library.context(scope)).selected, 1);
+  await assert.rejects(library.add(scope, attachment('fourth.txt')), /full/);
+});
 
 test('permanent Files uploads persist across restart without content or provider IDs in listings', async t => {
   const { library, calls, directory } = setup(t);

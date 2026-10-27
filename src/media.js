@@ -1,6 +1,7 @@
 import { card } from './ui.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ProviderError } from './ai.js';
+import { fullModeActive } from './full-mode.js';
 import { assertSafeText } from './safety.js';
 
 export function mediaUrl(value) {
@@ -120,8 +121,8 @@ export class MediaGenerator {
       throw new MediaInputError('Media generation was cancelled or not confirmed. No media request was submitted.');
     }
     callerSignal?.throwIfAborted();
-    const deadline = AbortSignal.timeout(this.timeoutMs);
-    const signal = callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline;
+    const deadline = fullModeActive() ? null : AbortSignal.timeout(this.timeoutMs);
+    const signal = deadline ? (callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline) : callerSignal ?? new AbortController().signal;
     const request = (path, body) => this.request(path, body, signal);
     onSubmitting?.();
     if (kind === 'image' || kind === 'edit_image') {

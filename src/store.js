@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DEFAULT_PERSONA, validatePersona } from './persona.js';
 import { validateLanguage } from './language.js';
 import { boundedHistory, memoryKey, memoryText, searchTerms } from './memory.js';
+import { FULL_MODE_OWNER, fullModeActive } from './full-mode.js';
 
 function personaUserId(userId) {
   if (typeof userId !== 'string' || !/^[0-9]{17,20}$/.test(userId)) throw new Error('Invalid persona user');
@@ -74,6 +75,10 @@ export class ConversationStore {
   }
   history(scope) {
     if (this.memoryStatus(scope).paused) return [];
+    if (fullModeActive()) return this.db.prepare('SELECT user, assistant FROM turns WHERE scope = ? AND created_at >= ? ORDER BY id')
+      .all(scope, Date.now() - this.retentionDays * 86400000).flatMap(t => [
+        { role: 'user', content: t.user }, { role: 'assistant', content: t.assistant },
+      ]);
     return boundedHistory(this.db.prepare('SELECT user, assistant FROM turns WHERE scope = ? AND created_at >= ? ORDER BY id DESC LIMIT ?')
       .all(scope, Date.now() - this.retentionDays * 86400000, this.maxTurns).reverse().flatMap(t => [
         { role: 'user', content: t.user }, { role: 'assistant', content: t.assistant },
@@ -81,7 +86,8 @@ export class ConversationStore {
   }
   append(scope, user, assistant, { userId, memories = [] } = {}) {
     if (this.memoryStatus(scope).paused) return;
-    if (typeof user !== 'string' || user.length > 17000 || typeof assistant !== 'string' || assistant.length > 100000 || !Array.isArray(memories) || memories.length > 4) throw new Error('Invalid conversation');
+    if (typeof user !== 'string' || typeof assistant !== 'string' || !Array.isArray(memories) ||
+      (!fullModeActive(userId) && (user.length > 17000 || assistant.length > 100000 || memories.length > 4))) throw new Error('Invalid conversation');
     this.db.exec('BEGIN');
     try {
       const inserted = this.db.prepare('INSERT INTO turns(scope,user,assistant,created_at) VALUES(?,?,?,?)')
@@ -106,7 +112,7 @@ export class ConversationStore {
     this.db.prepare('INSERT INTO memory_settings(scope,paused) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET paused=excluded.paused').run(scope, Number(paused));
   }
   listMemories(scope) {
-    return this.db.prepare('SELECT id,key,text,source,explicit,created_at,updated_at,source_turn_id FROM memories WHERE scope = ? ORDER BY explicit DESC,updated_at DESC,id DESC LIMIT 200').all(scope);
+    return this.db.prepare('SELECT id,key,text,source,explicit,created_at,updated_at,source_turn_id FROM memories WHERE scope = ? ORDER BY explicit DESC,updated_at DESC,id DESC LIMIT ?').all(scope, fullModeActive() ? -1 : 200);
   }
   remember(scope, userId, { key, text, source = 'command', explicit = false, sourceTurnId = null }) {
     personaUserId(userId);
@@ -114,7 +120,7 @@ export class ConversationStore {
     if (this.memoryStatus(scope).paused) throw new Error('Memory is paused');
     key = memoryKey(key); text = memoryText(text);
     if (!['command', 'conversation'].includes(source) || typeof explicit !== 'boolean') throw new Error('Invalid memory source');
-    if (!this.db.prepare('SELECT id FROM memories WHERE scope=? AND key=?').get(scope, key) && this.memoryStatus(scope).notes >= 200) throw new Error('Memory is full; forget a note first');
+    if (!fullModeActive(userId) && !this.db.prepare('SELECT id FROM memories WHERE scope=? AND key=?').get(scope, key) && this.memoryStatus(scope).notes >= 200) throw new Error('Memory is full; forget a note first');
     const now = Date.now();
     this.db.exec('SAVEPOINT save_memory');
     try {
@@ -180,10 +186,12 @@ export class ConversationStore {
     return { scope: 'this user in this channel only', notes: notes.slice(0, 8).map(({ id,key,text,updated_at }) => ({ id,key,text,updated_at: new Date(updated_at).toISOString() })), conversations: recalled.conversations };
   }
   fullMode(userId) {
+    if (personaUserId(userId) !== FULL_MODE_OWNER) return false;
     return this.db.prepare('SELECT full_mode FROM reply_settings WHERE user_id = ?').get(personaUserId(userId))?.full_mode === 1;
   }
   setFullMode(userId, enabled) {
     personaUserId(userId);
+    if (userId !== FULL_MODE_OWNER) throw new Error('Only the bot owner can use full mode');
     if (typeof enabled !== 'boolean') throw new TypeError('Invalid full mode setting');
     if (enabled) this.db.prepare('INSERT INTO reply_settings(user_id, full_mode) VALUES(?, 1) ON CONFLICT(user_id) DO UPDATE SET full_mode = 1').run(userId);
     else this.db.prepare('DELETE FROM reply_settings WHERE user_id = ?').run(userId);

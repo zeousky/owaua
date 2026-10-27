@@ -74,7 +74,7 @@ test('full mode removes both the prompt limit and delivery cap, including for cu
         assert.doesNotMatch(instructions, /1–3 short sentences|at most 600 characters/);
         return response(text);
       } });
-      const result = await ai.respond({ input: 'Explain fully.', persona, fullMode: true });
+      const result = await ai.respond({ input: 'Explain fully.', persona, fullMode: true, context: { userId: '1172433512364769342' } });
       assert.equal(result.text, text);
       assert.equal(result.fullMode, true);
       const payload = resultReply(result);
@@ -100,7 +100,7 @@ test('full mode is isolated between concurrent requests and survives tool contin
     return response(text);
   } });
   const [full, short] = await Promise.all([
-    ai.respond({ input: 'Explain fully.', fullMode: true }),
+    ai.respond({ input: 'Explain fully.', fullMode: true, context: { userId: '1172433512364769342' } }),
     ai.respond({ input: 'Answer briefly.' }),
   ]);
   assert.equal(full.text, text);

@@ -1,4 +1,5 @@
 import { ProviderError } from './ai.js';
+import { fullModeActive } from './full-mode.js';
 
 const MiB = 1024 * 1024;
 const DISCORD_HOSTS = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
@@ -88,7 +89,7 @@ export class DocumentInputs {
 
   async upload(attachments, { signal: callerSignal } = {}) {
     const documents = asAttachments(attachments).filter(isDocumentAttachment);
-    if (documents.length > this.maxFiles) {
+    if (!fullModeActive() && documents.length > this.maxFiles) {
       throw new DocumentInputError(`Please attach at most ${this.maxFiles} documents at once.`);
     }
     const ids = [];
@@ -104,9 +105,10 @@ export class DocumentInputs {
       }
       statedTotal += Number.isFinite(document.size) && document.size > 0 ? document.size : 0;
     }
-    if (statedTotal > this.maxTotalBytes) throw new DocumentInputError('The attached documents exceed the combined upload size limit.');
-    const deadline = AbortSignal.timeout(this.timeoutMs);
-    const signal = callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline;
+    const maxTotalBytes = fullModeActive() ? Infinity : this.maxTotalBytes;
+    if (statedTotal > maxTotalBytes) throw new DocumentInputError('The attached documents exceed the combined upload size limit.');
+    const deadline = fullModeActive() ? null : AbortSignal.timeout(this.timeoutMs);
+    const signal = deadline ? (callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline) : callerSignal ?? new AbortController().signal;
     let totalBytes = 0;
     try {
       for (const [index, document] of documents.entries()) {
@@ -117,7 +119,7 @@ export class DocumentInputs {
           throw new DocumentInputError('I could not download the document attachment. Please attach it again.');
         }
         const { blob, size } = await boundedDownload(response, {
-          signal, maxFileBytes: this.maxFileBytes, remainingBytes: this.maxTotalBytes - totalBytes,
+          signal, maxFileBytes: this.maxFileBytes, remainingBytes: maxTotalBytes - totalBytes,
         });
         totalBytes += size;
         signal.throwIfAborted();

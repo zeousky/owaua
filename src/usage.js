@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { mediaDay } from './media-store.js';
+import { fullModeActive } from './full-mode.js';
 
 export const DEFAULT_USAGE_LIMITS = {
   daily: { user: 60, server: 300, bot: 1000 },
@@ -41,14 +42,18 @@ export class UsageStore {
       CREATE INDEX IF NOT EXISTS usage_user ON usage_admissions(user_id, day, created_at);
       CREATE INDEX IF NOT EXISTS usage_guild ON usage_admissions(guild_id, day, created_at);
       CREATE INDEX IF NOT EXISTS usage_time ON usage_admissions(created_at);`);
+    if (!this.db.prepare('PRAGMA table_info(usage_admissions)').all().some(column => column.name === 'exempt')) {
+      this.db.exec('ALTER TABLE usage_admissions ADD COLUMN exempt INTEGER NOT NULL DEFAULT 0');
+    }
     this.db.prepare('DELETE FROM usage_admissions WHERE created_at < ?').run(now() - 31 * 86400000);
     this.prunedDay = mediaDay(now());
   }
-  count(scope, actor, { day, since, voice = false } = {}) {
+  count(scope, actor, { day, since, voice = false, includeExempt = false } = {}) {
     const columns = { user: 'user_id', server: 'guild_id', bot: null };
     if (!Object.hasOwn(columns, scope)) throw new Error('Invalid usage scope');
     if (scope !== 'bot' && !actor) return 0;
     const clauses = [], args = [];
+    if (!includeExempt) clauses.push('exempt=0');
     if (columns[scope]) { clauses.push(`${columns[scope]}=?`); args.push(actor); }
     if (day) { clauses.push('day=?'); args.push(day); }
     if (since !== undefined) { clauses.push('created_at>?'); args.push(since); }
@@ -58,9 +63,10 @@ export class UsageStore {
   reserve({ userId, guildId, voice = false }) {
     if (!/^\d{17,20}$/.test(userId) || (guildId && !/^\d{17,20}$/.test(guildId)) || typeof voice !== 'boolean') throw new Error('Invalid usage actor');
     const now = this.now(), day = mediaDay(now);
+    const exempt = fullModeActive(userId);
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      for (const [scope, actor] of [['user', userId], ['server', guildId], ['bot', null]]) {
+      for (const [scope, actor] of exempt ? [] : [['user', userId], ['server', guildId], ['bot', null]]) {
         if (scope === 'server' && !actor) continue;
         for (const window of ['minute', 'daily', ...(voice ? ['voice'] : [])]) {
           const criteria = window === 'minute' ? { since: now - 60000 } : { day, voice: window === 'voice' };
@@ -70,8 +76,8 @@ export class UsageStore {
           }
         }
       }
-      this.db.prepare('INSERT INTO usage_admissions(user_id,guild_id,day,voice,created_at) VALUES(?,?,?,?,?)')
-        .run(userId, guildId ?? '', day, Number(voice), now);
+      this.db.prepare('INSERT INTO usage_admissions(user_id,guild_id,day,voice,created_at,exempt) VALUES(?,?,?,?,?,?)')
+        .run(userId, guildId ?? '', day, Number(voice), now, Number(exempt));
       if (this.prunedDay !== day) this.db.prepare('DELETE FROM usage_admissions WHERE created_at < ?').run(now - 31 * 86400000);
       this.db.exec('COMMIT');
       this.prunedDay = day;
@@ -81,7 +87,7 @@ export class UsageStore {
     const day = mediaDay(this.now());
     return { day, limits: this.limits, scopes: Object.fromEntries(
       [['user', userId], ['server', guildId], ['bot', null]].filter(([scope, actor]) => scope === 'bot' || actor)
-        .map(([scope, actor]) => [scope, { requests: this.count(scope, actor, { day }), voice: this.count(scope, actor, { day, voice: true }) }])) };
+        .map(([scope, actor]) => [scope, { requests: this.count(scope, actor, { day, includeExempt: scope === 'user' }), voice: this.count(scope, actor, { day, voice: true, includeExempt: scope === 'user' }) }])) };
   }
   close() { this.db.close(); }
 }
@@ -92,22 +98,28 @@ export class RequestLimiter {
   constructor({ store, active = new Set(), isActive = () => false, isStopping = () => false,
     cooldownMs = 5000, concurrency = 3, now = Date.now }) {
     Object.assign(this, { store, active, isActive, isStopping, cooldownMs, concurrency, now });
-    this.users = new Set(); this.last = new Map();
+    this.users = new Map(); this.last = new Map(); this.exemptScopes = new Set();
   }
   acquire({ scope, userId, guildId, voice = false, charge = true }) {
     if (this.isStopping()) throw new UsageLimitError('I’m restarting — give me a moment, then try again.');
-    if (this.active.has(scope) || this.isActive(scope) || this.users.has(userId)) throw new UsageLimitError('Please wait for your current request to finish, including requests in other channels.');
-    if (this.active.size >= this.concurrency) throw new UsageLimitError('I’ve got a few requests going. Try me again in a moment.');
+    const fullMode = fullModeActive(userId);
+    if (this.active.has(scope) || this.isActive(scope) || (!fullMode && this.users.has(userId))) throw new UsageLimitError('Please wait for your current request to finish, including requests in other channels.');
+    if (!fullMode && this.active.size - this.exemptScopes.size >= this.concurrency) throw new UsageLimitError('I’ve got a few requests going. Try me again in a moment.');
     const now = this.now();
     if (charge) {
       const last = this.last.get(userId);
-      if (last !== undefined && now - last < this.cooldownMs) throw new UsageLimitError(`Please wait ${Math.ceil((this.cooldownMs - now + last) / 1000)} seconds before another request.`);
+      if (!fullMode && last !== undefined && now - last < this.cooldownMs) throw new UsageLimitError(`Please wait ${Math.ceil((this.cooldownMs - now + last) / 1000)} seconds before another request.`);
       this.store.reserve({ userId, guildId, voice });
       this.last.set(userId, now);
       if (this.last.size > 10000) for (const [user, time] of this.last) if (now - time >= this.cooldownMs) this.last.delete(user);
     }
-    this.active.add(scope); this.users.add(userId);
+    this.active.add(scope); this.users.set(userId, (this.users.get(userId) ?? 0) + 1);
+    if (fullMode) this.exemptScopes.add(scope);
     let released = false;
-    return () => { if (!released) { released = true; this.active.delete(scope); this.users.delete(userId); } };
+    return () => { if (!released) {
+      released = true; this.active.delete(scope); this.exemptScopes.delete(scope);
+      const remaining = this.users.get(userId) - 1;
+      if (remaining) this.users.set(userId, remaining); else this.users.delete(userId);
+    } };
   }
 }
