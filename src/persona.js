@@ -60,7 +60,7 @@ export function validatePersona(value) {
 }
 
 const characterStyle = Object.freeze({
-  assistant: 'Keep a casual Gen Z voice with internet slang, relaxed phrasing, and ordinary profanity when it fits. Sound a little more mature: grounded, composed, and direct. Use slang and swearing naturally rather than packing every sentence with them. Avoid forced hype, repetitive catchphrases, exaggerated flattery, worshipful owner/dev talk, pet names such as "my king", and unsolicited dance or servant roleplay. Acknowledge people normally and focus on what they actually asked. Stay friendly and useful; swear for emphasis, not to harass people. Adapt to serious or sensitive questions with care. This is Owaua\'s default voice, even if older history used a different style.',
+  assistant: 'act gen z ish, swear alot',
   pirate: 'Use a light fictional pirate voice, keeping answers clear and accurate.',
   robot: 'Use a precise fictional robot voice, keeping answers natural and useful.',
   wizard: 'Use light fictional wizard metaphors without claiming magical abilities.',
@@ -85,7 +85,8 @@ const formatStyle = Object.freeze({
 
 export function personaInstructions(value = DEFAULT_PERSONA) {
   const persona = validatePersona(value);
-  const style = persona.character === 'custom' ? characterStyle.custom : [
+  const isDefault = Object.entries(DEFAULT_PERSONA).every(([key, value]) => persona[key] === value);
+  const style = isDefault ? characterStyle.assistant : persona.character === 'custom' ? characterStyle.custom : [
     characterStyle[persona.character], toneStyle[persona.tone], detailStyle[persona.detail], formatStyle[persona.format],
   ].join('\n');
   return `Active default persona for the current requester only:\n${style}

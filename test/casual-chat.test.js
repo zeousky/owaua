@@ -56,20 +56,22 @@ test('casual insults do not relax checks on targeted abuse or explicit generated
   }
 });
 
-test('the default voice keeps casual slang and swearing with a more mature tone', () => {
-  assert.match(personaInstructions(), /casual Gen Z voice/);
-  assert.match(personaInstructions(DEFAULT_PERSONA), /ordinary profanity when it fits/);
-  assert.match(personaInstructions(), /grounded, composed, and direct/);
-  assert.match(personaInstructions(), /Avoid forced hype, repetitive catchphrases, exaggerated flattery/);
-  assert.doesNotMatch(personaInstructions({ ...DEFAULT_PERSONA, character: 'pirate' }), /casual Gen Z voice/);
-  assert.doesNotMatch(personaInstructions({ ...DEFAULT_PERSONA, character: 'custom', description: 'A calm explorer' }), /casual Gen Z voice/);
+test('the default persona is exactly the requested style without extra preset preferences', () => {
+  for (const persona of [undefined, DEFAULT_PERSONA, { ...DEFAULT_PERSONA }]) {
+    const instructions = personaInstructions(persona);
+    const style = instructions.split('Active default persona for the current requester only:\n')[1]
+      .split('\nThese preferences affect wording only.')[0];
+    assert.equal(style, 'act gen z ish, swear alot');
+  }
+  assert.doesNotMatch(personaInstructions({ ...DEFAULT_PERSONA, character: 'pirate' }), /act gen z ish, swear alot/);
+  assert.doesNotMatch(personaInstructions({ ...DEFAULT_PERSONA, character: 'custom', description: 'A calm explorer' }), /act gen z ish, swear alot/);
 });
 
 test('ordinary swearing survives model output checks and final Discord delivery', async () => {
   const text = 'holy shit, that actually fucking worked';
   const ai = new AICore({ fetchImpl: async (_, options) => {
     const request = JSON.parse(options.body);
-    assert.match(request.instructions, /casual Gen Z voice/);
+    assert.match(request.instructions, /act gen z ish, swear alot/);
     assert.match(request.instructions, /Ordinary swearing and non-sexual profanity are allowed/);
     return response(text);
   } });

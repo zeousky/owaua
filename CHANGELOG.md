@@ -6,6 +6,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ### Changed
 
+- Owaua’s default persona is now exactly “act gen z ish, swear alot”.
+
+## 2026-10-27
+
+### Changed
+
 - Chat replies now stay within 600 characters, with shorter, more direct answers. Requested files and JSON downloads keep their full contents.
 
 ## 2026-10-27
