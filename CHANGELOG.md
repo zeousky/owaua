@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-27
 
+### Fixed
+
+- Mentioning Owaua without a question now gets a short reply. Requested help guides stay private instead of filling the server channel.
+
+## 2026-10-27
+
 ### Changed
 
 - Replies now remove emojis, including linked and custom Discord emojis.
