@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { VoiceAPI, RealtimeVoice } from '../src/voice.js';
 import { SAFETY_INSTRUCTIONS, SafetyError } from '../src/safety.js';
+import { withServerLanguage, CLEAN_LANGUAGE_GUILD } from '../src/server-language.js';
 
 class FakeSocket extends EventEmitter {
   static latest;
@@ -27,6 +28,19 @@ const transcriptDone = (socket, transcript = 'Hello.', id = 'first') => socket.e
 });
 const responseDone = (socket, status = 'completed', id = 'first') => socket.event({
   type: 'response.done', response: { id, ...(status === undefined ? {} : { status }) },
+});
+
+test('server no-swearing rule mutes profane voice replies even when callbacks run outside request context', async () => {
+  for (const guild of [CLEAN_LANGUAGE_GUILD, 'other']) {
+    const f = await withServerLanguage(guild, () => fixture());
+    audioDelta(f.socket); transcriptDone(f.socket, 'That shit worked.'); responseDone(f.socket);
+    if (guild === CLEAN_LANGUAGE_GUILD) {
+      assert.match(f.socket.sent[0].session.instructions, /Server rule:/);
+      assert.equal(f.audio.length, 0);
+      assert.equal(f.failures[0].code, 'voice_unsafe_response');
+    } else assert.equal(f.audio.length, 1);
+    f.voice.close();
+  }
 });
 
 test('realtime appends fixed safety instructions and releases PCM only after the complete safe transcript', async () => {

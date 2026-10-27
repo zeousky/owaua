@@ -4,6 +4,13 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-27
 
+### Fixed
+
+- The no-swearing rule now covers every channel and thread in the designated server.
+- Harmless banter gets a natural reply when a rejected draft can be safely rewritten, instead of an unrelated safety refusal.
+
+## 2026-10-27
+
 ### Changed
 
 - Owaua now keeps replies clean in the designated no-swearing channel, overriding persona and full-mode settings.

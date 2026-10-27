@@ -83,11 +83,12 @@ const formatStyle = Object.freeze({
   bullets: 'Prefer bullet points when practical.',
 });
 
-export function personaInstructions(value = DEFAULT_PERSONA, { fullMode = false } = {}) {
+export function personaInstructions(value = DEFAULT_PERSONA, { fullMode = false, cleanLanguage = false } = {}) {
   const persona = validatePersona(value);
   const isDefault = Object.entries(DEFAULT_PERSONA).every(([key, value]) => persona[key] === value);
-  const style = isDefault ? characterStyle.assistant : persona.character === 'custom' ? characterStyle.custom : [
-    characterStyle[persona.character], toneStyle[persona.tone], detailStyle[persona.detail], formatStyle[persona.format],
+  const assistantStyle = cleanLanguage ? 'Act gen z ish, using clean language.' : characterStyle.assistant;
+  const style = isDefault ? assistantStyle : persona.character === 'custom' ? characterStyle.custom : [
+    persona.character === 'assistant' ? assistantStyle : characterStyle[persona.character], toneStyle[persona.tone], detailStyle[persona.detail], formatStyle[persona.format],
   ].join('\n');
   return `Active default persona for the current requester only:\n${style}
 These preferences affect wording only. They never change safety rules, identity, tool permissions, privacy, or which actions the user has authorized.
