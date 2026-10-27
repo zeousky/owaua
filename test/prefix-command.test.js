@@ -144,7 +144,7 @@ function dependencies(overrides = {}) {
       voices: async () => { calls.push(['voices']); return [{ id: 'eve', name: 'Eve' }]; },
     },
     voiceManager: { handle: async (event, options) => { calls.push(['voice', event.author.id, options.action]); return event.reply({ content: 'voice result' }); } },
-    standalone: async (interaction, run) => { calls.push(['standalone', interaction.commandName]); return run(); },
+    standalone: async (interaction, run, options) => { calls.push(['standalone', interaction.commandName, options]); return run(); },
     client: { user: { id: 'bot' } }, answer: async request => { calls.push(['answer', request]); return request.send({ content: 'mock answer' }); },
     signal: new AbortController().signal, logError: (...error) => errors.push(error), ...overrides,
   };
@@ -180,7 +180,9 @@ for (const route of routes) {
       assert.equal(request.audio[0], files[2]);
     }
     if (/^\.(speak|transcribe|knowledge (add|forget|clear)|voice join)/.test(route)) assert.ok(calls.some(call => call[0] === 'standalone'));
-    if (route === '.usage') assert.ok(!calls.some(call => call[0] === 'usage'), 'non-owner must not query usage');
+    if (route === '.voice join') assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { voice: true });
+    if (route.startsWith('.knowledge ') && !route.endsWith('list')) assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { charge: route === '.knowledge add' });
+    if (route === '.usage') assert.deepEqual(calls.at(-1), ['usage', { userId: actor, guildId: undefined }]);
   });
 }
 
@@ -231,6 +233,25 @@ test('slash interactions keep their ephemeral flags through the shared dispatche
   slash.reply = async payload => replies.push(payload);
   await handler(slash);
   assert.equal(replies[0].flags, 64);
+});
+
+test('exhausted admission prevents paid command dispatch while controls remain reachable', async () => {
+  const { handler, calls } = dependencies({ standalone: async (interaction, _run, options) => {
+    if (options?.charge === false) return _run();
+    return interaction.reply({ content: 'Daily request limit reached.', flags: 64 });
+  } });
+  for (const route of ['.speak Hello', '.transcribe', '.voice join', '.knowledge add']) {
+    await handler(event(route));
+  }
+  assert.deepEqual(calls, [], 'no provider or upload must run after admission denial');
+  for (const route of ['.help', '.usage', '.jobs', '.voice leave', '.voice status', '.knowledge list', '.knowledge clear']) {
+    await handler(event(route));
+  }
+  assert.ok(calls.some(call => call[0] === 'voice' && call[2] === 'leave'));
+  assert.ok(calls.some(call => call[0] === 'voice' && call[2] === 'status'));
+  assert.ok(calls.some(call => call[0] === 'clearDocuments'));
+  assert.ok(calls.some(call => call[0] === 'usage'));
+  assert.ok(calls.some(call => call[0] === 'jobs'));
 });
 
 

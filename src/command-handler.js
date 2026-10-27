@@ -9,7 +9,7 @@ import { conversationScope } from './store.js';
 import { requestAttachments } from './attachments.js';
 import { PrefixPrivateReplyError } from './prefix-command.js';
 
-export function createCommandHandler({ allowed, isStopping, store, mediaStore, knowledge, mcp, voiceAPI, voiceManager,
+export function createCommandHandler({ allowed, isStopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
   standalone, active, help, client, answer, signal, logError }) {
   return async function handleCommand(interaction) {
     const stopping = isStopping();
@@ -17,10 +17,10 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, k
       if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Owaua', 'Owaua is not enabled in this server.', { tone: 'warning' }), flags: 64 });
       if (stopping) return await interaction.reply({ ...card('', 'I’m restarting — give me a moment, then try again.'), flags: 64 });
       if (interaction.commandName === 'language') return await handleLanguageCommand(interaction, store, interaction.options.getString('name') ?? '');
-      if (['jobs', 'usage'].includes(interaction.commandName)) return await handleMediaCommand(interaction, mediaStore);
+      if (['jobs', 'usage'].includes(interaction.commandName)) return await handleMediaCommand(interaction, mediaStore, usageStore);
       if (interaction.commandName === 'knowledge') {
         const run = () => handleKnowledgeCommand(interaction, knowledge, { isActive: () => false, stopping, signal });
-        return await (interaction.options.getSubcommand() === 'list' ? run() : standalone(interaction, run));
+        return await (interaction.options.getSubcommand() === 'list' ? run() : standalone(interaction, run, { charge: interaction.options.getSubcommand() === 'add' }));
       }
       if (interaction.commandName === 'integrations') return await interaction.reply({ ...card('',
         mcp.list({ userId: interaction.user.id, guildId: interaction.guildId })
@@ -31,7 +31,7 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, k
         onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })) }));
       if (interaction.commandName === 'voice') {
         const run = () => handleVoiceCommand(interaction, voiceManager, voiceAPI, { signal });
-        return await (interaction.options.getSubcommand() === 'join' ? standalone(interaction, run) : run());
+        return await (interaction.options.getSubcommand() === 'join' ? standalone(interaction, run, { voice: true }) : run());
       }
       if (interaction.commandName === 'memory') return await handleMemoryCommand(interaction, store, { isActive: scope => active.has(scope), stopping });
       if (interaction.commandName === 'persona') {

@@ -2,6 +2,12 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-10-27
+
+### Changed
+
+- Added daily request and voice limits, shared across channels, plus burst protection. Use `/usage` or `.usage` to privately check your allowances; help, status and cleanup remain available when a limit is reached.
+
 ## 2026-10-25
 
 ### Added

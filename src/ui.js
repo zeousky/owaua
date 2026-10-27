@@ -24,7 +24,7 @@ export function helpCard(musicHelp) {
     '**Talk or play music**\n`/voice join` lets us talk; `/voice leave` ends it. `/speak` reads text aloud, and `/transcribe` turns a recording into text. For music, join a voice channel and try `.music <song name>`. Use `.music help` for controls.',
     '**Make it yours**\n`.language Hungarian` sets your reply language; `.language auto` lets me match your message. `/persona set description:...` changes how I talk to you. Both follow you across servers and DMs.',
     '**Memory and files**\n`/memory view` shows what I’ve saved here. `/memory pause` pauses memory; `/reset` clears your history and notes here. `/knowledge add` saves a document for later; `/ask library:true` uses it.',
-    'Daily limits: 2 images and 1 video per person; 5 images and 3 videos per server. They reset at midnight Budapest time. The bot owner is exempt.',
+    '**Usage limits**\n`/usage` privately shows your remaining requests, voice sessions and media allowance. Daily limits reset at midnight Budapest time; request and burst limits are shared across channels.',
     'Messages, recalled context, and attachments go to xAI. The attached guide has more settings and privacy details.',
   ].join('\n\n');
   const guide = [

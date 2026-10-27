@@ -147,7 +147,7 @@ test('polling rate limits never refund an accepted paid video', async t => {
   assert.throws(() => reserve(store, user, 'video'), /user video limit/);
 });
 
-test('owner-only usage and private job retrieval enforce actor and guild scope', async t => {
+test('personal usage and private job retrieval enforce actor and guild scope', async t => {
   const { store } = fixture(t);
   const id = reserve(store); store.complete(id, { kind: 'image', url: 'https://example.com/private.png' });
   const run = async (commandName, userId = user, guildId = guild) => {
@@ -156,7 +156,8 @@ test('owner-only usage and private job retrieval enforce actor and guild scope',
       options: { getUser: () => null, getString: () => null }, reply: async value => { payload = value; } }, store);
     assert.equal(payload.flags, 64); return payload.content;
   };
-  assert.match(await run('usage'), /Only the bot owner/);
+  assert.match(await run('usage'), /1 image — ready/);
+  assert.doesNotMatch(await run('usage', other), /1 image — ready/);
   assert.match(await run('usage', MEDIA_OWNER), /1 image — ready/);
   assert.match(await run('jobs'), /private.png/);
   assert.doesNotMatch(await run('jobs', other), /private.png/);

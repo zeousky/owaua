@@ -29,6 +29,7 @@ import { resultReply } from './reply.js';
 import { assertSafeValue, assertSafeChatInput, SafetyError, withRequestUser } from './safety.js';
 import { loadLocalExtension } from './local-extension.js';
 import { MEDIA_OWNER } from './media-store.js';
+import { UsageStore, RequestLimiter, UsageLimitError, usageLimitsFromEnv } from './usage.js';
 
 function integer(name, fallback, min, max) {
   const value = Number(process.env[name] ?? fallback);
@@ -77,7 +78,9 @@ const allowedGuilds = new Set((process.env.ALLOWED_GUILD_IDS ?? '').split(',').m
 const cooldown = integer('USER_COOLDOWN_SECONDS', 5, 0, 3600) * 1000;
 const concurrency = integer('MAX_CONCURRENT_REQUESTS', 3, 1, 20);
 const active = new Set();
-const lastRequest = new Map();
+const usageStore = new UsageStore(dataDirectory, { limits: usageLimitsFromEnv() });
+const limiter = new RequestLimiter({ store: usageStore, active, cooldownMs: cooldown, concurrency,
+  isActive: scope => knowledge.isActive(scope), isStopping: () => stopping });
 const shutdownController = new AbortController();
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
@@ -110,24 +113,18 @@ function answer(request) {
 async function answerForUser({ scope, userId, guildId, text, images = [], documents: documentAttachments = [], videos = [], audio = [],
   useLibrary = false, spoken = false, requestOptions = {}, send }) {
   if (stopping) return send(card('One moment', 'I’m restarting — give me a moment, then try again.', { tone: 'warning' }));
-  if (active.has(scope) || knowledge.isActive(scope)) return send(card('One moment', 'I’m still working on your previous request here.', { tone: 'warning' }));
-  if (active.size >= concurrency) return send(card('One moment', 'I’ve got a few requests going. Try me again in a moment.', { tone: 'warning' }));
-  const now = Date.now();
-  if (now - (lastRequest.get(userId) ?? 0) < cooldown) return send(card('One moment', 'Give me a few seconds before sending another request.', { tone: 'warning' }));
   // Reject oversize input rather than silently losing part of the question.
   if (text.length > 16000 || images.length > 5 || documentAttachments.length > 4 || videos.length > 1 || audio.length > 1) {
     return send(card('One moment', 'Please use at most 16,000 characters, five images, four documents, one audio recording, and one MP4 per request.', { tone: 'warning' }));
   }
-  if (lastRequest.size > 10000) for (const [key, time] of lastRequest) if (now - time > cooldown) lastRequest.delete(key);
-  lastRequest.set(userId, now);
-  active.add(scope);
   let progress;
-  let prepared;
+  let prepared, release;
   try {
     assertSafeChatInput(text);
     const options = normalizeRequestOptions(requestOptions, { model: ai.model });
     mcp.definitions(options.integrations ?? [], { userId, guildId });
     if (spoken && options.outputFormat === 'json') throw new RequestOptionsError('Choose text output for a spoken answer. JSON output is delivered as a file.');
+    release = limiter.acquire({ scope, userId, guildId });
     const persona = store.persona(userId);
     progress = await animate(send);
     const songRequest = parseSongRequest(text);
@@ -193,7 +190,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
   } catch (error) {
     logError('ai_error', error);
     const message = stopping ? 'I’m restarting. Check /jobs before retrying media; saved video jobs resume automatically.'
-      : error instanceof SafetyError || error instanceof MediaInputError || error instanceof DocumentInputError || error instanceof RequestOptionsError ||
+      : error instanceof UsageLimitError || error instanceof SafetyError || error instanceof MediaInputError || error instanceof DocumentInputError || error instanceof RequestOptionsError ||
         error instanceof VoiceInputError || error instanceof KnowledgeError || error instanceof SongInputError ? error.message
       : error instanceof ProviderError && ['invalid_structured_output', 'incomplete_structured_output'].includes(error.code)
         ? 'xAI did not return a complete answer matching your JSON schema. Try a simpler schema or a larger output limit.'
@@ -209,24 +206,22 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       await progress?.stop();
     } finally {
       try { if (prepared) await prepared.cleanup().catch(error => logError('file_cleanup_error', error)); }
-      finally { active.delete(scope); }
+      finally { release?.(); }
     }
   }
 }
 
 // Speech generation, transcription and durable uploads share chat's admission
 // limits. Stop/status controls remain reachable without a paid-request cooldown.
-async function standalone(interaction, handler) {
+async function standalone(interaction, handler, { charge = true, voice = false } = {}) {
   const scope = conversationScope(interaction.guildId, interaction.channelId, interaction.user.id);
-  const now = Date.now();
-  const unavailable = stopping ? 'I’m restarting — give me a moment, then try again.'
-    : active.has(scope) || knowledge.isActive(scope) ? 'Please wait for your current request here to finish.'
-    : active.size >= concurrency ? 'I’ve got a few requests going. Try me again in a moment.'
-    : now - (lastRequest.get(interaction.user.id) ?? 0) < cooldown ? 'Give me a few seconds before sending another request.' : null;
-  if (unavailable) return interaction.reply({ ...card('', unavailable), flags: 64 });
-  if (lastRequest.size > 10000) for (const [key, time] of lastRequest) if (now - time > cooldown) lastRequest.delete(key);
-  active.add(scope); lastRequest.set(interaction.user.id, now);
-  try { return await withRequestUser(interaction.user.id, handler); } finally { active.delete(scope); }
+  let release;
+  try { release = limiter.acquire({ scope, userId: interaction.user.id, guildId: interaction.guildId, voice, charge }); }
+  catch (error) {
+    if (!(error instanceof UsageLimitError)) throw error;
+    return interaction.reply({ ...card('', error.message), flags: 64 });
+  }
+  try { return await withRequestUser(interaction.user.id, handler); } finally { release(); }
 }
 client.once(Events.ClientReady, async ready => {
   console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, model: ai.model }));
@@ -238,7 +233,7 @@ client.once(Events.ClientReady, async ready => {
     console.log(JSON.stringify({ event: 'commands_registered', capabilities }));
   } catch (error) { logError('command_registration_error', error); }
 });
-const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping, store, mediaStore, knowledge, mcp, voiceAPI, voiceManager,
+const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
   standalone, active, help, client, answer, signal: shutdownController.signal, logError });
 client.on(Events.InteractionCreate, async interaction => {
   try {
@@ -331,6 +326,7 @@ async function shutdown(exitCode = 0) {
   client.destroy();
   try { await knowledge.close(); } catch (error) { logError('knowledge_close_error', error); exitCode = 1; }
   try { store.close(); } catch (error) { logError('memory_close_error', error); exitCode = 1; }
+  try { usageStore.close(); } catch (error) { logError('usage_close_error', error); exitCode = 1; }
   try { mediaStore.close(); } catch (error) { logError('media_close_error', error); exitCode = 1; }
   process.exit(exitCode);
 }
