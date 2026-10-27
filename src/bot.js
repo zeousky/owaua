@@ -1,5 +1,6 @@
 import './runtime.js';
 import 'dotenv/config';
+import { installChannelLanguageGuard, cleanChannelText } from './channel-language.js';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
@@ -86,6 +87,7 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel], allowedMentions: { parse: [], repliedUser: false },
 });
+installChannelLanguageGuard(client.rest);
 const music = new MusicManager({ isVoiceBusy: guildId => voiceManager.sessions.has(guildId) });
 const songs = new SongDownloads();
 const voiceManager = new VoiceManager({ apiKey: process.env.XAI_API_KEY,
@@ -157,6 +159,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       knowledgeTools: prepared.knowledgeTools,
       cacheKey: createHash('sha256').update(scope).digest('hex'),
       safetyIdentifier: createHash('sha256').update(userId).digest('hex') });
+    if (result.outputFormat !== 'json') result.text = cleanChannelText(result.text);
     // Keep text history only; Discord attachment links expire.
     assertSafeValue({ text: result.text, warnings: result.artifactWarnings });
     const notices = [...prepared.notices];

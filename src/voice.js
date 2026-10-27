@@ -1,3 +1,4 @@
+import { cleanChannelText } from './channel-language.js';
 import { Transform } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
@@ -114,6 +115,7 @@ export class VoiceAPI {
   }
   async speak(text, { signal: callerSignal, voice = 'eve', language = 'auto', speed = 1,
     format = 'mp3', timestamps = false, normalize = false } = {}) {
+    text = cleanChannelText(text);
     if (typeof text !== 'string' || !text.trim() || text.length > 4000) throw new VoiceInputError('Use between 1 and 4,000 characters for speech.');
     assertSafeText(text, { ...this.safetyOptions, instructions: true });
     if (!Number.isFinite(speed) || speed < 0.7 || speed > 1.5) throw new VoiceInputError('Speech speed must be between 0.7 and 1.5.');

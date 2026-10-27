@@ -1,3 +1,4 @@
+import { withChannelLanguage } from './channel-language.js';
 import { parseMusicCommand } from './music.js';
 import { parsePrefixCommand, createPrefixInteraction, PrefixCommandError } from './prefix-command.js';
 import { requestAttachments } from './attachments.js';
@@ -8,7 +9,7 @@ import { withFullMode } from './full-mode.js';
 export function createMessageHandler({ allowed, localExtension, handleCommand, client, isStopping,
   voiceManager, music, active, store, answer, logError }) {
   return function handleMessage(message) {
-    return withFullMode(message.author.id, store.fullMode?.(message.author.id), async () => {
+    return withChannelLanguage(message.channelId, () => withFullMode(message.author.id, store.fullMode?.(message.author.id), async () => {
     if (message.author.bot) return;
     try {
       if (!allowed(message.guildId)) return;
@@ -60,6 +61,6 @@ export function createMessageHandler({ allowed, localExtension, handleCommand, c
         await answer({ scope, userId: message.author.id, guildId: message.guildId, text, ...attachments, send });
       } finally { clearInterval(typing); }
     } catch (error) { logError('message_error', error); }
-    });
+    }));
   };
 }

@@ -1,3 +1,4 @@
+import { withChannelLanguage } from './channel-language.js';
 import { handleMediaCommand } from './media-command.js';
 import { handlePersonaCommand } from './persona-command.js';
 import { handleLanguageCommand } from './language-command.js';
@@ -14,7 +15,7 @@ import { withFullMode } from './full-mode.js';
 export function createCommandHandler({ allowed, isStopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
   standalone, active, help, client, answer, signal, logError }) {
   return function handleCommand(interaction) {
-    return withFullMode(interaction.user.id, store.fullMode?.(interaction.user.id), async () => {
+    return withChannelLanguage(interaction.channelId, () => withFullMode(interaction.user.id, store.fullMode?.(interaction.user.id), async () => {
     const stopping = isStopping();
     try {
       if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Owaua', 'Owaua is not enabled in this server.', { tone: 'warning' }), flags: 64 });
@@ -73,6 +74,6 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, u
       }
       logError('interaction_error', error);
     }
-    });
+    }));
   };
 }

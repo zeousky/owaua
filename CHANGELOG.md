@@ -6,6 +6,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ### Changed
 
+- Owaua now keeps replies clean in the designated no-swearing channel, overriding persona and full-mode settings.
+
+## 2026-10-27
+
+### Changed
+
 - Full mode is now available only to the bot owner and bypasses bot usage quotas, cooldowns, request/tool budgets, and voice session time caps. Other users keep the normal limits.
 
 ## 2026-10-27
