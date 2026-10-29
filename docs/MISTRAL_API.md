@@ -4,9 +4,16 @@ Owaua's Mistral chat model is **Mistral Large 4**, API ID `mistral-large-4`.
 Set `MISTRAL_API_KEY` on the existing Owaua bot service. Keys never belong in Git
 or Discord commands. The owner's `.provider mistral` / `/provider` selects it;
 `.provider xai` selects xAI and `.provider switch` toggles the provider. The choice
-applies to the bot and persists across restarts.
+applies to the current server (or current user's DMs) and persists across restarts.
 
-A confirmed insufficient-balance error selects the other configured provider.
+A confirmed insufficient-balance error selects the other configured provider for
+the affected server. It starts one shared recovery watcher for that failed key:
+after five minutes, a single `hello` request uses `ministral-3b-latest` for Mistral,
+or `grok-4.3` with reasoning disabled for xAI, with an eight-token output limit
+and no user data or tools. Failed probes back off to 10, 20, 40 and 60 minutes.
+A valid generated answer restores servers still on automatic fallback and stops
+the watcher. Manual provider changes are preserved. No probes run before a
+balance error; persisted schedules resume after restart.
 Ordinary authentication, validation, rate-limit and server errors do not switch
 providers unless the error specifically identifies exhausted credit. Explicit
 Mistral API actions are never replayed against another provider.

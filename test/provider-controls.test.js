@@ -29,7 +29,7 @@ test('provider choice persists privately across restarts and exposes no credenti
   assert.equal(router.model, 'mistral-large-4');
   assert.equal(new ProviderRouter({ providers, directory }).provider, 'mistral');
   const saved = readFileSync(join(directory, 'provider.json'), 'utf8');
-  assert.deepEqual(JSON.parse(saved), { version: 1, provider: 'mistral' });
+  assert.deepEqual(JSON.parse(saved), { version: 2, defaultProvider: 'mistral', scopes: { default: { provider: 'mistral', revision: 1 } }, recovery: {} });
   assert.equal(statSync(join(directory, 'provider.json')).mode & 0o777, 0o600);
   assert.doesNotMatch(JSON.stringify(router.status()), /test-key/);
   assert.equal(router.setProvider('switch').provider, 'xai');
@@ -73,7 +73,7 @@ for (const initial of ['xai', 'mistral']) test(`confirmed ${initial} insufficien
   assert.equal(router.provider, alternate);
   assert.equal(new ProviderRouter({ providers, directory }).provider, alternate);
   assert.deepEqual(calls.map(call => call.provider), [alternate]);
-  assert.deepEqual(notifications, [{ from: initial, to: alternate, automatic: true }]);
+  assert.deepEqual(notifications, [{ from: initial, to: alternate, automatic: true, scope: 'default' }]);
 });
 
 test('both depleted providers stop after one retry and cannot bounce on the next failure', async t => {
@@ -88,7 +88,8 @@ test('both depleted providers stop after one retry and cannot bounce on the next
   assert.deepEqual(calls, ['xai', 'mistral', 'mistral']);
   assert.equal(router.provider, 'mistral');
   router.setProvider('xai');
-  assert.equal(router.depleted.has('xai'), false, 'owner can select a topped-up provider again');
+  assert.equal(router.provider, 'xai', 'owner can explicitly try a topped-up provider again');
+  assert.equal(router.depleted.has('xai'), true, 'a manual choice does not establish shared account recovery');
 });
 
 test('unsafe replay still switches future requests without repeating tool effects', async t => {
@@ -191,11 +192,11 @@ test('only the owner can view or change providers, and replies stay private', as
   assert.match(replies.at(-1).content, /Only the bot owner/);
   assert.equal(router.provider, 'xai');
   await handleProviderCommand(event(FULL_MODE_OWNER, 'mistral'), router);
-  assert.equal(router.provider, 'mistral');
+  assert.equal(router.withScope({ userId: FULL_MODE_OWNER }, () => router.provider), 'mistral');
   assert.match(replies.at(-1).content, /Mistral \(mistral-large-4\)/);
   await handleProviderCommand(event(FULL_MODE_OWNER, null), router);
   await handleProviderCommand(event(FULL_MODE_OWNER, 'invalid'), router);
-  assert.equal(router.provider, 'mistral');
+  assert.equal(router.withScope({ userId: FULL_MODE_OWNER }, () => router.provider), 'mistral');
   assert.ok(replies.every(reply => reply.flags === 64));
 });
 
@@ -209,7 +210,7 @@ test('dot provider command reaches the real dispatcher and sends results to DMs'
   for (const content of ['.provider', '.provider mistral', '.provider switch', '.provider name:mistral']) {
     await handle(createPrefixInteraction(message, parsePrefixCommand(content)));
   }
-  assert.equal(router.provider, 'mistral');
+  assert.equal(router.withScope({ guildId: 'g' }, () => router.provider), 'mistral');
   assert.equal(replies.length, 4);
   assert.deepEqual(errors, []);
   assert.throws(() => parsePrefixCommand('.provider unknown'), PrefixCommandError);
@@ -226,4 +227,146 @@ test('Mistral dot commands preserve JSON payloads and accept any direct attachme
     assert.equal(parsed.values.get('file'), audio);
   }
   assert.equal(parsePrefixCommand('.mistral operations').values.get('operation'), 'operations');
+});
+
+test('guild choices and balance fallback are isolated while DM choices belong to one user', async t => {
+  const { router } = fixture(t, { xai: { respond: async () => { throw billing(); } } });
+  await router.respond({ input: 'Hello', context: { guildId: 'server-a', userId: 'alice' } });
+  assert.equal(router.withScope({ guildId: 'server-a', userId: 'bob' }, () => router.provider), 'mistral');
+  assert.equal(router.withScope({ guildId: 'server-b', userId: 'alice' }, () => router.provider), 'xai');
+  assert.equal(router.provider, 'xai');
+  router.withScope({ userId: 'alice' }, () => router.setProvider('mistral'));
+  assert.equal(router.withScope({ userId: 'alice' }, () => router.provider), 'mistral');
+  assert.equal(router.withScope({ userId: 'bob' }, () => router.provider), 'xai');
+});
+
+test('legacy global preference migrates atomically as the default for all server scopes', t => {
+  const { providers, directory } = fixture(t);
+  writeFileSync(join(directory, 'provider.json'), JSON.stringify({ version: 1, provider: 'mistral' }));
+  const router = new ProviderRouter({ providers, directory });
+  assert.equal(router.withScope({ guildId: 'a' }, () => router.provider), 'mistral');
+  assert.equal(router.withScope({ guildId: 'b' }, () => router.provider), 'mistral');
+  const saved = JSON.parse(readFileSync(join(directory, 'provider.json'), 'utf8'));
+  assert.equal(saved.version, 2);
+  assert.equal(saved.defaultProvider, 'mistral');
+  assert.equal(statSync(join(directory, 'provider.json')).mode & 0o777, 0o600);
+});
+
+test('repeated failures share one persisted recovery watch and retain its backoff schedule', t => {
+  const { router, providers, directory } = fixture(t);
+  const starts = [];
+  router.onDepleted = value => starts.push(value);
+  router.withScope({ guildId: 'a' }, () => router.reportFailure(billing(), 'xai'));
+  const generation = router.recoveryGeneration('xai');
+  assert.equal(router.scheduleRecovery('xai', { attempts: 2, nextCheckAt: 123456 }, { expectedGeneration: generation }), true);
+  router.withScope({ guildId: 'b' }, () => router.reportFailure(billing(), 'xai'));
+  assert.deepEqual(starts, [{ provider: 'xai' }]);
+  assert.ok(router.recoveryGeneration('xai') > generation);
+  assert.equal(router.recoveryState('xai').nextCheckAt, 123456);
+  assert.equal(router.recoveryState('xai').attempts, 2);
+  assert.equal(router.scheduleRecovery('xai', { attempts: 0, nextCheckAt: 0 }, { expectedGeneration: generation }), false);
+  const restored = new ProviderRouter({ providers, directory });
+  assert.deepEqual(restored.recoveryState('xai'), router.recoveryState('xai'));
+  assert.deepEqual(restored.recoveryProviders(), ['xai']);
+  assert.equal(restored.withScope({ guildId: 'a' }, () => restored.provider), 'mistral');
+  assert.equal(restored.withScope({ guildId: 'b' }, () => restored.provider), 'mistral');
+});
+
+test('confirmed recovery restores automatic choices and preserves manual overrides in every scope', t => {
+  const { router } = fixture(t);
+  for (const guildId of ['a', 'b']) router.withScope({ guildId }, () => router.reportFailure(billing(), 'xai'));
+  router.withScope({ guildId: 'a' }, () => router.setProvider('mistral'));
+  router.withScope({ guildId: 'c' }, () => router.setProvider('mistral'));
+  const generation = router.recoveryGeneration('xai');
+  assert.equal(router.recoverProvider('xai', { expectedGeneration: generation }), true);
+  assert.equal(router.withScope({ guildId: 'a' }, () => router.provider), 'mistral');
+  assert.equal(router.withScope({ guildId: 'b' }, () => router.provider), 'xai');
+  assert.equal(router.withScope({ guildId: 'c' }, () => router.provider), 'mistral');
+  assert.deepEqual(router.recoveryProviders(), []);
+  assert.equal(router.recoverProvider('xai', { expectedGeneration: generation }), false);
+});
+
+test('an old probe cannot recover a newer failure, including after a watch was removed and recreated', t => {
+  const { router } = fixture(t);
+  router.reportFailure(billing(), 'xai');
+  const first = router.recoveryGeneration('xai');
+  router.reportFailure(billing(), 'xai');
+  assert.equal(router.recoverProvider('xai', { expectedGeneration: first }), false);
+  assert.equal(router.recoverProvider('xai', { expectedGeneration: router.recoveryGeneration('xai') }), true);
+  router.reportFailure(billing(), 'xai');
+  assert.ok(router.recoveryGeneration('xai') > first);
+  assert.equal(router.recoverProvider('xai', { expectedGeneration: first }), false);
+  assert.equal(router.provider, 'mistral');
+});
+
+test('stale responses cannot recover an outage observed after their request began', async t => {
+  let finish, started;
+  const ready = new Promise(resolve => { started = resolve; });
+  const { router } = fixture(t, { xai: { respond: () => { started(); return new Promise(resolve => { finish = resolve; }); } } });
+  const response = router.respond({ input: 'Hello', context: { guildId: 'a' } });
+  await ready;
+  router.withScope({ guildId: 'a' }, () => router.reportFailure(billing(), 'xai'));
+  finish({ text: 'An earlier response' });
+  assert.equal((await response).text, 'An earlier response');
+  assert.equal(router.depleted.has('xai'), true);
+  assert.equal(router.withScope({ guildId: 'a' }, () => router.provider), 'mistral');
+});
+
+test('a concurrent manual choice is not overridden even when it selects the original provider again', async t => {
+  let fail, started;
+  const ready = new Promise(resolve => { started = resolve; });
+  const { router } = fixture(t, { xai: { respond: () => { started(); return new Promise((_, reject) => { fail = reject; }); } } });
+  const response = router.respond({ input: 'Hello', context: { guildId: 'a' } });
+  await ready;
+  router.withScope({ guildId: 'a' }, () => { router.setProvider('mistral'); router.setProvider('xai'); });
+  fail(billing());
+  await assert.rejects(response, { code: 'insufficient_balance' });
+  assert.equal(router.withScope({ guildId: 'a' }, () => router.provider), 'xai');
+});
+
+test('recovery persistence failure keeps the watch and delivers an already completed paid answer', async t => {
+  const { router, directory } = fixture(t);
+  router.withScope({ guildId: 'a' }, () => router.reportFailure(billing(), 'xai'));
+  const persisted = readFileSync(router.filename, 'utf8');
+  const recoveryErrors = [];
+  router.onRecoveryError = value => recoveryErrors.push(value);
+  const blockingDirectory = join(directory, 'blocked-provider.json');
+  mkdirSync(blockingDirectory);
+  router.filename = blockingDirectory;
+  const result = await router.respond({ input: 'Hello', context: { guildId: 'b' } });
+  assert.equal(result.text, 'xai');
+  assert.equal(router.depleted.has('xai'), true);
+  assert.equal(router.withScope({ guildId: 'a' }, () => router.provider), 'mistral');
+  assert.equal(readFileSync(join(directory, 'provider.json'), 'utf8'), persisted);
+  assert.equal(recoveryErrors.length, 1);
+  assert.ok(recoveryErrors[0].error instanceof ProviderSwitchError);
+});
+
+test('scope-local mutation refreshes its own revision without refreshing a stale concurrent request', t => {
+  const { router } = fixture(t);
+  router.withScope({ guildId: 'a' }, () => {
+    router.setProvider('mistral');
+    router.reportFailure(billing(), 'mistral');
+    assert.equal(router.provider, 'xai');
+    router.recoverProvider('mistral');
+    assert.equal(router.provider, 'mistral');
+    router.reportFailure(billing(), 'mistral');
+    assert.equal(router.provider, 'xai');
+  });
+});
+
+test('nested respond shares its recovery revision with later dedicated work in the same answer', async t => {
+  const { router } = fixture(t);
+  const context = { guildId: 'a', userId: 'alice' };
+  router.withScope(context, () => router.reportFailure(billing(), 'xai'));
+  router.providers.mistral.respond = async () => {
+    router.recoverProvider('xai', { expectedGeneration: router.recoveryGeneration('xai') });
+    return { text: 'Completed answer' };
+  };
+  await router.withScope(context, async () => {
+    assert.equal((await router.respond({ input: 'Hello', context })).text, 'Completed answer');
+    assert.equal(router.provider, 'xai');
+    router.reportFailure(billing(), 'xai');
+    assert.equal(router.provider, 'mistral', 'fresh dedicated failure after recovery still switches this scope');
+  });
 });

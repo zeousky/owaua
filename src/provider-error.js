@@ -52,12 +52,13 @@ export async function providerError(response, options = {}) {
 // (video, realtime sessions, uploads). Switch future requests without replaying.
 export function billingAwareFetch(provider, router, fetchImpl = fetch) {
   return async (url, options) => {
+    const revision = router.scopeRevision?.();
     const response = await fetchImpl(url, options);
     const host = new URL(url).hostname;
     if (!response.ok && (provider === 'mistral' ? host === 'api.mistral.ai' : ['api.x.ai', 'management-api.x.ai'].includes(host))) {
       const error = await providerError(response, { provider, replaySafe: true });
       if (error.code === 'insufficient_balance') {
-        router.reportFailure(error, provider);
+        router.reportFailure(error, provider, { expectedRevision: revision });
         throw error;
       }
       // The provider body has been consumed. Callers only use status on failure.

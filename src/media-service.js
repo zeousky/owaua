@@ -2,7 +2,9 @@ import { MediaInputError } from './media.js';
 import { requestsMedia } from './media-request.js';
 
 export class MediaService {
-  constructor({ media, store, confirm }) { Object.assign(this, { media, store, confirm }); this.active = new Set(); }
+  constructor({ media, store, confirm, withScope = (_context, work) => work() }) {
+    Object.assign(this, { media, store, confirm, withScope }); this.active = new Set();
+  }
   async generate(kind, prompt, { userId, guildId, send, signal, currentRequest, ...options }) {
     let id, posted = false, accepted = false;
     try {
@@ -40,7 +42,8 @@ export class MediaService {
       if (this.active.has(job.id)) continue;
       this.active.add(job.id);
       try {
-        const result = await this.media.checkVideo(job.request_id, { model: job.model, signal });
+        const result = await this.withScope({ guildId: job.guild_id || null, userId: job.user_id },
+          () => this.media.checkVideo(job.request_id, { model: job.model, signal }));
         if (result) this.store.complete(job.id, result);
       } catch (error) {
         if (['video_generation_failed', 'video_unavailable'].includes(error.code) ||

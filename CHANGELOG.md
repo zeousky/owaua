@@ -4,6 +4,13 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-29
 
+### Changed
+
+- Provider selection and insufficient-credit fallback now apply to the affected server, with separate preferences for DMs.
+- After a balance error, Owaua checks recovery with a tiny, low-cost greeting after five minutes, backing off to hourly checks. Recovered providers return automatically for affected servers, while manual choices are preserved.
+
+## 2026-10-29
+
 ### Added
 
 - The owner can switch between xAI and Mistral Large 4 with `.provider` or `/provider`. The choice survives restarts, and confirmed insufficient-credit errors trigger automatic fallback without repeating actions already started.

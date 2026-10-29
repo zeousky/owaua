@@ -8,6 +8,7 @@ import { MusicManager, musicHelp } from './music.js';
 import { SongDownloads, SongInputError, parseSongRequest, songResult } from './song-download.js';
 import { AICore, ProviderError } from './ai.js';
 import { ProviderRouter } from './providers.js';
+import { ProviderRecoveryMonitor } from './provider-recovery.js';
 import { billingAwareFetch } from './provider-error.js';
 import { MistralAPI } from './mistral-api.js';
 import { MistralDocumentInputs, MistralVoiceAPI } from './mistral-inputs.js';
@@ -63,11 +64,22 @@ const aiOptions = {
   maxContextCharacters: integer('MAX_CONTEXT_CHARACTERS', 32000, 1000, 100000),
   mcpRegistry: mcp,
 };
+let providerRecovery;
 const ai = new ProviderRouter({ directory: dataDirectory, defaultProvider: process.env.AI_PROVIDER ?? 'xai',
   providers: {
     xai: new AICore({ ...aiOptions, apiKey: process.env.XAI_API_KEY, model: process.env.XAI_MODEL ?? 'grok-4.7' }),
     mistral: new AICore({ ...aiOptions, provider: 'mistral', apiKey: process.env.MISTRAL_API_KEY, model: 'mistral-large-4' }),
-  }, onSwitch: details => console.log(JSON.stringify({ event: 'provider_switched', ...details })) });
+  }, onSwitch: details => console.log(JSON.stringify({ event: 'provider_switched', ...details })),
+  onDepleted: () => providerRecovery?.wake(),
+  onRecoveryError: ({ error }) => logError('provider_recovery_state_error', error) });
+providerRecovery = new ProviderRecoveryMonitor({ router: ai,
+  providers: {
+    xai: { apiKey: process.env.XAI_API_KEY, model: process.env.XAI_RECOVERY_MODEL ?? 'grok-4.3' },
+    mistral: { apiKey: process.env.MISTRAL_API_KEY, model: process.env.MISTRAL_RECOVERY_MODEL ?? 'ministral-3b-latest' },
+  }, intervalMs: integer('PROVIDER_RECOVERY_INTERVAL_MS', 300000, 60000, 3600000),
+  maxIntervalMs: integer('PROVIDER_RECOVERY_MAX_INTERVAL_MS', 3600000, 60000, 86400000),
+  onResult: details => console.log(JSON.stringify({ event: 'provider_recovery', ...details })),
+  onError: error => logError('provider_recovery_error', error) });
 const xaiFetch = billingAwareFetch('xai', ai);
 const mistralFetch = billingAwareFetch('mistral', ai);
 const mistralAPI = new MistralAPI({ apiKey: process.env.MISTRAL_API_KEY, fetchImpl: mistralFetch });
@@ -79,7 +91,8 @@ const media = { generate: (kind, ...args) => (ai.provider === 'mistral' && kind 
   checkVideo: (...args) => xaiMedia.checkVideo(...args) };
 const mediaStore = new MediaStore(dataDirectory);
 mediaStore.recover();
-const mediaService = new MediaService({ media, store: mediaStore, confirm: confirmMedia });
+const mediaService = new MediaService({ media, store: mediaStore, confirm: confirmMedia,
+  withScope: (context, work) => ai.withScope(context, work) });
 let recoveryTimer, recoveryTask;
 function recoverMedia() {
   if (stopping || recoveryTask) return;
@@ -116,6 +129,7 @@ const music = new MusicManager({ isVoiceBusy: guildId => voiceManager.sessions.h
 const songs = new SongDownloads();
 const voiceManager = new VoiceManager({ apiKey: process.env.XAI_API_KEY,
   isMusicBusy: guildId => music.sessions.has(guildId),
+  onProviderError: (error, context) => ai.withScope(context, () => ai.reportFailure(error, 'xai')),
   onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })),
   sessionOptions: ({ userId }) => {
     const persona = store.persona(userId);
@@ -135,8 +149,8 @@ function logError(event, error) {
 const localExtension = await loadLocalExtension({ card, assertSafeChatInput, assertSafeValue,
   ownerId: MEDIA_OWNER, signal: shutdownController.signal, isStopping: () => stopping, logError });
 function answer(request) {
-  return withFullMode(request.userId, store.fullMode(request.userId),
-    () => withRequestUser(request.userId, () => answerForUser(request)));
+  return ai.withScope(request, () => withFullMode(request.userId, store.fullMode(request.userId),
+    () => withRequestUser(request.userId, () => answerForUser(request))));
 }
 async function answerForUser({ scope, userId, guildId, text, images = [], documents: documentAttachments = [], videos = [], audio = [],
   useLibrary = false, spoken = false, requestOptions = {}, send }) {
@@ -223,7 +237,7 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       : error instanceof ProviderError && ['invalid_structured_output', 'incomplete_structured_output'].includes(error.code)
         ? 'The AI provider did not return a complete answer matching your JSON schema. Try a simpler schema or a larger output limit.'
       : error instanceof ProviderError && error.code === 'insufficient_balance'
-        ? 'The AI provider has insufficient credit. Automatic fallback was checked for future requests. Please try again; actions already started were not repeated.'
+        ? 'The AI provider has insufficient credit. Automatic fallback was checked for this server, and low-cost recovery checks will run in the background. Please try again; actions already started were not repeated.'
       : error instanceof ProviderError && error.status === 429
       ? 'The AI provider is getting too many requests right now. Give it a moment, then try again.'
       : error?.name === 'TimeoutError' || error?.name === 'AbortError'
@@ -247,10 +261,12 @@ async function standalone(interaction, handler, { charge = true, voice = false }
     if (!(error instanceof UsageLimitError)) throw error;
     return interaction.reply({ ...card('', error.message), flags: 64 });
   }
-  try { return await withRequestUser(interaction.user.id, handler); } finally { release(); }
+  try { return await ai.withScope({ guildId: interaction.guildId, userId: interaction.user.id },
+    () => withRequestUser(interaction.user.id, handler)); } finally { release(); }
 }
 client.once(Events.ClientReady, async ready => {
   console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, provider: ai.provider, model: ai.model }));
+  providerRecovery.start();
   recoverMedia();
   recoveryTimer = setInterval(recoverMedia, 30000);
   recoveryTimer.unref();
@@ -290,6 +306,7 @@ async function shutdown(exitCode = 0) {
   if (stopping) return;
   stopping = true;
   clearInterval(recoveryTimer);
+  providerRecovery.close();
   server.close();
   music.close();
   voiceManager.close();

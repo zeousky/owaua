@@ -9,6 +9,7 @@ import {
   VoiceConnectionStatus, NoSubscriberBehavior, StreamType, EndBehaviorType,
 } from '@discordjs/voice';
 import { ProviderError } from './ai.js';
+import { providerFailure } from './provider-error.js';
 import { card } from './ui.js';
 import { assertSafeText, assertSafeValue, SAFETY_INSTRUCTIONS, SafetyError } from './safety.js';
 import { fullModeActive } from './full-mode.js';
@@ -234,7 +235,7 @@ export class RealtimeVoice extends EventEmitter {
         this.ready = true; clearTimeout(this.timeout); this.resolveReady();
       } else if (event.type === 'error') {
         // No raw server messages: errors may echo audio, prompts, or credentials.
-        this.fail('voice_provider_error');
+        this.fail('voice_provider_error', event.error ?? event);
       } else if (event.type === 'response.created') {
         if (!this.responsePending || this.responding) return this.fail('invalid_voice_response_order');
         const id = event.response?.id ?? null;
@@ -284,8 +285,9 @@ export class RealtimeVoice extends EventEmitter {
       } else if (event.type === 'response.done') {
         if (!this.responding || !this.matchesResponse(event)) return;
         const status = event.response?.status;
-        if (!['completed', 'cancelled'].includes(status) || event.response?.error ||
-            (status === 'cancelled' && !this.cancelRequested)) return this.fail('voice_response_failed');
+        const responseError = event.response?.error ?? event.response?.status_details?.error;
+        if (!['completed', 'cancelled'].includes(status) || responseError ||
+            (status === 'cancelled' && !this.cancelRequested)) return this.fail('voice_response_failed', responseError);
         const discard = this.discardAudio || this.cancelRequested || status !== 'completed';
         let audio;
         if (!discard) {
@@ -325,6 +327,7 @@ export class RealtimeVoice extends EventEmitter {
         }
       }
     });
+    this.socket.on('unexpected-response', (_request, response) => { void this.handshakeFailure(response); });
     this.socket.on('error', () => this.fail('voice_connection_failed'));
     this.socket.on('close', () => { if (!this.closed) this.fail('voice_connection_closed'); });
     if (signal?.aborted) this.close();
@@ -376,9 +379,40 @@ export class RealtimeVoice extends EventEmitter {
     }
     this.emit('interrupted');
   }
-  fail(code) {
+  async handshakeFailure(response) {
+    if (this.closed) { response?.destroy?.(); return; }
+    this.handshakeResponse = response;
+    const status = Number.isInteger(response?.statusCode) && response.statusCode >= 400 && response.statusCode <= 599
+      ? response.statusCode : 502;
+    try {
+      // A payment-required handshake needs no body inspection. Other HTTP
+      // errors may identify exhausted credit, so inspect at most 16 KiB.
+      if (status === 402) { this.fail('voice_connection_failed', undefined, status); return; }
+      const chunks = [];
+      let size = 0;
+      if (response?.[Symbol.asyncIterator]) {
+        for await (const chunk of response) {
+          if (this.closed) return;
+          const bytes = Buffer.from(chunk), remaining = 16384 - size;
+          chunks.push(bytes.subarray(0, remaining)); size += Math.min(bytes.length, remaining);
+          if (bytes.length >= remaining) break;
+        }
+      }
+      if (this.closed) return;
+      const text = Buffer.concat(chunks, size).toString('utf8');
+      let value;
+      try { value = JSON.parse(text); } catch { value = text; }
+      this.fail('voice_connection_failed', value, status);
+    } catch {
+      if (!this.closed) this.fail('voice_connection_failed', undefined, status);
+    } finally {
+      response?.destroy?.();
+      if (this.handshakeResponse === response) this.handshakeResponse = null;
+    }
+  }
+  fail(code, value, status = 502) {
     if (this.closed) return;
-    const error = new ProviderError(502, code);
+    const error = providerFailure(status, value, { provider: 'xai', code });
     this.rejectReady(error); this.emit('failure', error); this.close();
   }
   close() {
@@ -386,18 +420,19 @@ export class RealtimeVoice extends EventEmitter {
     this.closed = true; this.discardAudio = true; this.clearOutput(); clearTimeout(this.timeout);
     this.rejectReady(new ProviderError(502, 'voice_session_closed'));
     this.signal?.removeEventListener('abort', this.abort);
+    this.handshakeResponse?.destroy?.();
     // terminate also closes a WebSocket still in its connecting state.
     this.socket.terminate(); this.emit('closed');
   }
 }
 
 export class VoiceManager {
-  constructor({ apiKey, isMusicBusy = () => false, onUsage = () => {},
+  constructor({ apiKey, isMusicBusy = () => false, onUsage = () => {}, onProviderError = () => {},
     sessionOptions = async () => ({}), instructionsFor, realtime = options => new RealtimeVoice(options),
     join = joinVoiceChannel, player = createAudioPlayer, resource = createAudioResource,
     decoder = () => new prism.opus.Decoder({ rate: 48000, channels: 1, frameSize: 960 }),
     wait = entersState, maxSessionMs = 10 * 60000, idleMs = 2 * 60000, maxSessions = 3 } = {}) {
-    Object.assign(this, { apiKey, isMusicBusy, onUsage, sessionOptions, instructionsFor, realtime, join, player, resource, decoder, wait,
+    Object.assign(this, { apiKey, isMusicBusy, onUsage, onProviderError, sessionOptions, instructionsFor, realtime, join, player, resource, decoder, wait,
       maxSessionMs, idleMs, maxSessions }); this.sessions = new Map(); this.closed = false;
   }
   close() { this.closed = true; for (const session of this.sessions.values()) this.dispose(session); }
@@ -496,7 +531,17 @@ export class VoiceManager {
       session.player = this.player({ behaviors: { noSubscriber: NoSubscriberBehavior.Stop } });
       session.player.on('error', () => { this.dispose(session); this.notify(session, 'Voice playback failed. Use /voice join to try again.'); });
       session.realtime = this.realtime({ ...options, apiKey: this.apiKey, voice, signal: session.abort.signal });
-      session.realtime.on('failure', () => { this.dispose(session); this.notify(session, 'The xAI voice connection ended. Use /voice join to try again.'); });
+      session.realtime.on('failure', error => {
+        if (session.failureReported || this.sessions.get(session.guildId) !== session) return;
+        session.failureReported = true;
+        // EventEmitter callbacks may run outside the join command's request
+        // context. Carry the saved authenticated actor and guild explicitly.
+        try { Promise.resolve(this.onProviderError(error, { guildId: session.guildId, userId: session.ownerId })).catch(() => {}); } catch {}
+        this.dispose(session);
+        this.notify(session, error?.code === 'insufficient_balance'
+          ? 'The xAI voice provider has insufficient credit, so this session ended. Automatic chat fallback and recovery checks were requested for this server.'
+          : 'The xAI voice connection ended. Use /voice join to try again.');
+      });
       session.realtime.on('response', () => {
         if (session.input || this.sessions.get(session.guildId) !== session) return;
         try { this.startOutput(session); } catch { this.dispose(session); this.notify(session, 'Voice playback failed. Use /voice join to try again.'); }
