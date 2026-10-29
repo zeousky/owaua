@@ -24,11 +24,11 @@ export class MediaService {
       });
     } catch (error) {
       if (id) {
-        if (!posted || (!accepted && error.code === 'media_provider_error' && [400,401,403,404,422,429].includes(error.status))) this.store.release(id);
+        if (!posted || error.providerRejected === true || (!accepted && error.code === 'media_provider_error' && [400,401,402,403,404,422,429].includes(error.status))) this.store.release(id);
         else if (['video_generation_failed','video_unavailable'].includes(error.code)) this.store.fail(id);
         else this.store.uncertain(id);
       }
-      if (id && posted && !['video_generation_failed','video_unavailable','media_provider_error'].includes(error.code)) {
+      if (id && posted && error.providerRejected !== true && !['video_generation_failed','video_unavailable','media_provider_error'].includes(error.code)) {
         throw new MediaInputError('I lost track of that request after sending it. Check /jobs before trying again — I’ll keep checking videos that have a saved job ID. A retry starts a new paid request.');
       }
       throw error;

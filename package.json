@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Owaua's Discord AI core powered by the official xAI API",
+  "description": "Owaua's Discord AI core powered by xAI and Mistral APIs",
   "engines": {
     "node": "^24.22.1 || ^26.12.1"
   },

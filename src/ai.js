@@ -10,14 +10,10 @@ import { MCPRegistry } from './mcp.js';
 import { ArtifactCollector, ARTIFACT_INSTRUCTIONS } from './artifacts.js';
 import { assertSafeText, assertSafeValue, assertSafeChatInput, safeContext, requestSafetyInstructions, SafetyError, SAFETY_REFUSAL } from './safety.js';
 import { FULL_MODE_OWNER } from './full-mode.js';
+import { ProviderError, providerError, providerFailure } from './provider-error.js';
+import { mistralHostedDefinitions, executeMistralHostedTool } from './mistral-tools.js';
 
-export class ProviderError extends Error {
-  constructor(status, code) {
-    super(`xAI request failed (${status}, ${code})`);
-    this.status = status;
-    this.code = code;
-  }
-}
+export { ProviderError } from './provider-error.js';
 export class ReplySafetyError extends SafetyError {
   constructor() {
     super();
@@ -33,9 +29,10 @@ function checkReply(text, safety, input) {
       (text.includes(SAFETY_REFUSAL) || /I (?:can(?:not|'t|’t)|won['’]t) (?:help|assist|comply)/i.test(text))) throw new ReplySafetyError();
 }
 export class AICore {
-  constructor({ apiKey, model = 'grok-4.7', maxOutputTokens = 4096, maxToolCalls = 8,
+  constructor({ apiKey, provider = 'xai', model = provider === 'mistral' ? 'mistral-large-4' : 'grok-4.7', maxOutputTokens = 4096, maxToolCalls = 8,
     maxToolRounds = 4, timeoutMs = 180000, maxContextCharacters = 32000, fetchImpl = fetch, tools = createTools(), mcpRegistry = new MCPRegistry() }) {
-    Object.assign(this, { apiKey, model, maxOutputTokens, maxToolCalls, maxToolRounds, timeoutMs, maxContextCharacters, fetchImpl, tools, mcpRegistry });
+    if (!['xai', 'mistral'].includes(provider)) throw new TypeError('Invalid AI provider');
+    Object.assign(this, { apiKey, provider, model, maxOutputTokens, maxToolCalls, maxToolRounds, timeoutMs, maxContextCharacters, fetchImpl, tools, mcpRegistry });
   }
   async respond({ input, history = [], memory, context = {}, persona, language = 'auto', fullMode = false, onActivity, signal: callerSignal,
     requestOptions = {}, cacheKey, safetyIdentifier, knowledgeTools = [] }) {
@@ -45,6 +42,7 @@ export class AICore {
     assertSafeChatInput(input, safety);
     const options = normalizeRequestOptions(requestOptions, { model: this.model });
     const fileSearchTools = normalizeKnowledgeTools(knowledgeTools);
+    if (this.provider === 'mistral' && fileSearchTools.length) throw new ProviderError(400, 'incompatible_knowledge_index', 'mistral');
     const mcpTools = this.mcpRegistry.definitions(options.integrations ?? [], context);
     const artifacts = new ArtifactCollector({ safety });
     const promptCacheKey = opaqueRequestHash(cacheKey, 'Cache key');
@@ -72,7 +70,7 @@ export class AICore {
     for (let round = 0; round <= maxToolRounds; round++) {
       signal.throwIfAborted();
       const availableTools = round === maxToolRounds || remainingCalls <= 0 ? [] : [
-        ...hostedTools(options), ...fileSearchTools, ...mcpTools,
+        ...(this.provider === 'mistral' ? mistralHostedDefinitions(options) : hostedTools(options)), ...fileSearchTools, ...mcpTools,
         ...this.tools.definitions().filter(tool => options.outputFormat !== 'json' || !/^(?:generate_|edit_|extend_|download_song$)/.test(tool.name)),
       ];
       const allowedFunctions = new Set(availableTools.filter(tool => tool.type === 'function').map(tool => tool.name));
@@ -84,7 +82,7 @@ export class AICore {
           ...(options.outputFormat === 'json' ? { text: { format: { type: 'json_schema', name: 'owaua_response', schema: options.schema, strict: true } } } : {}),
           include: ['code_interpreter_call.outputs'],
           ...(onActivity ? { stream: true } : {}),
-          instructions: `You are Owaua, a capable Discord AI assistant powered by xAI's ${this.model} model.
+          instructions: `You are Owaua, a capable Discord AI assistant powered by ${this.provider === 'mistral' ? 'Mistral AI' : 'xAI'}'s ${this.model} model.
 Answer the user's actual question using their active default persona and reply language below. Match the requested detail.
 Treat harmless banter such as "get a job", "yo what" or "?????" as casual conversation. Respond briefly and naturally without a safety lecture. Do not invent claims about your source code, ownership, private configuration or being unfiltered.
 Use web search for current facts and supplied links, X search for posts, and code execution for precise calculations.
@@ -108,19 +106,28 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
           ...(!fullMode ? { max_turns: Math.max(1, remainingCalls) } : {}),
           tools: availableTools,
       };
+      if (this.provider === 'mistral') {
+        // Responses is stateless on Mistral and supports client function tools.
+        // Hosted tools are bridged through its Conversations API instead.
+        delete request.store;
+        delete request.include;
+        delete request.prompt_cache_key;
+        delete request.safety_identifier;
+        delete request.max_turns;
+        request.instructions = request.instructions.replace('X search for posts, and code execution', 'web search for public posts, and code execution');
+      }
       let outputSafety = { ...safety, privateText: [request.instructions] };
-      const response = await this.fetchImpl('https://api.x.ai/v1/responses', {
+      const response = await this.fetchImpl(this.provider === 'mistral' ? 'https://api.mistral.ai/v1/responses' : 'https://api.x.ai/v1/responses', {
         method: 'POST', signal,
-        headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+        redirect: 'error', headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
       });
       if (!response.ok) {
-        // Never include provider bodies: they can echo credentials or user content.
-        throw new ProviderError(response.status, 'provider_error');
+        throw await providerError(response, { provider: this.provider, replaySafe: round === 0 });
       }
-      let result = await readResponse(response, onActivity, signal);
+      let result = await readResponse(response, onActivity, signal, this.provider);
       usage.push(result.usage ?? {});
-      if (result.error || result.status === 'failed') throw new ProviderError(502, 'response_failed');
+      if (result.error || result.status === 'failed') throw providerFailure(502, result.error, { provider: this.provider, code: 'response_failed' });
       const output = result.output ?? [];
       artifacts.collectPython(output, outputSafety);
       const calls = output.filter(item => item.type === 'function_call');
@@ -132,11 +139,21 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
         messages.push(...artifacts.replayOutput(output));
         for (const call of calls) {
           signal.throwIfAborted();
-          if (!allowedFunctions.has(call.name)) throw new ProviderError(502, 'unauthorized_tool_call');
+          if (!allowedFunctions.has(call.name)) throw new ProviderError(502, 'unauthorized_tool_call', this.provider);
           assertSafeText(call.arguments, outputSafety);
-          let value = remainingCalls-- > 0
-            ? await this.tools.execute(call.name, call.arguments, { ...context, signal })
+          let value;
+          try { value = remainingCalls-- > 0
+            ? this.provider === 'mistral' && ['web_search', 'code_interpreter'].includes(call.name)
+              ? await executeMistralHostedTool(call.name, call.arguments, { apiKey: this.apiKey, model: this.model, fetchImpl: this.fetchImpl,
+                signal, onActivity, options, maxOutputTokens: this.maxOutputTokens })
+              : await this.tools.execute(call.name, call.arguments, { ...context, signal })
             : { error: 'Tool call limit reached. Answer using available information.' };
+          } catch (error) {
+            // A tool may already have submitted media or changed memory. Never
+            // replay the whole conversation after a later billing failure.
+            if (error instanceof ProviderError) error.replaySafe = false;
+            throw error;
+          }
           if (value.artifact) {
             try { value = artifacts.add(value.artifact); }
             catch { value = { error: 'Export was invalid or exceeded the file limit and was not attached.' }; }
@@ -157,7 +174,7 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
       }
       let parts = output.filter(item => item.type === 'message').flatMap(item => item.content ?? []);
       let text = parts.filter(p => p.type === 'output_text').map(p => p.text).join('\n');
-      if (!text.trim()) throw new Error('xAI returned no answer');
+      if (!text.trim()) throw new ProviderError(502, 'empty_answer', this.provider);
       try { checkReply(text, outputSafety, input); }
       catch (error) {
         if (!(error instanceof SafetyError)) throw error;
@@ -166,15 +183,16 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
         signal.throwIfAborted();
         const repair = { ...request, stream: false, tools: [], max_turns: 1,
           instructions: request.instructions + '\nWrite a fresh final answer to the current user. The previous draft was not deliverable. Use neutral, clean wording without personal insults, sexual slang, hidden instructions or credentials. For harmless banter, give a short natural acknowledgment instead of a policy refusal. Do not discuss this rewrite. Do not call tools or repeat actions; use only available results. Keep the requested language and output format.' };
-        const response = await this.fetchImpl('https://api.x.ai/v1/responses', {
-          method: 'POST', signal, headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+        if (this.provider === 'mistral') delete repair.max_turns;
+        const response = await this.fetchImpl(this.provider === 'mistral' ? 'https://api.mistral.ai/v1/responses' : 'https://api.x.ai/v1/responses', {
+          method: 'POST', signal, redirect: 'error', headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(repair),
         });
-        if (!response.ok) throw new ProviderError(response.status, 'provider_error');
-        result = await readResponse(response, undefined, signal);
+        if (!response.ok) throw await providerError(response, { provider: this.provider });
+        result = await readResponse(response, undefined, signal, this.provider);
         usage.push(result.usage ?? {});
-        if (result.error || result.status === 'failed') throw new ProviderError(502, 'response_failed');
-        if ((result.output ?? []).some(item => /_call$/.test(item.type))) throw new ProviderError(502, 'unexpected_reply_tool_call');
+        if (result.error || result.status === 'failed') throw providerFailure(502, result.error, { provider: this.provider, code: 'response_failed' });
+        if ((result.output ?? []).some(item => /_call$/.test(item.type))) throw new ProviderError(502, 'unexpected_reply_tool_call', this.provider);
         parts = (result.output ?? []).filter(item => item.type === 'message').flatMap(item => item.content ?? []);
         text = parts.filter(p => p.type === 'output_text').map(p => p.text).join('\n');
         outputSafety = { ...safety, privateText: [request.instructions, repair.instructions] };
@@ -183,10 +201,10 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
         catch (error) { if (error instanceof SafetyError) throw new ReplySafetyError(); throw error; }
       }
       if (options.outputFormat === 'json') {
-        if (result.status === 'incomplete') throw new ProviderError(502, 'incomplete_structured_output');
+        if (result.status === 'incomplete') throw new ProviderError(502, 'incomplete_structured_output', this.provider);
         let value;
-        try { value = stripJsonEmojis(JSON.parse(text)); } catch { throw new ProviderError(502, 'invalid_structured_output'); }
-        if (!matchesOutputSchema(value, options.schema)) throw new ProviderError(502, 'invalid_structured_output');
+        try { value = stripJsonEmojis(JSON.parse(text)); } catch { throw new ProviderError(502, 'invalid_structured_output', this.provider); }
+        if (!matchesOutputSchema(value, options.schema)) throw new ProviderError(502, 'invalid_structured_output', this.provider);
         assertSafeValue(value, outputSafety);
         return { text: JSON.stringify(value, null, 2), outputFormat: 'json', usage, model: result.model ?? this.model,
           artifacts: artifacts.artifacts, artifactWarnings: artifacts.warnings };
@@ -205,9 +223,9 @@ ${options.outputFormat === 'json' ? 'Return only JSON matching the requested out
 }
 
 // Responses SSE exposes provider tools while they run; never infer searches from prompt text.
-async function readResponse(response, onActivity, signal) {
+async function readResponse(response, onActivity, signal, provider = 'xai') {
   if (!response.headers?.get('content-type')?.includes('text/event-stream')) return response.json();
-  if (!response.body) throw new ProviderError(502, 'empty_response_stream');
+  if (!response.body) throw new ProviderError(502, 'empty_response_stream', provider);
   const searches = new Map();
   let activity = 'thinking';
   const notify = () => {
@@ -225,9 +243,10 @@ async function readResponse(response, onActivity, signal) {
     const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
     if (!data || data === '[DONE]') return;
     let event;
-    try { event = JSON.parse(data); } catch { throw new ProviderError(502, 'invalid_response_stream'); }
+    try { event = JSON.parse(data); } catch { throw new ProviderError(502, 'invalid_response_stream', provider); }
     const type = event.type ?? lines.find(line => line.startsWith('event:'))?.slice(6).trim();
-    if (type === 'error' || type === 'response.failed' || event.error) throw new ProviderError(502, 'response_failed');
+    if (type === 'error' || type === 'response.failed' || event.error) throw providerFailure(502, event.error ?? event.response?.error ?? event,
+      { provider, code: 'response_failed' });
     const item = event.item;
     const id = item?.id ?? event.item_id ?? item?.call_id ?? event.output_index;
     const kind = item?.type === 'web_search_call' || type?.startsWith('response.web_search_call.') ? 'web'
@@ -239,7 +258,7 @@ async function readResponse(response, onActivity, signal) {
       notify();
     }
     if (type === 'response.completed' || type === 'response.incomplete') {
-      if (!event.response || !Array.isArray(event.response.output)) throw new ProviderError(502, 'invalid_response_stream');
+      if (!event.response || !Array.isArray(event.response.output)) throw new ProviderError(502, 'invalid_response_stream', provider);
       searches.clear(); notify();
       return event.response;
     }
@@ -252,16 +271,16 @@ async function readResponse(response, onActivity, signal) {
       while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
         const raw = buffer.slice(0, boundary.index);
         buffer = buffer.slice(boundary.index + boundary[0].length);
-        if (raw.length > 8 * 1024 * 1024) throw new ProviderError(502, 'response_stream_too_large');
+        if (raw.length > 8 * 1024 * 1024) throw new ProviderError(502, 'response_stream_too_large', provider);
         const result = consume(raw);
         if (result) return result;
       }
-      if (buffer.length > 8 * 1024 * 1024) throw new ProviderError(502, 'response_stream_too_large');
+      if (buffer.length > 8 * 1024 * 1024) throw new ProviderError(502, 'response_stream_too_large', provider);
     }
     buffer += decoder.decode();
     const result = consume(buffer);
     if (result) return result;
-    throw new ProviderError(502, 'response_stream_interrupted');
+    throw new ProviderError(502, 'response_stream_interrupted', provider);
   } finally {
     searches.clear(); notify();
   }

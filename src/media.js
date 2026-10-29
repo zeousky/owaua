@@ -123,7 +123,13 @@ export class MediaGenerator {
     callerSignal?.throwIfAborted();
     const deadline = fullModeActive() ? null : AbortSignal.timeout(this.timeoutMs);
     const signal = deadline ? (callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline) : callerSignal ?? new AbortController().signal;
-    const request = (path, body) => this.request(path, body, signal);
+    const request = async (path, body) => {
+      try { return await this.request(path, body, signal); }
+      catch (error) {
+        if (error instanceof ProviderError && error.code === 'insufficient_balance') error.providerRejected = true;
+        throw error;
+      }
+    };
     onSubmitting?.();
     if (kind === 'image' || kind === 'edit_image') {
       const result = await request(path, body);

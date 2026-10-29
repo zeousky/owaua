@@ -17,7 +17,7 @@ function tokens(input) {
       if (char === '\\') { i++; continue; }
       if (char === quote) quote = '';
     } else if ((char === '"' || char === "'") && (depth || i === start || /[:=]/.test(input[i - 1]))) quote = char;
-    else if ((char === '{' || char === '[') && (depth || /^(?:--)?schema[:=]$/i.test(input.slice(start, i)))) depth++;
+    else if ((char === '{' || char === '[') && (depth || /^(?:--)?(?:schema|payload)[:=]$/i.test(input.slice(start, i)))) depth++;
     else if ((char === '}' || char === ']') && depth) depth--;
     else if ((char === undefined || /\s/.test(char)) && !depth) {
       if (i > start) {
@@ -114,14 +114,15 @@ export function parsePrefixCommand(content, { attachments = new Map() } = {}) {
   while (positional.length) {
     const option = positionalOptions.shift();
     if (!option) throw new PrefixCommandError(`Unexpected arguments for .${command.name}. Use .help for examples.`);
-    const rest = option.type === 3 && !positionalOptions.some(next => next.required);
+    const rest = option.type === 3 && !positionalOptions.some(next => next.required) &&
+      !(command.name === 'mistral' && option.name === 'operation');
     values.set(option.name, rest ? positional.splice(0) : [positional.shift()]);
   }
   const supplied = [...attachments.values()];
   for (const option of options) {
     if (values.has(option.name)) values.set(option.name, convert(option, joinTokens(values.get(option.name)), supplied));
     else if (option.type === 11) {
-      const attachment = supplied.find(attachment => matchesAttachment(option.name, attachment));
+      const attachment = supplied.find(attachment => (command.name === 'mistral' && option.name === 'file') || matchesAttachment(option.name, attachment));
       if (attachment) values.set(option.name, attachment);
     }
     if (option.required && !values.has(option.name)) throw new PrefixCommandError(

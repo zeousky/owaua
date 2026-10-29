@@ -15,6 +15,7 @@ export async function confirmMedia({ userId, send, proposal, signal, timeoutMs =
   const nonce = randomUUID();
   const yes = `media:${nonce}:yes`, no = `media:${nonce}:no`;
   const body = proposal.body;
+  const provider = proposal.provider === 'mistral' ? 'Mistral' : 'xAI';
   const labels = { model: 'Model', n: 'Images', quality: 'Quality', resolution: 'Resolution',
     duration: proposal.kind === 'extend_video' ? 'Added seconds' : 'Seconds', aspect_ratio: 'Aspect ratio' };
   const settings = Object.fromEntries(Object.entries(labels).filter(([key]) => body[key] !== undefined)
@@ -24,7 +25,7 @@ export async function confirmMedia({ userId, send, proposal, signal, timeoutMs =
   const note = body.video ? 'Video edits inherit source settings, capped at 720p. Extension seconds are added to the source.'
     : body.image ? 'The aspect ratio comes from the source image.' : 'An unspecified aspect ratio uses the provider default.';
   const review = { action: actions[proposal.kind], prompt: body.prompt, settings, sources, note };
-  const message = await send({ ...card('', `Ready to go? **${actions[proposal.kind]}**\n\n${Object.entries(settings).map(([label, value]) => `${label}: ${value}`).join(' · ')}\nUsing ${sources.length} reference ${sources.length === 1 ? 'file' : 'files'}. ${note}\n\nThe attached file has the full prompt, references, and settings. Take a look, then hit “Go ahead” to start this paid xAI request. Only you can approve it. You have ${Math.ceil(timeoutMs / 1000)} seconds to decide.`),
+  const message = await send({ ...card('', `Ready to go? **${actions[proposal.kind]}**\n\n${Object.entries(settings).map(([label, value]) => `${label}: ${value}`).join(' · ')}\nUsing ${sources.length} reference ${sources.length === 1 ? 'file' : 'files'}. ${note}\n\nThe attached file has the full prompt, references, and settings. Take a look, then hit “Go ahead” to start this paid ${provider} request. Only you can approve it. You have ${Math.ceil(timeoutMs / 1000)} seconds to decide.`),
     attachments: [], files: [{ attachment: Buffer.from(JSON.stringify(review, null, 2)), name: 'media-request.json' }],
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(yes).setLabel('Go ahead').setStyle(ButtonStyle.Primary),
