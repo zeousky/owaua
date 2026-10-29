@@ -189,14 +189,27 @@ To return from Mac fallback hosting, stop the Mac bot and create final snapshots
 
 ## Railway
 
-The Dockerfile installs locked production dependencies on Node 24.22.1. Runtime security updates require a new image build and deployment; changing the source does not patch a running container. Set the Railway healthcheck path to `/health` with a 120-second startup timeout; it returns 200 only when the Discord gateway is ready. A running container alone does not prove a Discord login.
+Use the same commands in your Mac terminal and in Owaua's Railway terminal:
+
+```sh
+start owaua
+stop owaua
+owaua status
+owaua restart
+```
+
+On the Mac, install them once from this checkout with `bash scripts/install-terminal-commands.sh`. It adds links in `~/.local/bin` and preserves existing commands. Keep this checkout in place and ensure that directory is on your `PATH`. The Mac commands connect to the production Owaua service using the authenticated Railway CLI and its explicit project, environment and service IDs. They do not start another Discord client on the Mac. The first SSH connection may ask you to register a key; see [Railway SSH](https://docs.railway.com/cli/ssh). Inside Owaua's Railway terminal, the same commands control that container directly. `owaua start` and `owaua stop` are equivalent alternatives.
+
+Stopping Owaua gracefully disconnects the Discord bot while leaving its small host process and Railway terminal available for the next `start`. The stopped setting survives a container restart or deployment. Starting is idempotent, and restarting waits for the previous child to exit. Normal crashes restart the child with a delay. Control requests use a private Unix socket; there is no public start/stop endpoint. These commands require terminal access to the service, not a Discord command or an AI prompt. The legacy `scripts/mac-host.sh` controls the separate local fallback and must only be used after stopping the hosted bot.
+
+The Dockerfile installs locked production dependencies on Node 24.22.1. Runtime security updates require a new image build and deployment. `railway.json` starts the supervisor and uses `/live` for deployment health: it succeeds when the bot is ready or deliberately stopped. `/health` still returns 200 only when the Discord gateway is ready, and 503 while the bot is stopped or starting. The supervisor proxies the bot's other HTTP routes, including private integration routes.
 
 In a Railway project with available capacity:
 
 1. Create a service from this private repository, branch `main`.
 2. Add a persistent volume mounted at `/app/data`. If reusing Sefbot's volume, set `DATA_DIR=/app/data/kirmy` to preserve its database separately.
 3. Set `DISCORD_TOKEN`, `XAI_API_KEY`, `XAI_MODEL=grok-4.7`, and `DATA_DIR=/app/data` as Railway variables. Use the values in your local `.env`; do not upload that file.
-4. Set healthcheck path `/health`, startup timeout 120 seconds, one replica, and restart on failure (10 retries). Deploy and verify `discord_ready` and `commands_registered` in the new deployment logs.
+4. Keep one replica. The checked-in `railway.json` sets the supervisor start command, `/live` deployment healthcheck, startup timeout and restart policy. Deploy and verify `discord_ready`, `commands_registered`, `/live` and `/health` when the bot is enabled.
 
 For CLI deployment after linking the project/service:
 

@@ -1,0 +1,11 @@
+#!/bin/bash
+set -euo pipefail
+# Follow managed symlinks without relying on GNU readlink -f (absent on macOS).
+script_source="$0"
+while [[ -L "$script_source" ]]; do
+  source_dir="$(cd -P "$(dirname "$script_source")" && pwd)"
+  script_source="$(readlink "$script_source")"
+  [[ "$script_source" = /* ]] || script_source="$source_dir/$script_source"
+done
+script_dir="$(cd -P "$(dirname "$script_source")" && pwd)"
+exec node "$script_dir/../src/host-control.js" "$@"

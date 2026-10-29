@@ -12,6 +12,9 @@ RUN npm ci --omit=dev \
     && useradd --uid 10001 --gid owaua --home-dir /app owaua \
     && mkdir /app/data && chown owaua:owaua /app/data
 COPY --chown=owaua:owaua src ./src
+COPY --chown=owaua:owaua scripts ./scripts
+COPY --chown=owaua:owaua BOT_IDENTITY.json ./BOT_IDENTITY.json
+RUN bash scripts/install-terminal-commands.sh --directory /usr/local/bin
 USER owaua
 ENV NODE_ENV=production DATA_DIR=/app/data
-CMD ["node", "src/bot.js"]
+CMD ["node", "scripts/owaua-host.js"]

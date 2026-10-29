@@ -9,8 +9,12 @@
   },
   "scripts": {
     "start": "node src/bot.js",
+    "host": "node scripts/owaua-host.js",
+    "bot:start": "node src/host-control.js start",
+    "bot:stop": "node src/host-control.js stop",
+    "bot:status": "node src/host-control.js status",
     "test": "node src/runtime.js && node --test",
-    "check": "node src/runtime.js && for file in src/*.js scripts/*.js; do node --check \"$file\" || exit; done",
+    "check": "node src/runtime.js && for file in src/*.js scripts/*.js; do node --check \"$file\" || exit; done && for file in scripts/*.sh scripts/owaua scripts/start scripts/stop; do bash -n \"$file\" || exit; done",
     "memory:backup": "node scripts/backup-memory.js backup",
     "memory:verify": "node scripts/backup-memory.js verify"
   },

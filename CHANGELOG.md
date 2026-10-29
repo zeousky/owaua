@@ -4,6 +4,12 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-10-29
 
+### Added
+
+- Owaua can be started and stopped with `start owaua` and `stop owaua` from the owner's Mac or Railway terminal. Stop gracefully disconnects the bot while leaving terminal controls available, and the stopped setting survives restarts.
+
+## 2026-10-29
+
 ### Changed
 
 - Provider selection and insufficient-credit fallback now apply to the affected server, with separate preferences for DMs.

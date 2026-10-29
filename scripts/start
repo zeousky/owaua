@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+if [[ "$#" -ne 1 || "$1" != owaua ]]; then
+  echo 'Usage: start owaua' >&2
+  exit 1
+fi
+script_source="$0"
+while [[ -L "$script_source" ]]; do
+  source_dir="$(cd -P "$(dirname "$script_source")" && pwd)"
+  script_source="$(readlink "$script_source")"
+  [[ "$script_source" = /* ]] || script_source="$source_dir/$script_source"
+done
+script_dir="$(cd -P "$(dirname "$script_source")" && pwd)"
+exec "$script_dir/owaua" start
