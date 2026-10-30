@@ -2,25 +2,17 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-10-30
+
+### Changed
+
+- Owaua has returned to its earlier xAI-only behavior. Terminal start and stop commands remain available.
+
 ## 2026-10-29
 
 ### Added
 
 - Owaua can be started and stopped with `start owaua` and `stop owaua` from the owner's Mac or Railway terminal. Stop gracefully disconnects the bot while leaving terminal controls available, and the stopped setting survives restarts.
-
-## 2026-10-29
-
-### Changed
-
-- Provider selection and insufficient-credit fallback now apply to the affected server, with separate preferences for DMs.
-- After a balance error, Owaua checks recovery with a tiny, low-cost greeting after five minutes, backing off to hourly checks. Recovered providers return automatically for affected servers, while manual choices are preserved.
-
-## 2026-10-29
-
-### Added
-
-- The owner can switch between xAI and Mistral Large 4 with `.provider` or `/provider`. The choice survives restarts, and confirmed insufficient-credit errors trigger automatic fallback without repeating actions already started.
-- Mistral supports chat, images and document questions, web research, hosted code, new image creation, speech, transcription, and structured answers. The owner can use `.mistral operations` to explore the full REST API catalog; specialist features require the appropriate account access.
 
 ## 2026-10-27
 

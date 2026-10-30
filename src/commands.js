@@ -1,8 +1,6 @@
 import { personaCommand } from './persona-command.js';
 import { languageCommand } from './language-command.js';
 import { fullCommand } from './full-command.js';
-import { providerCommand } from './provider-command.js';
-import { mistralCommand } from './mistral-command.js';
 import { memoryCommand } from './memory-command.js';
 import { jobsCommand, usageCommand } from './media-command.js';
 import { knowledgeCommand } from './knowledge-command.js';
@@ -21,8 +19,8 @@ export const commands = [
     { type: 3, name: 'output', description: 'Answer format (default: text)', choices: [{ name: 'Text', value: 'text' }, { name: 'JSON file', value: 'json' }] },
     { type: 3, name: 'schema', description: 'Optional JSON Schema for JSON output (object, up to 4000 characters)', max_length: 4000 },
     { type: 3, name: 'integrations', description: 'Opt into read-only MCP integrations, e.g. xai_docs,deepwiki', max_length: 200 },
-    { type: 3, name: 'reasoning', description: 'Reasoning effort (Mistral: none or high); higher can take longer and cost more', choices:
-      ['low', 'medium', 'high', 'xhigh', 'none'].map(value => ({ name: value, value })) },
+    { type: 3, name: 'reasoning', description: 'Reasoning effort; higher can take longer and cost more', choices:
+      ['low', 'medium', 'high', 'xhigh'].map(value => ({ name: value, value })) },
     { type: 3, name: 'web_domains', description: 'Limit web search to these domains (comma-separated, up to 5)', max_length: 1000 },
     { type: 3, name: 'x_handles', description: 'Limit X search to these handles (comma-separated, up to 20)', max_length: 400 },
     { type: 3, name: 'from_date', description: 'Search X posts from this date (YYYY-MM-DD)', max_length: 10 },
@@ -34,8 +32,6 @@ export const commands = [
   personaCommand,
   languageCommand,
   fullCommand,
-  providerCommand,
-  mistralCommand,
   memoryCommand,
   jobsCommand, usageCommand,
   knowledgeCommand, speakCommand, transcribeCommand, voiceCommand,

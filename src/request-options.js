@@ -5,7 +5,7 @@ export class RequestOptionsError extends Error {
 }
 
 const FIELDS = new Set(['reasoningEffort', 'webDomains', 'xHandles', 'fromDate', 'toDate', 'visualSearch', 'outputFormat', 'schema', 'integrations']);
-const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh'];
+const EFFORTS = ['low', 'medium', 'high', 'xhigh'];
 const unset = value => value === undefined || value === null || value === '';
 
 function list(value, { name, max, length, normalize }) {
@@ -65,13 +65,10 @@ export function normalizeRequestOptions(raw = {}, { model = 'grok-4.7' } = {}) {
   }
   const options = {};
   if (!unset(raw.reasoningEffort)) {
-    if (!EFFORTS.includes(raw.reasoningEffort)) throw new RequestOptionsError('Choose a supported reasoning effort.');
-    if (model === 'mistral-large-4') {
-      if (!['none', 'high'].includes(raw.reasoningEffort)) throw new RequestOptionsError('Mistral Large 4 supports none or high reasoning.');
-    } else if (!['grok-4.5', 'grok-4.6', 'grok-4.7'].includes(model)) {
+    if (!EFFORTS.includes(raw.reasoningEffort)) throw new RequestOptionsError('Reasoning effort must be low, medium, high, or xhigh.');
+    if (!['grok-4.5', 'grok-4.6', 'grok-4.7'].includes(model)) {
       throw new RequestOptionsError('Reasoning effort is supported here for grok-4.5, grok-4.6, and grok-4.7.');
     }
-    if (model !== 'mistral-large-4' && raw.reasoningEffort === 'none') throw new RequestOptionsError('Use low, medium, high, or xhigh reasoning with xAI.');
     if (model === 'grok-4.5' && raw.reasoningEffort === 'xhigh') throw new RequestOptionsError('xhigh reasoning requires grok-4.6 or grok-4.7.');
     options.reasoningEffort = raw.reasoningEffort;
   }

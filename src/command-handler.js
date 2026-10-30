@@ -3,8 +3,6 @@ import { handleMediaCommand } from './media-command.js';
 import { handlePersonaCommand } from './persona-command.js';
 import { handleLanguageCommand } from './language-command.js';
 import { handleFullCommand } from './full-command.js';
-import { handleProviderCommand } from './provider-command.js';
-import { handleMistralCommand } from './mistral-command.js';
 import { handleMemoryCommand } from './memory-command.js';
 import { handleSpeakCommand, handleTranscribeCommand, handleVoiceCommand } from './voice-command.js';
 import { handleKnowledgeCommand } from './knowledge-command.js';
@@ -14,18 +12,16 @@ import { requestAttachments } from './attachments.js';
 import { PrefixPrivateReplyError } from './prefix-command.js';
 import { withFullMode } from './full-mode.js';
 
-export function createCommandHandler({ allowed, isStopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager, providerRouter, mistralAPI,
+export function createCommandHandler({ allowed, isStopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
   standalone, active, help, client, answer, signal, logError }) {
   return function handleCommand(interaction) {
-    const run = () => withServerLanguage(interaction.guildId, () => withFullMode(interaction.user.id, store.fullMode?.(interaction.user.id), async () => {
+    return withServerLanguage(interaction.guildId, () => withFullMode(interaction.user.id, store.fullMode?.(interaction.user.id), async () => {
     const stopping = isStopping();
     try {
       if (!allowed(interaction.guildId)) return await interaction.reply({ ...card('Owaua', 'Owaua is not enabled in this server.', { tone: 'warning' }), flags: 64 });
       if (stopping) return await interaction.reply({ ...card('', 'I’m restarting — give me a moment, then try again.'), flags: 64 });
       if (interaction.commandName === 'language') return await handleLanguageCommand(interaction, store, interaction.options.getString('name') ?? '');
       if (interaction.commandName === 'full') return await handleFullCommand(interaction, store);
-      if (interaction.commandName === 'provider') return await handleProviderCommand(interaction, providerRouter);
-      if (interaction.commandName === 'mistral') return await handleMistralCommand(interaction, { api: mistralAPI, standalone, router: providerRouter, signal });
       if (['jobs', 'usage'].includes(interaction.commandName)) return await handleMediaCommand(interaction, mediaStore, usageStore);
       if (interaction.commandName === 'knowledge') {
         const run = () => handleKnowledgeCommand(interaction, knowledge, { isActive: () => false, stopping, signal });
@@ -79,7 +75,5 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, u
       logError('interaction_error', error);
     }
     }));
-    return providerRouter?.withScope
-      ? providerRouter.withScope({ guildId: interaction.guildId, userId: interaction.user.id }, run) : run();
   };
 }

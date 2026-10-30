@@ -7,12 +7,6 @@ import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'disco
 import { MusicManager, musicHelp } from './music.js';
 import { SongDownloads, SongInputError, parseSongRequest, songResult } from './song-download.js';
 import { AICore, ProviderError } from './ai.js';
-import { ProviderRouter } from './providers.js';
-import { ProviderRecoveryMonitor } from './provider-recovery.js';
-import { billingAwareFetch } from './provider-error.js';
-import { MistralAPI } from './mistral-api.js';
-import { MistralDocumentInputs, MistralVoiceAPI } from './mistral-inputs.js';
-import { MistralMediaGenerator } from './mistral-tools.js';
 import { MediaGenerator, MediaInputError } from './media.js';
 import { MediaStore } from './media-store.js';
 import { MediaService } from './media-service.js';
@@ -43,10 +37,9 @@ function integer(name, fallback, min, max) {
   if (!Number.isInteger(value) || value < min || value > max) throw new Error(`Invalid ${name}`);
   return value;
 }
-for (const name of ['DISCORD_TOKEN']) {
+for (const name of ['DISCORD_TOKEN', 'XAI_API_KEY']) {
   if (!process.env[name]) throw new Error(`Missing required environment variable: ${name}`);
 }
-if (!process.env.XAI_API_KEY && !process.env.MISTRAL_API_KEY) throw new Error('Configure XAI_API_KEY or MISTRAL_API_KEY');
 const dataDirectory = process.env.DATA_DIR ?? './data';
 const store = new ConversationStore(dataDirectory, integer('MAX_CONTEXT_TURNS', 16, 1, 50), {
   archiveTurns: integer('MAX_ARCHIVE_TURNS', 1000, 50, 10000),
@@ -56,58 +49,32 @@ const store = new ConversationStore(dataDirectory, integer('MAX_CONTEXT_TURNS', 
 console.log(JSON.stringify({ event: 'memory_ready', recentTurns: store.maxTurns, archiveTurns: store.archiveTurns,
   retentionDays: store.retentionDays, contextCharacters: store.maxContextCharacters }));
 const mcp = createMCPRegistry();
-const aiOptions = {
+const ai = new AICore({
+  apiKey: process.env.XAI_API_KEY, model: process.env.XAI_MODEL ?? 'grok-4.7',
   maxOutputTokens: integer('MAX_OUTPUT_TOKENS', 4096, 256, 16000),
   maxToolCalls: integer('MAX_TOOL_CALLS', 8, 1, 30),
   maxToolRounds: integer('MAX_TOOL_ROUNDS', 4, 1, 8),
   timeoutMs: integer('REQUEST_TIMEOUT_MS', 180000, 1000, 600000),
   maxContextCharacters: integer('MAX_CONTEXT_CHARACTERS', 32000, 1000, 100000),
   mcpRegistry: mcp,
-};
-let providerRecovery;
-const ai = new ProviderRouter({ directory: dataDirectory, defaultProvider: process.env.AI_PROVIDER ?? 'xai',
-  providers: {
-    xai: new AICore({ ...aiOptions, apiKey: process.env.XAI_API_KEY, model: process.env.XAI_MODEL ?? 'grok-4.7' }),
-    mistral: new AICore({ ...aiOptions, provider: 'mistral', apiKey: process.env.MISTRAL_API_KEY, model: 'mistral-large-4' }),
-  }, onSwitch: details => console.log(JSON.stringify({ event: 'provider_switched', ...details })),
-  onDepleted: () => providerRecovery?.wake(),
-  onRecoveryError: ({ error }) => logError('provider_recovery_state_error', error) });
-providerRecovery = new ProviderRecoveryMonitor({ router: ai,
-  providers: {
-    xai: { apiKey: process.env.XAI_API_KEY, model: process.env.XAI_RECOVERY_MODEL ?? 'grok-4.3' },
-    mistral: { apiKey: process.env.MISTRAL_API_KEY, model: process.env.MISTRAL_RECOVERY_MODEL ?? 'ministral-3b-latest' },
-  }, intervalMs: integer('PROVIDER_RECOVERY_INTERVAL_MS', 300000, 60000, 3600000),
-  maxIntervalMs: integer('PROVIDER_RECOVERY_MAX_INTERVAL_MS', 3600000, 60000, 86400000),
-  onResult: details => console.log(JSON.stringify({ event: 'provider_recovery', ...details })),
-  onError: error => logError('provider_recovery_error', error) });
-const xaiFetch = billingAwareFetch('xai', ai);
-const mistralFetch = billingAwareFetch('mistral', ai);
-const mistralAPI = new MistralAPI({ apiKey: process.env.MISTRAL_API_KEY, fetchImpl: mistralFetch });
-const xaiMedia = new MediaGenerator({ apiKey: process.env.XAI_API_KEY, fetchImpl: xaiFetch,
+});
+const media = new MediaGenerator({ apiKey: process.env.XAI_API_KEY,
   timeoutMs: integer('MEDIA_TIMEOUT_MS', 600000, 1000, 720000) });
-const mistralMedia = new MistralMediaGenerator({ apiKey: process.env.MISTRAL_API_KEY, fetchImpl: mistralFetch,
-  timeoutMs: integer('MEDIA_TIMEOUT_MS', 600000, 1000, 720000) });
-const media = { generate: (kind, ...args) => (ai.provider === 'mistral' && kind === 'image' ? mistralMedia : xaiMedia).generate(kind, ...args),
-  checkVideo: (...args) => xaiMedia.checkVideo(...args) };
 const mediaStore = new MediaStore(dataDirectory);
 mediaStore.recover();
-const mediaService = new MediaService({ media, store: mediaStore, confirm: confirmMedia,
-  withScope: (context, work) => ai.withScope(context, work) });
+const mediaService = new MediaService({ media, store: mediaStore, confirm: confirmMedia });
 let recoveryTimer, recoveryTask;
 function recoverMedia() {
   if (stopping || recoveryTask) return;
   recoveryTask = mediaService.resume({ signal: shutdownController.signal })
     .catch(error => logError('media_recovery_error', error)).finally(() => { recoveryTask = undefined; });
 }
-const documents = new DocumentInputs({ apiKey: process.env.XAI_API_KEY, fetchImpl: xaiFetch,
+const documents = new DocumentInputs({ apiKey: process.env.XAI_API_KEY,
   onCleanupFailure: failed => console.error(JSON.stringify({ event: 'file_cleanup_error', failed })) });
-const mistralDocuments = new MistralDocumentInputs();
-const knowledge = new KnowledgeLibrary({ directory: dataDirectory, apiKey: process.env.XAI_API_KEY, fetchImpl: xaiFetch,
+const knowledge = new KnowledgeLibrary({ directory: dataDirectory, apiKey: process.env.XAI_API_KEY,
   managementApiKey: process.env.XAI_MANAGEMENT_API_KEY,
   onCleanupFailure: failed => console.error(JSON.stringify({ event: 'knowledge_cleanup_error', failed })) });
-const voices = { xai: new VoiceAPI({ apiKey: process.env.XAI_API_KEY, fetchImpl: xaiFetch }),
-  mistral: new MistralVoiceAPI({ apiKey: process.env.MISTRAL_API_KEY, fetchImpl: mistralFetch }) };
-const voiceAPI = Object.fromEntries(['transcribe', 'speak', 'voices'].map(method => [method, (...args) => voices[ai.provider][method](...args)]));
+const voiceAPI = new VoiceAPI({ apiKey: process.env.XAI_API_KEY });
 const allowedGuilds = new Set((process.env.ALLOWED_GUILD_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean));
 const cooldown = integer('USER_COOLDOWN_SECONDS', 5, 0, 3600) * 1000;
 const concurrency = integer('MAX_CONCURRENT_REQUESTS', 3, 1, 20);
@@ -129,7 +96,6 @@ const music = new MusicManager({ isVoiceBusy: guildId => voiceManager.sessions.h
 const songs = new SongDownloads();
 const voiceManager = new VoiceManager({ apiKey: process.env.XAI_API_KEY,
   isMusicBusy: guildId => music.sessions.has(guildId),
-  onProviderError: (error, context) => ai.withScope(context, () => ai.reportFailure(error, 'xai')),
   onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })),
   sessionOptions: ({ userId }) => {
     const persona = store.persona(userId);
@@ -138,7 +104,7 @@ const voiceManager = new VoiceManager({ apiKey: process.env.XAI_API_KEY,
       initialMessages: personaContext(persona) };
   },
 });
-const capabilities = ['voice', 'knowledge', 'mcp', 'artifacts', 'structured_outputs', 'providers', 'mistral_api'];
+const capabilities = ['voice', 'knowledge', 'mcp', 'artifacts', 'structured_outputs'];
 let stopping = false;
 const help = helpCard(musicHelp);
 
@@ -149,8 +115,8 @@ function logError(event, error) {
 const localExtension = await loadLocalExtension({ card, assertSafeChatInput, assertSafeValue,
   ownerId: MEDIA_OWNER, signal: shutdownController.signal, isStopping: () => stopping, logError });
 function answer(request) {
-  return ai.withScope(request, () => withFullMode(request.userId, store.fullMode(request.userId),
-    () => withRequestUser(request.userId, () => answerForUser(request))));
+  return withFullMode(request.userId, store.fullMode(request.userId),
+    () => withRequestUser(request.userId, () => answerForUser(request)));
 }
 async function answerForUser({ scope, userId, guildId, text, images = [], documents: documentAttachments = [], videos = [], audio = [],
   useLibrary = false, spoken = false, requestOptions = {}, send }) {
@@ -160,7 +126,6 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
     return send(card('One moment', 'Please use at most 16,000 characters, five images, four documents, one audio recording, and one MP4 per request.', { tone: 'warning' }));
   }
   let prepared, release;
-  const preparedInputs = new Map();
   try {
     assertSafeChatInput(text);
     const options = normalizeRequestOptions(requestOptions, { model: ai.model });
@@ -175,15 +140,10 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       console.log(JSON.stringify({ event: 'song_attachment', bytes: song.file.attachment.length }));
       return;
     }
-    const prepareForProvider = async provider => {
-      if (provider === 'mistral' && useLibrary) throw new RequestOptionsError('Your saved /knowledge library uses xAI. Select xAI, or attach the document directly for Mistral. Mistral Libraries are available through the owner API command.');
-      if (!preparedInputs.has(provider)) preparedInputs.set(provider, await prepareRequestInput({ text, images,
-        documents: documentAttachments, videos, audio, useLibrary, scope, voice: voices[provider],
-        documentInputs: provider === 'mistral' ? mistralDocuments : documents, knowledge, signal: shutdownController.signal }));
-      prepared = preparedInputs.get(provider);
-      return { input: prepared.input, knowledgeTools: prepared.knowledgeTools, memory: store.context(scope, prepared.userText) };
-    };
-    const memory = createMemorySession(store, { scope, userId, input: text });
+    prepared = await prepareRequestInput({ text, images, documents: documentAttachments, videos, audio, useLibrary, scope,
+      voice: voiceAPI, documentInputs: documents, knowledge, signal: shutdownController.signal });
+    assertSafeChatInput(prepared.userText);
+    const memory = createMemorySession(store, { scope, userId, input: prepared.memoryInput });
     let generationStarted = false;
     const generateMedia = async (type, prompt, { useReference = true, options = {} } = {}) => {
       if (generationStarted && !fullModeActive(userId)) throw new Error('Only one generation attempt per request');
@@ -197,10 +157,10 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       songStarted = true;
       return songs.download(query, { signal: signal ?? shutdownController.signal });
     };
-    const result = await ai.respond({ input: text, history: store.history(scope), persona, language: store.language(userId), fullMode: fullModeActive(userId),
+    const result = await ai.respond({ input: prepared.input, history: store.history(scope), memory: store.context(scope, prepared.userText), persona, language: store.language(userId), fullMode: fullModeActive(userId),
       context: { userId, guildId, generateMedia, downloadSong, memory }, signal: shutdownController.signal,
       requestOptions: options,
-      prepareForProvider,
+      knowledgeTools: prepared.knowledgeTools,
       cacheKey: createHash('sha256').update(scope).digest('hex'),
       safetyIdentifier: createHash('sha256').update(userId).digest('hex') });
     if (result.outputFormat !== 'json') result.text = cleanServerText(result.text);
@@ -235,18 +195,16 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       : error instanceof UsageLimitError || error instanceof SafetyError || error instanceof MediaInputError || error instanceof DocumentInputError || error instanceof RequestOptionsError ||
         error instanceof VoiceInputError || error instanceof KnowledgeError || error instanceof SongInputError ? error.message
       : error instanceof ProviderError && ['invalid_structured_output', 'incomplete_structured_output'].includes(error.code)
-        ? 'The AI provider did not return a complete answer matching your JSON schema. Try a simpler schema or a larger output limit.'
-      : error instanceof ProviderError && error.code === 'insufficient_balance'
-        ? 'The AI provider has insufficient credit. Automatic fallback was checked for this server, and low-cost recovery checks will run in the background. Please try again; actions already started were not repeated.'
+        ? 'xAI did not return a complete answer matching your JSON schema. Try a simpler schema or a larger output limit.'
       : error instanceof ProviderError && error.status === 429
-      ? 'The AI provider is getting too many requests right now. Give it a moment, then try again.'
+      ? 'xAI is getting too many requests right now. Give it a moment, then try again.'
       : error?.name === 'TimeoutError' || error?.name === 'AbortError'
         ? 'That request timed out. Check /jobs before retrying media; a submitted job may still complete.'
         : 'I couldn’t finish that one. Give it another try in a moment.';
     const payload = card('Couldn’t complete your request', message, { tone: 'error' });
     await send(payload).catch(error => logError('send_error', error));
   } finally {
-    try { for (const input of preparedInputs.values()) await input.cleanup().catch(error => logError('file_cleanup_error', error)); }
+    try { if (prepared) await prepared.cleanup().catch(error => logError('file_cleanup_error', error)); }
     finally { release?.(); }
   }
 }
@@ -261,12 +219,10 @@ async function standalone(interaction, handler, { charge = true, voice = false }
     if (!(error instanceof UsageLimitError)) throw error;
     return interaction.reply({ ...card('', error.message), flags: 64 });
   }
-  try { return await ai.withScope({ guildId: interaction.guildId, userId: interaction.user.id },
-    () => withRequestUser(interaction.user.id, handler)); } finally { release(); }
+  try { return await withRequestUser(interaction.user.id, handler); } finally { release(); }
 }
 client.once(Events.ClientReady, async ready => {
-  console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, provider: ai.provider, model: ai.model }));
-  providerRecovery.start();
+  console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, model: ai.model }));
   recoverMedia();
   recoveryTimer = setInterval(recoverMedia, 30000);
   recoveryTimer.unref();
@@ -276,7 +232,7 @@ client.once(Events.ClientReady, async ready => {
   } catch (error) { logError('command_registration_error', error); }
 });
 const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
-  providerRouter: ai, mistralAPI, standalone, active, help, client, answer, signal: shutdownController.signal, logError });
+  standalone, active, help, client, answer, signal: shutdownController.signal, logError });
 client.on(Events.InteractionCreate, async interaction => {
   try {
     if (interaction.isChatInputCommand()) await handleCommand(interaction);
@@ -306,7 +262,6 @@ async function shutdown(exitCode = 0) {
   if (stopping) return;
   stopping = true;
   clearInterval(recoveryTimer);
-  providerRecovery.close();
   server.close();
   music.close();
   voiceManager.close();

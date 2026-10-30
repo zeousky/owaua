@@ -2,9 +2,7 @@ import { MediaInputError } from './media.js';
 import { requestsMedia } from './media-request.js';
 
 export class MediaService {
-  constructor({ media, store, confirm, withScope = (_context, work) => work() }) {
-    Object.assign(this, { media, store, confirm, withScope }); this.active = new Set();
-  }
+  constructor({ media, store, confirm }) { Object.assign(this, { media, store, confirm }); this.active = new Set(); }
   async generate(kind, prompt, { userId, guildId, send, signal, currentRequest, ...options }) {
     let id, posted = false, accepted = false;
     try {
@@ -26,11 +24,11 @@ export class MediaService {
       });
     } catch (error) {
       if (id) {
-        if (!posted || error.providerRejected === true || (!accepted && error.code === 'media_provider_error' && [400,401,402,403,404,422,429].includes(error.status))) this.store.release(id);
+        if (!posted || (!accepted && error.code === 'media_provider_error' && [400,401,403,404,422,429].includes(error.status))) this.store.release(id);
         else if (['video_generation_failed','video_unavailable'].includes(error.code)) this.store.fail(id);
         else this.store.uncertain(id);
       }
-      if (id && posted && error.providerRejected !== true && !['video_generation_failed','video_unavailable','media_provider_error'].includes(error.code)) {
+      if (id && posted && !['video_generation_failed','video_unavailable','media_provider_error'].includes(error.code)) {
         throw new MediaInputError('I lost track of that request after sending it. Check /jobs before trying again — I’ll keep checking videos that have a saved job ID. A retry starts a new paid request.');
       }
       throw error;
@@ -42,8 +40,7 @@ export class MediaService {
       if (this.active.has(job.id)) continue;
       this.active.add(job.id);
       try {
-        const result = await this.withScope({ guildId: job.guild_id || null, userId: job.user_id },
-          () => this.media.checkVideo(job.request_id, { model: job.model, signal }));
+        const result = await this.media.checkVideo(job.request_id, { model: job.model, signal });
         if (result) this.store.complete(job.id, result);
       } catch (error) {
         if (['video_generation_failed', 'video_unavailable'].includes(error.code) ||
