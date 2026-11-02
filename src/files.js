@@ -2,6 +2,7 @@ import { ProviderError } from './ai.js';
 import { fullModeActive } from './full-mode.js';
 
 const MiB = 1024 * 1024;
+const MAX_PARALLEL_UPLOADS = 3;
 const DISCORD_HOSTS = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
 // The Files guide documents PDF and UTF-8 text, including code, CSV and JSON.
 // Binary Office documents are deliberately excluded from this attachment path.
@@ -48,7 +49,7 @@ function asAttachments(attachments) {
   throw new DocumentInputError('The document attachments are invalid.');
 }
 
-async function boundedDownload(response, { signal, maxFileBytes, remainingBytes }) {
+async function boundedDownload(response, { signal, maxFileBytes, remainingBytes, reserveBytes }) {
   const limit = Math.min(maxFileBytes, remainingBytes);
   const statedSize = Number(response.headers?.get('content-length'));
   if (Number.isFinite(statedSize) && statedSize > limit) {
@@ -69,6 +70,9 @@ async function boundedDownload(response, { signal, maxFileBytes, remainingBytes 
       if (done) break;
       size += value.byteLength;
       if (size > limit) throw new DocumentInputError('The attached documents exceed the upload size limit.');
+      // Reserve each chunk synchronously so concurrent readers share one real
+      // byte budget, even when Discord's declared sizes are missing or wrong.
+      reserveBytes(value.byteLength);
       chunks.push(value);
     }
     if (!size) throw new DocumentInputError('The document attachment is empty.');
@@ -108,45 +112,68 @@ export class DocumentInputs {
     const maxTotalBytes = fullModeActive() ? Infinity : this.maxTotalBytes;
     if (statedTotal > maxTotalBytes) throw new DocumentInputError('The attached documents exceed the combined upload size limit.');
     const deadline = fullModeActive() ? null : AbortSignal.timeout(this.timeoutMs);
-    const signal = deadline ? (callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline) : callerSignal ?? new AbortController().signal;
+    const failedUpload = new AbortController();
+    const signal = AbortSignal.any([failedUpload.signal, ...(deadline ? [deadline] : []), ...(callerSignal ? [callerSignal] : [])]);
     let totalBytes = 0;
-    try {
-      for (const [index, document] of documents.entries()) {
-        signal.throwIfAborted();
-        const response = await this.fetchImpl(urls[index], { signal, redirect: 'error' });
-        if (!response.ok) {
-          await response.body?.cancel().catch(() => {});
-          throw new DocumentInputError('I could not download the document attachment. Please attach it again.');
+    let nextIndex = 0;
+    let failure;
+    const orderedIds = new Array(documents.length);
+    const reserveBytes = bytes => {
+      totalBytes += bytes;
+      if (totalBytes > maxTotalBytes) throw new DocumentInputError('The attached documents exceed the upload size limit.');
+    };
+    const uploadNext = async () => {
+      while (!failure && nextIndex < documents.length) {
+        const index = nextIndex++;
+        const document = documents[index];
+        try {
+          signal.throwIfAborted();
+          const response = await this.fetchImpl(urls[index], { signal, redirect: 'error' });
+          if (!response.ok) {
+            await response.body?.cancel().catch(() => {});
+            throw new DocumentInputError('I could not download the document attachment. Please attach it again.');
+          }
+          const { blob } = await boundedDownload(response, {
+            signal, maxFileBytes: this.maxFileBytes, remainingBytes: maxTotalBytes - totalBytes, reserveBytes,
+          });
+          signal.throwIfAborted();
+          const body = new FormData();
+          body.append('purpose', 'assistants');
+          // Provider-side expiry is a backstop if the process stops before cleanup.
+          body.append('expires_after', '3600');
+          const name = attachmentName(document) || 'attachment.txt';
+          const mime = String(document.contentType ?? '').split(';')[0].trim().toLowerCase() ||
+            (name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain');
+          body.append('file', new Blob([blob], { type: mime }), name);
+          const upload = await this.fetchImpl('https://api.x.ai/v1/files', {
+            method: 'POST', signal, redirect: 'error',
+            headers: { Authorization: `Bearer ${this.apiKey}` }, body,
+          });
+          if (!upload.ok) {
+            await upload.body?.cancel().catch(() => {});
+            throw new ProviderError(upload.status, 'document_upload_failed');
+          }
+          const result = await upload.json();
+          if (typeof result.id !== 'string' || !/^file[-_][A-Za-z0-9_-]{1,200}$/.test(result.id)) {
+            throw new ProviderError(502, 'invalid_document_upload');
+          }
+          ids.push(result.id);
+          orderedIds[index] = result.id;
+        } catch (error) {
+          if (!failure) {
+            failure = { error };
+            failedUpload.abort(error);
+          }
         }
-        const { blob, size } = await boundedDownload(response, {
-          signal, maxFileBytes: this.maxFileBytes, remainingBytes: maxTotalBytes - totalBytes,
-        });
-        totalBytes += size;
-        signal.throwIfAborted();
-        const body = new FormData();
-        body.append('purpose', 'assistants');
-        // Provider-side expiry is a backstop if the process stops before cleanup.
-        body.append('expires_after', '3600');
-        const name = attachmentName(document) || 'attachment.txt';
-        const mime = String(document.contentType ?? '').split(';')[0].trim().toLowerCase() ||
-          (name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain');
-        body.append('file', new Blob([blob], { type: mime }), name);
-        const upload = await this.fetchImpl('https://api.x.ai/v1/files', {
-          method: 'POST', signal, redirect: 'error',
-          headers: { Authorization: `Bearer ${this.apiKey}` }, body,
-        });
-        if (!upload.ok) {
-          await upload.body?.cancel().catch(() => {});
-          throw new ProviderError(upload.status, 'document_upload_failed');
-        }
-        const result = await upload.json();
-        if (typeof result.id !== 'string' || !/^file[-_][A-Za-z0-9_-]{1,200}$/.test(result.id)) {
-          throw new ProviderError(502, 'invalid_document_upload');
-        }
-        ids.push(result.id);
       }
+    };
+    try {
+      // Wait for every worker before rollback: an in-flight upload can still
+      // succeed after another fails, and its ID must also be deleted.
+      await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL_UPLOADS, documents.length) }, uploadNext));
+      if (failure) throw failure.error;
       signal.throwIfAborted();
-      return { input: ids.map(file_id => ({ type: 'input_file', file_id })), cleanup };
+      return { input: orderedIds.map(file_id => ({ type: 'input_file', file_id })), cleanup };
     } catch (error) {
       await cleanup();
       throw error;

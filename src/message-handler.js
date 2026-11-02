@@ -49,8 +49,13 @@ export function createMessageHandler({ allowed, localExtension, handleCommand, c
       try { attachments = requestAttachments(message, reference, client.user.id); }
       catch (error) { return message.reply(card('Check your images', error.message, { tone: 'warning' })); }
       if (!text && !attachments.images.length && !attachments.documents.length && !attachments.videos.length && !attachments.audio.length) return message.reply(card('', 'Hey, what’s up? Ask me something, or use `/help` for the guide.'));
-      await message.channel.sendTyping();
-      const typing = setInterval(() => { message.channel.sendTyping().catch(() => {}); }, 8000);
+      // Typing is only a hint: Discord latency or a failed hint must never
+      // delay the answer, including when the channel throws synchronously.
+      const sendTyping = () => {
+        try { Promise.resolve(message.channel.sendTyping()).catch(() => {}); } catch {}
+      };
+      sendTyping();
+      const typing = setInterval(sendTyping, 8000);
       let response;
       const send = async payload => {
         if (response) return response.edit(payload);

@@ -25,7 +25,7 @@ import { KnowledgeLibrary, KnowledgeError } from './knowledge.js';
 import { createMCPRegistry } from './mcp.js';
 import { personaContext, personaInstructions } from './persona.js';
 import { prepareRequestInput } from './request-input.js';
-import { resultReply } from './reply.js';
+import { resultReply, deliverResultReply } from './reply.js';
 import { assertSafeValue, assertSafeChatInput, SafetyError, withRequestUser } from './safety.js';
 import { loadLocalExtension } from './local-extension.js';
 import { MEDIA_OWNER } from './media-store.js';
@@ -51,6 +51,7 @@ console.log(JSON.stringify({ event: 'memory_ready', recentTurns: store.maxTurns,
 const mcp = createMCPRegistry();
 const ai = new AICore({
   apiKey: process.env.XAI_API_KEY, model: process.env.XAI_MODEL ?? 'grok-4.7',
+  defaultReasoningEffort: process.env.XAI_REASONING_EFFORT ?? 'low',
   maxOutputTokens: integer('MAX_OUTPUT_TOKENS', 4096, 256, 16000),
   maxToolCalls: integer('MAX_TOOL_CALLS', 8, 1, 30),
   maxToolRounds: integer('MAX_TOOL_ROUNDS', 4, 1, 8),
@@ -172,20 +173,8 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
       logError('memory_save_error', error);
       notices.push('I couldn’t save memory for this reply. Please try saving important facts with /memory remember.');
     }
-    let speech;
-    if (spoken && !result.media) {
-      try {
-        const spokenText = result.text.slice(0, 4000);
-        const generated = await voiceAPI.speak(spokenText, { signal: shutdownController.signal });
-        speech = { attachment: generated.attachment, name: generated.name };
-        if (result.text.length > 4000) notices.push('Spoken audio covers the first 4,000 characters. The full answer is available in text.');
-      } catch (error) {
-        logError('speech_error', error);
-        notices.push('I couldn’t generate the spoken audio. Your text answer is still available.');
-      }
-    }
-    const payload = resultReply(result, { notices, speech });
-    await send(payload);
+    await deliverResultReply(result, { notices, spoken, voice: voiceAPI, signal: shutdownController.signal,
+      send, onSpeechError: error => logError('speech_error', error) });
     console.log(JSON.stringify({ event: 'ai_response', model: result.media ? ai.model : result.model, usage: result.usage,
       ...(result.media ? { mediaModel: result.media.model, mediaUsage: result.media.usage ?? null,
         mediaRequestId: result.media.requestId ?? null } : {}) }));

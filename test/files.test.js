@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentInputs, DocumentInputError, isDocumentAttachment } from '../src/files.js';
+import { FULL_MODE_OWNER, withFullMode } from '../src/full-mode.js';
 
 const document = (name = 'notes.txt', extras = {}) => ({
   name, url: `https://cdn.discordapp.com/attachments/1/2/${name}?ex=signature`, size: 4,
@@ -89,9 +90,11 @@ test('rejects excessive Content-Length before reading a document body', async ()
 
 test('enforces aggregate streamed size and deletes earlier uploads on partial failure', async () => {
   const deleted = [];
+  const firstUpload = Promise.withResolvers();
   const client = new DocumentInputs({ maxFileBytes: 8, maxTotalBytes: 10, fetchImpl: async (url, options) => {
     if (options?.method === 'DELETE') { deleted.push(url); return json({ deleted: true }); }
-    if (options?.method === 'POST') return json({ id: 'file_first' });
+    if (options?.method === 'POST') { firstUpload.resolve(); return json({ id: 'file_first' }); }
+    if (url.includes('second.txt')) await firstUpload.promise;
     return stream([3, 3]);
   } });
   await assert.rejects(client.upload([document('first.txt', { size: 1 }), document('second.txt', { size: 1 })]), /size limit/);
@@ -118,19 +121,103 @@ test('provider upload failures clean earlier files and never expose response bod
 
 test('caller abort interrupts a stalled body and cleanup uses a fresh signal', async () => {
   const controller = new AbortController();
+  const firstUpload = Promise.withResolvers();
   let downloads = 0;
   let cancelled = false;
   let cleanupSignal;
   const client = new DocumentInputs({ fetchImpl: async (url, options) => {
     if (options?.method === 'DELETE') { cleanupSignal = options.signal; return json({ deleted: true }); }
-    if (options?.method === 'POST') return json({ id: 'file_first' });
+    if (options?.method === 'POST') { firstUpload.resolve(); return json({ id: 'file_first' }); }
     if (++downloads === 1) return new Response('test');
+    await firstUpload.promise;
     queueMicrotask(() => controller.abort(new Error('user cancelled')));
     return new Response(new ReadableStream({ cancel() { cancelled = true; } }));
   } });
   await assert.rejects(client.upload([document(), document('second.txt')], { signal: controller.signal }), /user cancelled/);
   assert.equal(cancelled, true);
   assert.equal(cleanupSignal.aborted, false);
+});
+
+for (const fullMode of [false, true]) test(`uploads concurrently with bounded workers and attachment order (full mode: ${fullMode})`, { timeout: 1000 }, async () => {
+  const names = ['first.txt', 'second.txt', 'third.txt', 'fourth.txt', ...(fullMode ? ['fifth.txt', 'sixth.txt'] : [])];
+  const gates = new Map(names.map(name => [name, Promise.withResolvers()]));
+  const initialUploads = Promise.withResolvers();
+  const fourthUpload = Promise.withResolvers();
+  const started = [];
+  let active = 0, peak = 0;
+  const client = new DocumentInputs({ ...(fullMode ? { maxFiles: 1, maxTotalBytes: 1 } : {}), fetchImpl: async (url, options) => {
+    if (options?.method === 'DELETE') return json({ deleted: true });
+    if (options?.method !== 'POST') return new Response('test');
+    const name = options.body.get('file').name;
+    started.push(name);
+    peak = Math.max(peak, ++active);
+    if (started.length === 3) initialUploads.resolve();
+    if (name === 'fourth.txt') fourthUpload.resolve();
+    await gates.get(name).promise;
+    active--;
+    return json({ id: `file_${name.split('.')[0]}` });
+  } });
+  const pending = withFullMode(FULL_MODE_OWNER, fullMode, () => client.upload(names.map(name => document(name))));
+  try {
+    await initialUploads.promise;
+    assert.deepEqual(started, names.slice(0, 3));
+    gates.get('third.txt').resolve();
+    await fourthUpload.promise;
+    assert.equal(peak, 3);
+  } finally {
+    for (const gate of gates.values()) gate.resolve();
+  }
+  const uploaded = await pending;
+  assert.equal(peak, 3);
+  assert.deepEqual(uploaded.input.map(file => file.file_id), names.map(name => `file_${name.split('.')[0]}`));
+  await uploaded.cleanup();
+});
+
+test('concurrent downloads share the actual byte budget despite inaccurate sizes', async () => {
+  const uploaded = [], deleted = [];
+  const client = new DocumentInputs({ maxFileBytes: 8, maxTotalBytes: 10, fetchImpl: async (url, options) => {
+    if (options?.method === 'DELETE') { deleted.push(url.split('/').at(-1)); return json({ deleted: true }); }
+    if (options?.method === 'POST') {
+      const id = `file_${uploaded.length}`;
+      uploaded.push(id);
+      return json({ id });
+    }
+    return stream([3, 3], { 'content-length': '1' });
+  } });
+  await assert.rejects(client.upload([document('first.txt', { size: 1 }), document('second.txt', { size: 1 })]), /size limit/);
+  assert.deepEqual(deleted.sort(), uploaded.sort());
+});
+
+test('rollback waits for late successful uploads and never starts queued documents after failure', { timeout: 1000 }, async () => {
+  const allStarted = Promise.withResolvers();
+  const releaseLateUploads = Promise.withResolvers();
+  const failureReturned = Promise.withResolvers();
+  const uploaded = [], deleted = [], downloaded = [];
+  const client = new DocumentInputs({ fetchImpl: async (url, options) => {
+    if (options?.method === 'DELETE') { deleted.push(url.split('/').at(-1)); return json({ deleted: true }); }
+    if (options?.method !== 'POST') { downloaded.push(url); return new Response('test'); }
+    const name = options.body.get('file').name;
+    uploaded.push(name);
+    if (uploaded.length === 3) allStarted.resolve();
+    await allStarted.promise;
+    if (name === 'first.txt') { failureReturned.resolve(); return json({ private: 'provider body' }, 429); }
+    // Simulate a provider that finishes an upload even after its signal aborts.
+    await releaseLateUploads.promise;
+    return json({ id: `file_${name.split('.')[0]}` });
+  } });
+  let settled = false;
+  const pending = client.upload(['first.txt', 'second.txt', 'third.txt', 'fourth.txt'].map(name => document(name)));
+  const checked = assert.rejects(pending, error => error.status === 429 && error.code === 'document_upload_failed');
+  pending.then(() => { settled = true; }, () => { settled = true; });
+  try {
+    await failureReturned.promise;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false);
+    assert.deepEqual(deleted, []);
+    assert.equal(downloaded.length, 3);
+  } finally { releaseLateUploads.resolve(); }
+  await checked;
+  assert.deepEqual(deleted.sort(), ['file_second', 'file_third']);
 });
 
 test('total deadline aborts a stalled download', async () => {

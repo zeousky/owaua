@@ -36,9 +36,13 @@ function checkReply(text, safety, input) {
       /I (?:can(?:not|'t|’t)|won['’]t) (?:help|assist|comply)/i.test(text)) throw new ReplySafetyError();
 }
 export class AICore {
-  constructor({ apiKey, model = 'grok-4.7', maxOutputTokens = 4096, maxToolCalls = 8,
+  constructor({ apiKey, model = 'grok-4.7', defaultReasoningEffort = 'low', maxOutputTokens = 4096, maxToolCalls = 8,
     maxToolRounds = 4, timeoutMs = 180000, maxContextCharacters = 32000, fetchImpl = fetch, tools = createTools(), mcpRegistry = new MCPRegistry() }) {
-    Object.assign(this, { apiKey, model, maxOutputTokens, maxToolCalls, maxToolRounds, timeoutMs, maxContextCharacters, fetchImpl, tools, mcpRegistry });
+    // These models otherwise default to high effort, even for a short chat.
+    // Keep custom model defaults untouched rather than send unsupported options.
+    defaultReasoningEffort = ['grok-4.5', 'grok-4.6', 'grok-4.7'].includes(model)
+      ? normalizeRequestOptions({ reasoningEffort: defaultReasoningEffort }, { model }).reasoningEffort : undefined;
+    Object.assign(this, { apiKey, model, defaultReasoningEffort, maxOutputTokens, maxToolCalls, maxToolRounds, timeoutMs, maxContextCharacters, fetchImpl, tools, mcpRegistry });
   }
   async respond({ input, history = [], memory, context = {}, persona, language = 'auto', fullMode = false, onActivity, signal: callerSignal,
     requestOptions = {}, cacheKey, safetyIdentifier, knowledgeTools = [] }) {
@@ -47,6 +51,7 @@ export class AICore {
     const safety = { secrets: [this.apiKey] };
     assertSafeChatInput(input, safety);
     const options = normalizeRequestOptions(requestOptions, { model: this.model });
+    const reasoningEffort = options.reasoningEffort ?? this.defaultReasoningEffort;
     const fileSearchTools = normalizeKnowledgeTools(knowledgeTools);
     const mcpTools = this.mcpRegistry.definitions(options.integrations ?? [], context);
     const artifacts = new ArtifactCollector({ safety });
@@ -83,7 +88,7 @@ export class AICore {
           model: this.model, store: false,
           ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
           ...(safetyId ? { safety_identifier: safetyId } : {}),
-          ...(options.reasoningEffort ? { reasoning: { effort: options.reasoningEffort } } : {}),
+          ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
           ...(options.outputFormat === 'json' ? { text: { format: { type: 'json_schema', name: 'owaua_response', schema: options.schema, strict: true } } } : {}),
           include: ['code_interpreter_call.outputs'],
           ...(onActivity ? { stream: true } : {}),

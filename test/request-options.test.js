@@ -2,22 +2,67 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AICore } from '../src/ai.js';
 import { hostedTools, normalizeRequestOptions, RequestOptionsError } from '../src/request-options.js';
+import { FULL_MODE_OWNER } from '../src/full-mode.js';
 
 const final = () => ({ ok: true, json: async () => ({ status: 'completed', output: [
   { type: 'message', content: [{ type: 'output_text', text: 'Answer' }] },
 ] }) });
 
-test('optional Discord nulls preserve provider defaults and never enable paid visual search', async () => {
+test('optional Discord nulls use low reasoning by default and never enable paid visual search', async () => {
   let body;
   const ai = new AICore({ fetchImpl: async (_, request) => { body = JSON.parse(request.body); return final(); } });
   await ai.respond({ input: 'Hi', requestOptions: {
     reasoningEffort: null, webDomains: null, xHandles: null, fromDate: null, toDate: null, visualSearch: null,
   } });
   assert.deepEqual(body.tools.slice(0, 3), [{ type: 'web_search' }, { type: 'x_search' }, { type: 'code_interpreter' }]);
-  for (const field of ['reasoning', 'prompt_cache_key', 'safety_identifier']) assert.equal(Object.hasOwn(body, field), false);
+  assert.deepEqual(body.reasoning, { effort: 'low' });
+  for (const field of ['prompt_cache_key', 'safety_identifier']) assert.equal(Object.hasOwn(body, field), false);
   assert.equal(body.max_turns, 8);
   assert.equal(Object.hasOwn(body, 'max_tool_calls'), false);
   assert.equal(body.store, false);
+});
+
+test('fast reasoning defaults honor configured effort and explicit overrides without changing full mode limits', async () => {
+  for (const model of ['grok-4.5', 'grok-4.6', 'grok-4.7', 'custom-model']) {
+    const requests = [];
+    const ai = new AICore({ model, fetchImpl: async (_, request) => { requests.push(JSON.parse(request.body)); return final(); } });
+    await ai.respond({ input: 'Hi' });
+    await ai.respond({ input: 'Hi', fullMode: true, context: { userId: FULL_MODE_OWNER } });
+    for (const body of requests) {
+      assert.deepEqual(body.reasoning, model === 'custom-model' ? undefined : { effort: 'low' });
+    }
+    assert.equal(requests[0].max_output_tokens, 4096);
+    assert.equal(requests[0].max_turns, 8);
+    assert.equal(Object.hasOwn(requests[1], 'max_output_tokens'), false);
+    assert.equal(Object.hasOwn(requests[1], 'max_turns'), false);
+  }
+  const requests = [];
+  const ai = new AICore({ defaultReasoningEffort: 'medium', fetchImpl: async (_, request) => { requests.push(JSON.parse(request.body)); return final(); } });
+  await ai.respond({ input: 'Hi' });
+  await ai.respond({ input: 'Solve this carefully', requestOptions: { reasoningEffort: 'xhigh' }, fullMode: true, context: { userId: FULL_MODE_OWNER } });
+  assert.deepEqual(requests.map(body => body.reasoning), [{ effort: 'medium' }, { effort: 'xhigh' }]);
+  assert.throws(() => new AICore({ defaultReasoningEffort: 'none' }), RequestOptionsError);
+  assert.throws(() => new AICore({ model: 'grok-4.5', defaultReasoningEffort: 'xhigh' }), RequestOptionsError);
+});
+
+test('default reasoning persists through tool continuation and the bounded safety rewrite', async () => {
+  const requests = [];
+  const ai = new AICore({ fetchImpl: async (_, request) => {
+    requests.push(JSON.parse(request.body));
+    if (requests.length === 1) return { ok: true, json: async () => ({ output: [
+      { type: 'function_call', name: 'current_time', call_id: 'clock', arguments: '{"timezone":"UTC"}' },
+    ] }) };
+    if (requests.length === 2) return { ok: true, json: async () => ({ output: [
+      { type: 'message', content: [{ type: 'output_text', text: "You're an idiot" }] },
+    ] }) };
+    return final();
+  } });
+  assert.equal((await ai.respond({ input: 'Time?' })).text, 'Answer');
+  assert.equal(requests.length, 3);
+  assert.ok(requests.every(body => body.reasoning.effort === 'low'));
+  assert.equal(requests[1].input.at(-1).call_id, 'clock');
+  assert.deepEqual(requests[2].tools, []);
+  assert.equal(requests[2].max_turns, 1);
 });
 
 test('domain and X allowlists normalize equivalent entries while rejecting URL-shaped filters', () => {

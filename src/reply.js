@@ -30,3 +30,37 @@ export function resultReply(result, { notices = [], speech } = {}) {
   if (!payload.files.length) delete payload.files;
   return payload;
 }
+
+// Deliver the checked answer before optional speech generation. The caller's
+// send function edits that same message on subsequent calls.
+export async function deliverResultReply(result, { notices = [], spoken = false, voice, signal, send,
+  onSpeechError = () => {} } = {}) {
+  const deliveryNotices = [...notices];
+  const shouldSpeak = spoken && !result.media;
+  if (shouldSpeak && result.text.length > 4000) {
+    deliveryNotices.push('Spoken audio covers the first 4,000 characters. The full answer is available in text.');
+  }
+  const delivered = await send(resultReply(result, { notices: deliveryNotices }));
+  if (!shouldSpeak) return delivered;
+  const report = error => {
+    try { Promise.resolve(onSpeechError(error)).catch(() => {}); } catch {}
+  };
+  let speech;
+  try {
+    const generated = await voice.speak(result.text.slice(0, 4000), { signal });
+    speech = { attachment: generated.attachment, name: generated.name };
+  } catch (error) {
+    report(error);
+    deliveryNotices.push('I couldn’t generate the spoken audio. Your text answer is still available.');
+  }
+  try {
+    // Rebuild every file and replace previous attachments so exports and long
+    // answers remain present exactly once after adding speech or a notice.
+    return await send({ ...resultReply(result, { notices: deliveryNotices, speech }), attachments: [] });
+  } catch (error) {
+    // The useful answer is already visible. A failed optional edit must not
+    // turn it into a generic request failure in the caller.
+    report(error);
+    return delivered;
+  }
+}

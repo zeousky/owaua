@@ -9,7 +9,7 @@ const botId = '1442127404607737999';
 const help = helpCard(musicHelp);
 
 function fixture(content, { guildId = 'server', dmBlocked = false, mentioned = true,
-  reference, attachments = new Map() } = {}) {
+  reference, attachments = new Map(), sendTyping = async () => {}, answerWait } = {}) {
   const publicReplies = [], privateReplies = [], answers = [], errors = [], resets = [];
   const message = { content, guildId, channelId: 'channel', attachments,
     author: { id: 'user', bot: false, send: async payload => {
@@ -19,13 +19,13 @@ function fixture(content, { guildId = 'server', dmBlocked = false, mentioned = t
     mentions: { users: new Map(mentioned ? [[botId, {}]] : []) },
     reference: reference ? { messageId: 'previous' } : undefined,
     fetchReference: async () => reference,
-    channel: { sendTyping: async () => {} },
+    channel: { sendTyping },
     reply: async payload => { publicReplies.push(payload); },
   };
   const deps = { allowed: () => true, isStopping: () => false, help,
     client: { user: { id: botId } }, active: new Set(),
     store: { reset: scope => resets.push(scope) },
-    answer: async request => { answers.push(request); await request.send({ content: 'chat answer' }); },
+    answer: async request => { answers.push(request); await answerWait; await request.send({ content: 'chat answer' }); },
     logError: (...args) => errors.push(args),
   };
   const handler = createMessageHandler({ ...deps, handleCommand: createCommandHandler(deps) });
@@ -104,6 +104,46 @@ test('a mentioned question continues to the chat answer', async () => {
   assert.equal(f.publicReplies[0].content, 'chat answer');
   assert.deepEqual(f.errors, []);
 });
+
+test('a slow Discord typing request does not delay the answer', async () => {
+  let finishTyping;
+  const pendingTyping = new Promise(resolve => { finishTyping = resolve; });
+  const f = fixture(`<@${botId}> Hello`, { sendTyping: () => pendingTyping });
+  const running = f.run();
+  await new Promise(setImmediate);
+  try {
+    assert.equal(f.answers.length, 1);
+    assert.equal(f.publicReplies[0]?.content, 'chat answer');
+    assert.deepEqual(f.errors, []);
+  } finally { finishTyping(); await running; }
+});
+
+for (const failure of ['throw', 'reject']) {
+  test(`typing ${failure} does not prevent the answer or escape an interval callback`, async t => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    let calls = 0, finishAnswer;
+    const answerWait = new Promise(resolve => { finishAnswer = resolve; });
+    const sendTyping = () => {
+      calls++;
+      if (failure === 'throw') throw new Error('Discord unavailable');
+      return Promise.reject(new Error('Discord unavailable'));
+    };
+    const f = fixture(`<@${botId}> Hello`, { sendTyping, answerWait });
+    const running = f.run();
+    await new Promise(setImmediate);
+    try {
+      assert.equal(f.answers.length, 1);
+      assert.equal(calls, 1);
+      t.mock.timers.tick(8000);
+      await new Promise(setImmediate);
+      assert.equal(calls, 2);
+    } finally { finishAnswer(); await running; }
+    assert.equal(f.publicReplies[0]?.content, 'chat answer');
+    assert.deepEqual(f.errors, []);
+    t.mock.timers.tick(8000);
+    assert.equal(calls, 2, 'typing stops after the answer');
+  });
+}
 
 test('a mention with an attachment still sends it to the answer handler', async () => {
   const file = { name: 'note.txt', contentType: 'text/plain', size: 12,

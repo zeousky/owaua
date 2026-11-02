@@ -4,6 +4,14 @@ Add each user-facing update as a new dated section at the top. The first dated s
 
 ## 2026-11-02
 
+### Changed
+
+- Replies now use faster reasoning by default. Choose higher effort with `/ask reasoning:high` for harder questions.
+- Multiple attached documents are prepared in parallel, and typing notifications no longer hold up answers.
+- Spoken answers show their text first while the audio is generated.
+
+## 2026-11-02
+
 ### Fixed
 
 - Questions mentioning offensive or sensitive words can now receive a respectful answer instead of an automatic safety refusal. Ordinary topic corrections also work, and generic policy replies get one attempt at a useful rewrite.

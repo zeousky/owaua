@@ -4,6 +4,8 @@
 
 Discord AI core using **Grok 4.7** directly through the official xAI Responses API (`https://api.x.ai/v1/responses`).
 
+Chat uses `low` reasoning effort by default to favor reply speed. [xAI's reasoning guide](https://docs.x.ai/developers/model-capabilities/text/reasoning) documents that these models otherwise default to `high`. Set `XAI_REASONING_EFFORT` to change the default for `grok-4.5`, `grok-4.6`, or `grok-4.7`; `/ask reasoning:...` overrides it for one request. Full mode still removes its existing caps. Other model names keep their provider defaults. Lower effort can reduce depth on difficult questions, so select `high` or `xhigh` when needed.
+
 ## Use
 
 Every slash command also works with the `.` prefix, without a mention. Use the same subcommands and `option:value` names:
@@ -24,7 +26,7 @@ Private command results are sent by DM, with the original server/channel scope p
 - `.music <song name or SoundCloud track link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
 - `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
 - `/ask prompt:...` — ask a question, optionally with an image, a PDF/text/code document (`file`), or an MP4 (`video`) to edit or extend.
-- `/ask reasoning:low|medium|high|xhigh` — choose reasoning effort for that request. Higher effort can take longer and cost more.
+- `/ask reasoning:low|medium|high|xhigh` — choose reasoning effort for that request. Replies default to `low` for speed, including full mode; higher effort can take longer and cost more.
 - `/ask web_domains:docs.x.ai,example.com x_handles:xai from_date:2026-10-01 to_date:2026-10-22` — narrow web/X research. Options are independent; the X end date is exclusive.
 - `/ask visual_search:true` — also allow web image search and image/video understanding inside web/X search results.
 - `/ask output:json` — download a schema-validated JSON answer; optionally supply your own JSON object `schema`.
@@ -59,7 +61,7 @@ These bounded checks cannot recognize every jailbreak or harmful meaning. Arbitr
 
 ## Voice and spoken replies
 
-Audio attachments and Discord voice messages in mentions, replies or DMs are transcribed before the normal chat request. Audio is limited to one recording up to 20 MiB per question. Transcripts over 24,000 characters must use `/transcribe` instead. The audio bytes are not saved locally; the transcript becomes normal conversation text when used with `/ask` or ordinary chat. Standalone `/transcribe` delivers files without saving a conversation. `/speak` accepts up to 4,000 characters; speech output is capped at 8 MiB. `/ask spoken:true` speaks the first 4,000 characters of a text answer and preserves its full text. JSON answers are file-only.
+Audio attachments and Discord voice messages in mentions, replies or DMs are transcribed before the normal chat request. Audio is limited to one recording up to 20 MiB per question. Transcripts over 24,000 characters must use `/transcribe` instead. The audio bytes are not saved locally; the transcript becomes normal conversation text when used with `/ask` or ordinary chat. Standalone `/transcribe` delivers files without saving a conversation. `/speak` accepts up to 4,000 characters; speech output is capped at 8 MiB. `/ask spoken:true` shows the validated text answer first, then adds speech covering its first 4,000 characters to the same message when ready. JSON answers are file-only.
 
 `/voice join` starts a native `grok-voice-3.0` conversation and sends **only the initiating user's microphone audio** to xAI. Replies are audible to everyone in that voice channel. Only that user can control the session from the same channel. Voice sessions use the user's current persona, with custom descriptions kept in a separate user message, but do not read or save SQLite conversation history or knowledge libraries. Web/X search is available inside the voice session. Barge-in cancels the current spoken answer before starting the next one.
 
