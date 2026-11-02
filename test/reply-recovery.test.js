@@ -34,6 +34,18 @@ test('a model-generated policy refusal for harmless banter is rewritten too', as
   assert.equal(f.requests.length, 2);
 });
 
+test('the generic policy recital is rewritten for ordinary questions and sensitive-word mentions', async () => {
+  for (const input of ['Why is the sky blue?', 'Yo do you like faggots']) {
+    const clean = input.startsWith('Why') ? 'Air scatters blue light more than red light.' :
+      'I treat gay people with the same respect as anyone else.';
+    const f = fixture([final(SAFETY_REFUSAL), final(clean)]);
+    assert.equal((await f.ai.respond({ input })).text, clean);
+    assert.equal(f.requests.length, 2);
+    assert.deepEqual(f.requests[1].tools, []);
+    assert.equal(JSON.stringify(f.requests[1]).includes(SAFETY_REFUSAL), false);
+  }
+});
+
 test('the screenshot replies are rewritten in the protected server even for the exempt owner', async () => {
   for (const text of ["hows ur ass doin tho", "I'll tear that shit apart and make it slap."]) {
     const f = fixture([final(text), final('Send it over and I can help improve it.')]);

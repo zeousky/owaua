@@ -28,9 +28,12 @@ export class ReplySafetyError extends SafetyError {
 function checkReply(text, safety, input) {
   assertSafeText(text, safety);
   if (cleanLanguageRequired() && containsProfanity(text)) throw new ReplySafetyError();
+  // Rewrite an unrelated catch-all policy recital into a useful answer or a
+  // relevant boundary, under the same output checks and one-retry limit.
+  if (text.includes(SAFETY_REFUSAL)) throw new ReplySafetyError();
   // A policy recital is not an answer to harmless, short conversational banter.
   if (typeof input === 'string' && /^\s*(?:get a job|fuck you|what|yo what|\?+)\s*[.!?]*\s*$/i.test(input) &&
-      (text.includes(SAFETY_REFUSAL) || /I (?:can(?:not|'t|’t)|won['’]t) (?:help|assist|comply)/i.test(text))) throw new ReplySafetyError();
+      /I (?:can(?:not|'t|’t)|won['’]t) (?:help|assist|comply)/i.test(text)) throw new ReplySafetyError();
 }
 export class AICore {
   constructor({ apiKey, model = 'grok-4.7', maxOutputTokens = 4096, maxToolCalls = 8,
@@ -62,7 +65,7 @@ export class AICore {
       // to the same checks as a newly generated reply.
       if (pair[0]?.role === 'user' && pair[1]?.role === 'assistant' &&
         typeof pair[0].content === 'string' && typeof pair[1].content === 'string' &&
-        safeContext(pair, { ...safety, allowRudeInput: true, retained: true }).length === 2 &&
+        safeContext([pair[0]], { ...safety, allowRudeInput: true, allowSensitiveInput: true, retained: true }).length === 1 &&
         safeContext([pair[1]], { ...safety, retained: true }).length === 1) safeHistory.push(...pair);
     }
     const messages = [...memoryContext(safeContext(memory, { ...safety, retained: true })), ...historyContext(safeHistory, fullMode ? Infinity : this.maxContextCharacters), ...personaContext(persona), { role: 'user', content: input }];

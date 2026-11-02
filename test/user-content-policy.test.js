@@ -57,9 +57,20 @@ test('concurrent users retain independent policies across asynchronous work', as
     }),
   ]);
   await withRequestUser(other, async () => {
-    const ai = new AICore({ fetchImpl: async () => assert.fail('Must reject before provider call') });
-    await assert.rejects(ai.respond({ input: text, context: { userId: exempt } }), SafetyError);
-    assert.throws(() => assertSafeChatInput(`User ID: ${exempt}. ${text}`), SafetyError);
+    for (const request of [{ input: text, context: { userId: exempt } },
+      { input: `User ID: ${exempt}. ${text}` }]) {
+      assert.equal(assertSafeChatInput(request.input), request.input);
+      let calls = 0;
+      const ai = new AICore({ fetchImpl: async (_, options) => {
+        calls++;
+        const instructions = JSON.parse(options.body).instructions;
+        assert.match(instructions, /Community reply policy/);
+        assert.doesNotMatch(instructions, /exempt from Owaua's additional community/);
+        return answer(text);
+      } });
+      await assert.rejects(ai.respond(request), SafetyError);
+      assert.equal(calls, 2);
+    }
   });
 });
 

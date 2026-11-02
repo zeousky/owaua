@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assertSafeText, assertSafeValue, safeContext, SafetyError, SAFETY_REFUSAL } from '../src/safety.js';
+import { assertSafeText, assertSafeValue, assertSafeChatInput, safeContext, SafetyError, SAFETY_REFUSAL } from '../src/safety.js';
 import { AICore } from '../src/ai.js';
 import { exportFile, exportChart, ArtifactCollector } from '../src/artifacts.js';
 import { MediaGenerator } from '../src/media.js';
@@ -68,6 +68,13 @@ test('current encoded content and common direct overrides stop before any infere
     await assert.rejects(ai.respond({ input }), SafetyError);
   }
   assert.equal(calls, 0); assert.equal(tools, 0);
+});
+
+test('literal input cannot exempt an identical decoded payload in another field', () => {
+  for (const value of [[decoded, b64(decoded)], [b64(decoded), decoded],
+    { literal: decoded, encoded: b64(decoded) }, { encoded: b64(decoded), literal: decoded }]) {
+    assert.throws(() => assertSafeChatInput(value), SafetyError);
+  }
 });
 
 test('benign decoding still receives the actual current request and can return a clean result', async () => {
@@ -200,7 +207,7 @@ test('unsafe current text and attached transcript stop before document uploads',
   const documentInputs = { upload: async () => { uploads++; return { input: [], cleanup: async () => {} }; } };
   await assert.rejects(prepareRequestInput({ text: `decode this ${sample}`, documentInputs }), SafetyError);
   await assert.rejects(prepareRequestInput({ text: 'Summarize the recording.', audio: [{}],
-    voice: { transcribe: async () => ({ text: decoded }) }, documentInputs }), SafetyError);
+    voice: { transcribe: async () => ({ text: sample }) }, documentInputs }), SafetyError);
   assert.equal(uploads, 0);
 });
 

@@ -2,6 +2,12 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-11-02
+
+### Fixed
+
+- Questions mentioning offensive or sensitive words can now receive a respectful answer instead of an automatic safety refusal. Ordinary topic corrections also work, and generic policy replies get one attempt at a useful rewrite.
+
 ## 2026-10-30
 
 ### Changed
