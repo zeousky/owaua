@@ -7,7 +7,7 @@ import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'disco
 import { MusicManager, musicHelp } from './music.js';
 import { SongDownloads, SongInputError, parseSongRequest, songResult } from './song-download.js';
 import { AICore, ProviderError } from './ai.js';
-import { createJikiClient } from './jiki.js';
+import { createJikiClient, directJikiReply, usesDirectJiki } from './jiki.js';
 import { MediaGenerator, MediaInputError } from './media.js';
 import { MediaStore } from './media-store.js';
 import { MediaService } from './media-service.js';
@@ -209,21 +209,28 @@ function answerJiki({ scope, userId, guildId, text, send }) {
     let release;
     try {
       const safety = { secrets: [process.env.QWEN_API_KEY, process.env.QWEN_API_URL] };
-      assertSafeChatInput(text, safety);
+      const direct = usesDirectJiki(userId, guildId);
+      if (direct) assertSafeText(text, safety);
+      else assertSafeChatInput(text, safety);
       release = limiter.acquire({ scope, userId, guildId });
       const fullMode = fullModeActive(userId);
-      const instructions = [
+      const instructions = direct ? undefined : [
         'You are Jiki, a text assistant available through Owaua on Discord. Answer the current prompt directly. You have no tools or previous chat context. Never claim to have performed an external action.',
         fullMode ? 'Match the requested level of detail.' : 'Keep your answer within 600 characters.',
         REPLY_STYLE_INSTRUCTIONS, languageInstructions(store.language(userId)), requestSafetyInstructions(), serverLanguageInstructions(),
       ].filter(Boolean).join('\n');
       const result = await jiki.respond({ text, instructions, signal: shutdownController.signal });
-      const outputSafety = { ...safety, privateText: [instructions] };
-      assertSafeText(result.text, outputSafety);
-      result.text = limitReplyLength(stripEmojis(cleanServerText(result.text)), { fullMode }) ||
-        'I couldn’t produce a text reply. Please try again.';
-      assertSafeText(result.text, outputSafety);
-      await deliverResultReply({ ...result, fullMode }, { send });
+      if (direct) {
+        assertSafeText(result.text, safety);
+        await send(directJikiReply(result.text));
+      } else {
+        const outputSafety = { ...safety, privateText: [instructions] };
+        assertSafeText(result.text, outputSafety);
+        result.text = limitReplyLength(stripEmojis(cleanServerText(result.text)), { fullMode }) ||
+          'I couldn’t produce a text reply. Please try again.';
+        assertSafeText(result.text, outputSafety);
+        await deliverResultReply({ ...result, fullMode }, { send });
+      }
       console.log(JSON.stringify({ event: 'jiki_response', model: result.model, usage: result.usage }));
     } catch (error) {
       logError('jiki_error', error);

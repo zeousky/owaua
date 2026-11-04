@@ -1,8 +1,26 @@
+import { MessageFlags } from 'discord.js';
+import { FULL_MODE_OWNER } from './full-mode.js';
+import { cleanLanguageRequired } from './server-language.js';
+
 export const JIKI_MODEL = 'qwen3.5-9b-abliterated';
 export const JIKI_MAX_PROMPT_LENGTH = 2000;
 const MAX_INSTRUCTIONS_LENGTH = 4500;
 const MAX_OUTPUT_TOKENS = 768;
 const TIMEOUT_MS = 140_000;
+
+export function usesDirectJiki(userId, guildId) {
+  return userId === FULL_MODE_OWNER && !cleanLanguageRequired(guildId);
+}
+
+export function directJikiReply(text) {
+  const options = { allowedMentions: { parse: [], repliedUser: false }, flags: MessageFlags.SuppressEmbeds };
+  if (text.length <= 2000) return { ...options, content: text };
+  return {
+    ...options,
+    content: 'The full Jiki reply is attached.',
+    files: [{ attachment: Buffer.from(text), name: 'jiki-reply.txt' }],
+  };
+}
 
 export class JikiProviderError extends Error {
   constructor(code, status) {
@@ -25,9 +43,12 @@ export function createJikiClient({ url, apiKey, fetchImpl = fetch } = {}) {
   return {
     async respond({ text, instructions, signal: callerSignal }) {
       if (typeof text !== 'string' || !text.trim() || text.length > JIKI_MAX_PROMPT_LENGTH ||
-          typeof instructions !== 'string' || !instructions.trim() || instructions.length > MAX_INSTRUCTIONS_LENGTH) {
+          (instructions !== undefined && (typeof instructions !== 'string' || !instructions.trim() ||
+            instructions.length > MAX_INSTRUCTIONS_LENGTH))) {
         throw new JikiProviderError('invalid_prompt', 400);
       }
+      const messages = [{ role: 'user', content: text }];
+      if (instructions !== undefined) messages.unshift({ role: 'system', content: instructions });
       const deadline = AbortSignal.timeout(TIMEOUT_MS);
       const signal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
       let phase = 'connection_error';
@@ -39,7 +60,7 @@ export function createJikiClient({ url, apiKey, fetchImpl = fetch } = {}) {
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: JIKI_MODEL,
-            messages: [{ role: 'system', content: instructions }, { role: 'user', content: text }],
+            messages,
             max_tokens: MAX_OUTPUT_TOKENS,
           }),
         });
@@ -67,7 +88,7 @@ export function createJikiClient({ url, apiKey, fetchImpl = fetch } = {}) {
         const count = result.usage?.[field];
         if (Number.isSafeInteger(count) && count >= 0) counts[field] = count;
       }
-      return { text: answer.trim(), model: JIKI_MODEL, usage: Object.keys(counts).length ? [counts] : [] };
+      return { text: instructions === undefined ? answer : answer.trim(), model: JIKI_MODEL, usage: Object.keys(counts).length ? [counts] : [] };
     },
   };
 }

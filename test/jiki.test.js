@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createJikiClient, JIKI_MODEL, JIKI_MAX_PROMPT_LENGTH, JikiProviderError } from '../src/jiki.js';
+import { createJikiClient, JIKI_MODEL, JIKI_MAX_PROMPT_LENGTH, JikiProviderError,
+  directJikiReply, usesDirectJiki } from '../src/jiki.js';
+import { FULL_MODE_OWNER } from '../src/full-mode.js';
+import { CLEAN_LANGUAGE_GUILD } from '../src/server-language.js';
 
 const url = 'https://jiki.example';
 const apiKey = 'test-' + 'a'.repeat(32);
@@ -45,6 +48,31 @@ test('Jiki uses a single-turn text payload and returns only the final answer and
   assert.deepEqual(await client.respond(prompt), {
     text: 'Hi.', model: JIKI_MODEL, usage: [{ prompt_tokens: 10, completion_tokens: 7 }],
   });
+});
+
+test('only the owner can use direct Jiki outside the clean-language server', () => {
+  assert.equal(usesDirectJiki(FULL_MODE_OWNER, null), true);
+  assert.equal(usesDirectJiki(FULL_MODE_OWNER, 'other-guild'), true);
+  assert.equal(usesDirectJiki(FULL_MODE_OWNER, CLEAN_LANGUAGE_GUILD), false);
+  assert.equal(usesDirectJiki('other-user', null), false);
+});
+
+test('direct Jiki sends no system message and preserves the final text through delivery', async () => {
+  const reply = '  I decline. 🧪 @everyone\n';
+  const client = clientFor(async (_, { body }) => {
+    assert.deepEqual(JSON.parse(body), {
+      model: JIKI_MODEL,
+      messages: [{ role: 'user', content: prompt.text }],
+      max_tokens: 768,
+    });
+    return Response.json({ choices: [{ message: { content: reply } }] });
+  });
+  const result = await client.respond({ text: prompt.text });
+  const payload = directJikiReply(result.text);
+  assert.equal(payload.content, reply);
+  assert.deepEqual(payload.allowedMentions, { parse: [], repliedUser: false });
+  const long = reply.repeat(100);
+  assert.equal(directJikiReply(long).files[0].attachment.toString(), long);
 });
 
 test('Jiki rejects empty or oversized prompts without sending a request', async () => {
