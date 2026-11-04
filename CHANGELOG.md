@@ -2,6 +2,12 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-11-04
+
+### Added
+
+- Ask Jiki, the Qwen3.5 9B model, with `/jiki prompt:…` or `.jiki …`. Each question is a separate text request with no previous chat history.
+
 ## 2026-11-02
 
 ### Changed

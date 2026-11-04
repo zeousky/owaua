@@ -11,6 +11,7 @@ Chat uses `low` reasoning effort by default to favor reply speed. [xAI's reasoni
 Every slash command also works with the `.` prefix, without a mention. Use the same subcommands and `option:value` names:
 
 - `.ask What time is it?` or `.ask prompt:"Summarize the news" reasoning:high web_domains:example.com`
+- `.jiki Explain how a sundial works` — send a text question to Jiki.
 - `.speak Hello there voice:eve speed:1.1` and `.transcribe language:hu` (attach audio)
 - `.voice join`, `.voice leave`, `.voice status`, `.voice voices`
 - `.persona set description:"Talk like a pirate"`, `.persona view`, `.persona reset`
@@ -26,6 +27,7 @@ Private command results are sent by DM, with the original server/channel scope p
 - `.music <song name or SoundCloud track link>` — join your current voice channel and play music, for example `.music go away`. No mention needed. More requests queue up (20 waiting songs per server).
 - `.music queue`, `.music skip`, `.music pause`, `.music resume`, `.music stop` (or `leave`) — control playback from the same voice channel.
 - `/ask prompt:...` — ask a question, optionally with an image, a PDF/text/code document (`file`), or an MP4 (`video`) to edit or extend.
+- `/jiki prompt:...` — ask Jiki, a Qwen3.5 9B model hosted on Modal. Each text prompt can contain up to 2,000 characters.
 - `/ask reasoning:low|medium|high|xhigh` — choose reasoning effort for that request. Replies default to `low` for speed, including full mode; higher effort can take longer and cost more.
 - `/ask web_domains:docs.x.ai,example.com x_handles:xai from_date:2026-10-01 to_date:2026-10-22` — narrow web/X research. Options are independent; the X end date is exclusive.
 - `/ask visual_search:true` — also allow web image search and image/video understanding inside web/X search results.
@@ -50,6 +52,8 @@ Private command results are sent by DM, with the original server/channel scope p
 - In DMs or when mentioning Owaua, `!reset` and `!help` also work.
 
 Tools are selected automatically by Grok: web search and browsing, X search, xAI-hosted sandboxed Python, and a local `current_time` function. PNG, JPEG, WebP, and GIF attachments up to 20 MB are accepted, up to five per message. Long answers are sent as Markdown files. Source citations are preserved. Search filters affect their respective search tools; X thread retrieval can fetch posts outside handle/date filters, and ordinary web search remains available alongside filtered X search. These are research controls, not access restrictions.
+
+Jiki receives the prompt you enter and the bot’s reply instructions. Each request is independent and uses text only. Jiki has no access to chat history, saved memory, attachments, or tools. It shares Owaua’s request limits. Configure `QWEN_API_URL` with the HTTPS root of the private gateway and `QWEN_API_KEY` with its bearer key to enable the command.
 
 Attach up to four PDF or UTF-8 text/code documents (20 MiB each, 40 MiB total) through Discord to summarize, compare, or ask questions about them. `/ask` accepts one document; message requests support multiple documents and mixed image/document/audio attachments. Current attachments take priority over replied-to attachments. Ordinary documents are uploaded to xAI Files for the current request and deletion is attempted afterward, including on failures; a one-hour provider expiry is a fallback if cleanup fails or the process stops. Raw documents and temporary file IDs are not saved locally or carried into future requests. Normal answers derived from them remain in text history. Reattach or reply to the source document for a new analysis, or explicitly save it using `/knowledge add`. Binary Office documents are not supported by this attachment path.
 

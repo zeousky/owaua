@@ -80,7 +80,7 @@ test('invalid input is rejected before dispatch, without echoing values', () => 
     '.memory view page:11', '.memory forget id:1.2', '.memory forget id:9007199254740992', '.speak Hello speed:Infinity',
     '.speak Hello speed:0.1', '.speak Hello format:ogg', '.reset unexpected', '.voice invalid', '.persona',
     '.ask Hello output:json output:text', '.ask --unknown:secret', '.ask "unclosed', '.ask schema:{"type":"object"',
-    '.persona set description:' + 'x'.repeat(121), '.usage user:someone', '.usage server:short']) {
+    '.persona set description:' + 'x'.repeat(121), '.usage user:someone', '.usage server:short', '.jiki', '.jiki ' + 'x'.repeat(2001)]) {
     assert.throws(() => parsePrefixCommand(input), PrefixCommandError, input);
   }
   for (const input of ['.music hi', '.asker hello', 'hello .ask there', '/ask hi', 'plain text']) assert.equal(parsePrefixCommand(input), null);
@@ -147,13 +147,14 @@ function dependencies(overrides = {}) {
     voiceManager: { handle: async (event, options) => { calls.push(['voice', event.author.id, options.action]); return event.reply({ content: 'voice result' }); } },
     standalone: async (interaction, run, options) => { calls.push(['standalone', interaction.commandName, options]); return run(); },
     client: { user: { id: 'bot' } }, answer: async request => { calls.push(['answer', request]); return request.send({ content: 'mock answer' }); },
+    answerJiki: async request => { calls.push(['answerJiki', request]); return request.send({ content: 'mock Jiki answer' }); },
     signal: new AbortController().signal, logError: (...error) => errors.push(error), ...overrides,
   };
   return { deps, calls, errors, scope, handler: createCommandHandler(deps) };
 }
 
 const routes = [
-  '.ask Hello library:true spoken:true reasoning:high output:json', '.reset', '.help', '.language Hungarian',
+  '.ask Hello library:true spoken:true reasoning:high output:json', '.jiki Explain why the sky is blue.', '.reset', '.help', '.language Hungarian',
   '.persona set description:"Talk like a pirate"', '.persona view', '.persona reset',
   '.memory view page:1', '.memory remember key:hobby text:"I like hiking"', '.memory forget id:1', '.memory clear', '.memory pause', '.memory resume',
   '.jobs', '.usage', '.knowledge list', '.knowledge add', '.knowledge forget id:1', '.knowledge clear',
@@ -166,7 +167,7 @@ for (const route of routes) {
     await handler(interaction);
     assert.deepEqual(errors, []);
     assert.ok(interaction.sourceMessage.publicReplies.length + interaction.sourceMessage.privateReplies.length > 0);
-    if (/^\.(ask|speak|transcribe|voice)\b/.test(route)) assert.ok(interaction.sourceMessage.publicReplies.length > 0);
+    if (/^\.(ask|jiki|speak|transcribe|voice)\b/.test(route)) assert.ok(interaction.sourceMessage.publicReplies.length > 0);
     else assert.equal(interaction.sourceMessage.publicReplies.length, 0, 'private results must stay out of the server');
     if (route.startsWith('.ask')) {
       const request = calls.find(call => call[0] === 'answer')[1];
@@ -180,12 +181,41 @@ for (const route of routes) {
       assert.equal(request.documents[0], files[1]);
       assert.equal(request.audio[0], files[2]);
     }
+    if (route.startsWith('.jiki')) {
+      assert.equal(calls.length, 1);
+      const [[action, { send, ...request }]] = calls;
+      assert.equal(action, 'answerJiki');
+      assert.equal(typeof send, 'function');
+      assert.deepEqual(request, { scope, userId: actor, guildId: 'guild', text: 'Explain why the sky is blue.' });
+      assert.equal(interaction.sourceMessage.publicReplies[0].content, 'Working on it…');
+      assert.equal(interaction.sourceMessage.edits[0].content, 'mock Jiki answer');
+    }
     if (/^\.(speak|transcribe|knowledge (add|forget|clear)|voice join)/.test(route)) assert.ok(calls.some(call => call[0] === 'standalone'));
     if (route === '.voice join') assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { voice: true });
     if (route.startsWith('.knowledge ') && !route.endsWith('list')) assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { charge: route === '.knowledge add' });
     if (route === '.usage') assert.deepEqual(calls.at(-1), ['usage', { userId: actor, guildId: undefined }]);
   });
 }
+
+test('unconfigured Jiki replies without deferring or invoking the default provider', async () => {
+  const { handler, calls, errors } = dependencies({ answerJiki: undefined });
+  const interaction = event('.jiki hello');
+  await handler(interaction);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(errors, []);
+  assert.equal(interaction.sourceMessage.publicReplies[0].content, 'Jiki is unavailable right now.');
+  assert.equal(interaction.sourceMessage.edits.length, 0);
+});
+
+test('Jiki rejects a whitespace-only prompt before deferring or dispatching', async () => {
+  const { handler, calls, errors } = dependencies();
+  const interaction = event('.jiki "   "');
+  await handler(interaction);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(errors, []);
+  assert.equal(interaction.sourceMessage.publicReplies[0].content, 'Enter a text prompt for Jiki.');
+  assert.equal(interaction.sourceMessage.edits.length, 0);
+});
 
 test('original channel scope, owner authorization and busy guards survive DM delivery', async () => {
   const { handler, calls, scope, deps } = dependencies();

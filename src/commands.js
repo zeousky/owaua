@@ -5,6 +5,7 @@ import { memoryCommand } from './memory-command.js';
 import { jobsCommand, usageCommand } from './media-command.js';
 import { knowledgeCommand } from './knowledge-command.js';
 import { speakCommand, transcribeCommand, voiceCommand } from './voice-command.js';
+import { JIKI_MAX_PROMPT_LENGTH } from './jiki.js';
 
 // One registry for Discord registration and dot-prefix parsing.
 export const commands = [
@@ -26,6 +27,9 @@ export const commands = [
     { type: 3, name: 'from_date', description: 'Search X posts from this date (YYYY-MM-DD)', max_length: 10 },
     { type: 3, name: 'to_date', description: 'Search X posts before this date (YYYY-MM-DD, exclusive)', max_length: 10 },
     { type: 5, name: 'visual_search', description: 'Allow web image search and search image/video understanding' },
+  ] },
+  { name: 'jiki', description: 'Send your current text prompt to Jiki on Modal', options: [
+    { type: 3, name: 'prompt', description: 'Your question for Jiki', required: true, max_length: JIKI_MAX_PROMPT_LENGTH },
   ] },
   { name: 'reset', description: 'Clear your Owaua history and saved memories in this channel' },
   { name: 'help', description: 'Show what Owaua can do' },

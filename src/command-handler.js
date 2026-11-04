@@ -13,7 +13,7 @@ import { PrefixPrivateReplyError } from './prefix-command.js';
 import { withFullMode } from './full-mode.js';
 
 export function createCommandHandler({ allowed, isStopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
-  standalone, active, help, client, answer, signal, logError }) {
+  standalone, active, help, client, answer, answerJiki, signal, logError }) {
   return function handleCommand(interaction) {
     return withServerLanguage(interaction.guildId, () => withFullMode(interaction.user.id, store.fullMode?.(interaction.user.id), async () => {
     const stopping = isStopping();
@@ -49,6 +49,14 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, u
         if (active.has(scope)) return await interaction.reply({ ...card('Owaua', 'Let me finish your current request, then you can reset our chat.', { tone: 'warning' }), flags: 64 });
         store.reset(scope);
         return await interaction.reply({ ...card('A fresh start', 'Fresh start — I’ve cleared your conversation history and saved notes in this channel.', { tone: 'success' }), flags: 64 });
+      }
+      if (interaction.commandName === 'jiki') {
+        if (!answerJiki) return await interaction.reply(card('', 'Jiki is unavailable right now.'));
+        const text = interaction.options.getString('prompt', true);
+        if (!text.trim()) return await interaction.reply(card('', 'Enter a text prompt for Jiki.', { tone: 'warning' }));
+        await interaction.deferReply();
+        return await answerJiki({ scope, userId: interaction.user.id, guildId: interaction.guildId,
+          text, send: payload => interaction.editReply(payload) });
       }
       if (interaction.commandName !== 'ask') return;
       let attachments;

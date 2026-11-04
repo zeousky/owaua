@@ -7,6 +7,7 @@ import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'disco
 import { MusicManager, musicHelp } from './music.js';
 import { SongDownloads, SongInputError, parseSongRequest, songResult } from './song-download.js';
 import { AICore, ProviderError } from './ai.js';
+import { createJikiClient } from './jiki.js';
 import { MediaGenerator, MediaInputError } from './media.js';
 import { MediaStore } from './media-store.js';
 import { MediaService } from './media-service.js';
@@ -26,7 +27,8 @@ import { createMCPRegistry } from './mcp.js';
 import { personaContext, personaInstructions } from './persona.js';
 import { prepareRequestInput } from './request-input.js';
 import { resultReply, deliverResultReply } from './reply.js';
-import { assertSafeValue, assertSafeChatInput, SafetyError, withRequestUser } from './safety.js';
+import { assertSafeValue, assertSafeText, assertSafeChatInput, requestSafetyInstructions, SafetyError, withRequestUser } from './safety.js';
+import { limitReplyLength, stripEmojis, REPLY_STYLE_INSTRUCTIONS } from './reply-style.js';
 import { loadLocalExtension } from './local-extension.js';
 import { MEDIA_OWNER } from './media-store.js';
 import { UsageStore, RequestLimiter, UsageLimitError, usageLimitsFromEnv } from './usage.js';
@@ -105,7 +107,11 @@ const voiceManager = new VoiceManager({ apiKey: process.env.XAI_API_KEY,
       initialMessages: personaContext(persona) };
   },
 });
-const capabilities = ['voice', 'knowledge', 'mcp', 'artifacts', 'structured_outputs'];
+let jiki;
+try {
+  jiki = createJikiClient({ url: process.env.QWEN_API_URL, apiKey: process.env.QWEN_API_KEY });
+} catch (error) { logError('jiki_config_error', error); }
+const capabilities = ['voice', 'knowledge', 'mcp', 'artifacts', 'structured_outputs', ...(jiki ? ['jiki'] : [])];
 let stopping = false;
 const help = helpCard(musicHelp);
 
@@ -198,6 +204,38 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
   }
 }
 
+function answerJiki({ scope, userId, guildId, text, send }) {
+  return withRequestUser(userId, async () => {
+    let release;
+    try {
+      const safety = { secrets: [process.env.QWEN_API_KEY, process.env.QWEN_API_URL] };
+      assertSafeChatInput(text, safety);
+      release = limiter.acquire({ scope, userId, guildId });
+      const fullMode = fullModeActive(userId);
+      const instructions = [
+        'You are Jiki, a text assistant available through Owaua on Discord. Answer the current prompt directly. You have no tools or previous chat context. Never claim to have performed an external action.',
+        fullMode ? 'Match the requested level of detail.' : 'Keep your answer within 600 characters.',
+        REPLY_STYLE_INSTRUCTIONS, languageInstructions(store.language(userId)), requestSafetyInstructions(), serverLanguageInstructions(),
+      ].filter(Boolean).join('\n');
+      const result = await jiki.respond({ text, instructions, signal: shutdownController.signal });
+      const outputSafety = { ...safety, privateText: [instructions] };
+      assertSafeText(result.text, outputSafety);
+      result.text = limitReplyLength(stripEmojis(cleanServerText(result.text)), { fullMode }) ||
+        'I couldn’t produce a text reply. Please try again.';
+      assertSafeText(result.text, outputSafety);
+      await deliverResultReply({ ...result, fullMode }, { send });
+      console.log(JSON.stringify({ event: 'jiki_response', model: result.model, usage: result.usage }));
+    } catch (error) {
+      logError('jiki_error', error);
+      const message = stopping ? 'I’m restarting. Give me a moment, then try again.'
+        : error instanceof UsageLimitError || error instanceof SafetyError ? error.message
+        : error?.status === 504 ? 'Jiki took too long to answer. Try again in a moment.'
+        : 'Jiki couldn’t finish that request. Give it another try in a moment.';
+      await send(card('Couldn’t complete your request', message, { tone: 'error' })).catch(error => logError('send_error', error));
+    } finally { release?.(); }
+  });
+}
+
 // Speech generation, transcription and durable uploads share chat's admission
 // limits. Stop/status controls remain reachable without a paid-request cooldown.
 async function standalone(interaction, handler, { charge = true, voice = false } = {}) {
@@ -221,7 +259,7 @@ client.once(Events.ClientReady, async ready => {
   } catch (error) { logError('command_registration_error', error); }
 });
 const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
-  standalone, active, help, client, answer, signal: shutdownController.signal, logError });
+  standalone, active, help, client, answer, answerJiki: jiki ? answerJiki : undefined, signal: shutdownController.signal, logError });
 client.on(Events.InteractionCreate, async interaction => {
   try {
     if (interaction.isChatInputCommand()) await handleCommand(interaction);
