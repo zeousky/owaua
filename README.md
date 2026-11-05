@@ -20,7 +20,7 @@ The longer tour is in [Using Owaua](docs/USAGE.md).
 
 ## Run a copy
 
-You need Node.js 24, a Discord bot token, and an xAI API key. Music also needs FFmpeg and yt-dlp. Calls to xAI are billed to the key you provide.
+You need Node.js 24, a Discord bot token, and an xAI API key. Music also needs FFmpeg and yt-dlp. Calls to xAI are billed to the key you provide
 
 ```sh
 nvm install && nvm use
