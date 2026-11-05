@@ -1,0 +1,42 @@
+name: Publish container
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release
+        uses: actions/checkout@v4
+
+      - name: Build and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/kirmy-bot"
+          version="${GITHUB_REF_NAME#v}"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker build \
+            --label org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}" \
+            --label org.opencontainers.image.url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" \
+            --label org.opencontainers.image.version="$version" \
+            --label org.opencontainers.image.title="Owaua" \
+            --label org.opencontainers.image.licenses="MIT" \
+            -t "$image:$version" \
+            -t "$image:${GITHUB_REF_NAME}" \
+            -t "$image:latest" \
+            .
+          docker push "$image:$version"
+          docker push "$image:${GITHUB_REF_NAME}"
+          docker push "$image:latest"
+          if [ "$GITHUB_REF_NAME" = "v1.0.0" ]; then
+            docker tag "$image:$version" "$image:side-a"
+            docker push "$image:side-a"
+          fi

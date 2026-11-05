@@ -39,6 +39,15 @@ docker run --env-file .env -v owaua-data:/app/data -p 3000:3000 owaua
 
 The data directory inside the container is `/app/data`. Keep that volume. It holds the conversation database and the document-library index.
 
+The Side A image is already built:
+
+```sh
+docker pull ghcr.io/zeousky/kirmy-bot:side-a
+docker run --env-file .env -v owaua-data:/app/data -p 3000:3000 ghcr.io/zeousky/kirmy-bot:side-a
+```
+
+`1.0.0` and `v1.0.0` are the same build. `side-a` stays on this release. `latest` moves when a newer release is published. Pulling needs access to this repository's packages.
+
 `/live` on port 3000 answers when the process is up, including when the bot has been stopped on purpose. `/health` answers only while Discord is connected.
 
 ## Optional pieces

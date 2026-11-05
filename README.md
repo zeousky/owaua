@@ -4,6 +4,8 @@ Owaua is a Discord bot. Mention it, reply to it, or send it a DM and it talks ba
 
 The GitHub repository is still called kirmy-bot. The bot this code runs is Owaua
 
+The first release is [1.0, Side A](https://github.com/zeousky/kirmy-bot/releases/tag/v1.0.0). That same build is the container tag `side-a`.
+
 ## Try it
 
 Slash commands and the same commands with a dot both work. A dot command does not need a mention.
