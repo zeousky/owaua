@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Owaua's Discord AI core powered by the official xAI API",
+  "description": "Owaua, a Discord bot that chats with Grok",
+  "license": "MIT",
   "engines": {
     "node": "^24.22.1 || ^26.12.1"
   },

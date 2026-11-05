@@ -1,5 +1,7 @@
 # Codex cloud development
 
+This page is for Codex cloud setup. Running the bot starts in the README and [Self-hosting](SELF_HOSTING.md).
+
 **Bot identity:** This repository develops **Owaua (Node)**. Its historical checkout/repository labels are not the bot's current name. Read `../BOT_IDENTITY.json` and the root `AGENTS.md` first. Owaua = Node.js / `zeousky/kirmy-bot`; Kirmy = Python / `zeousky/owaua`. Cloud development does not authorize live deployment.
 
 Use a private Codex cloud environment connected to `zeousky/kirmy-bot`.
