@@ -14,7 +14,7 @@ Slash commands and the same commands with a dot both work. A dot command does no
 - `/voice join` — talk with it in your voice channel.
 - `.music song name` — play a song in the voice channel you are in. `.mp3 song name` sends the file in chat.
 - `/persona`, `/memory`, `/knowledge`, `/language` — your voice, your notes, saved documents, and which language it answers in.
-- `/help` — a short reminder. `/usage` — what you have left today.
+- `/help` — a short reminder. `/usage` — what you have left today
 
 The longer tour is in [Using Owaua](docs/USAGE.md).
 
