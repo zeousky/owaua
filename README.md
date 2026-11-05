@@ -2,7 +2,7 @@
 
 Owaua is a Discord bot. Mention it, reply to it, or send it a DM and it talks back. Chat runs on Grok 4.7 through xAI. It can search the web and X, read pictures and documents you attach, remember things you tell it, make images and short videos, speak, and play music in a voice channel.
 
-The GitHub repository is still called kirmy-bot. The bot this code runs is Owaua.
+The GitHub repository is still called kirmy-bot. The bot this code runs is Owaua
 
 ## Try it
 
