@@ -1,0 +1,23 @@
+title = "Owaua secret scanning"
+
+[extend]
+useDefault = true
+
+# Exact, deliberately fake credentials used to test rejection. Do not exclude
+# entire test files: a real credential accidentally added there must still fail.
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Synthetic structured-output fixture"
+condition = "AND"
+paths = ['''(^|/)test/safety\.test\.js$''']
+regexTarget = "secret"
+regexes = ['''^synthetic-sensitive-12345$''']
+
+[[rules.allowlists]]
+description = "Synthetic memory-rejection fixture"
+condition = "AND"
+paths = ['''(^|/)test/memory\.test\.js$''']
+regexTarget = "secret"
+regexes = ['''^abcdefgh12345678$''']

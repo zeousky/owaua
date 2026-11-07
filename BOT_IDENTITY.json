@@ -4,7 +4,7 @@
   "runtime": "node",
   "discordApplicationId": "1442127404607737999",
   "entrypoint": "src/bot.js",
-  "githubRepository": "zeousky/kirmy-bot",
+  "githubRepository": "zeousky/owaua",
   "legacyCheckoutName": "kirmy",
   "railway": {
     "projectName": "bots",

@@ -1,7 +1,16 @@
-.git
-.env
-.env.*
-node_modules
-data
-.railway
-test
+# Only send the files needed by Dockerfile to the builder.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!BOT_IDENTITY.json
+!src/
+src/**
+!src/*.js
+!scripts/
+scripts/**
+!scripts/*.js
+!scripts/*.sh
+!scripts/owaua
+!scripts/start
+!scripts/stop

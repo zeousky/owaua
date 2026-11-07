@@ -34,19 +34,12 @@ The Dockerfile builds a production image on Node 24.22.1, with FFmpeg and yt-dlp
 
 ```sh
 docker build -t owaua .
-docker run --env-file .env -v owaua-data:/app/data -p 3000:3000 owaua
+docker run --env-file .env -v owaua-data:/app/data -p 127.0.0.1:3000:3000 owaua
 ```
 
 The data directory inside the container is `/app/data`. Keep that volume. It holds the conversation database and the document-library index.
 
-The Side A image is already built:
-
-```sh
-docker pull ghcr.io/zeousky/kirmy-bot:side-a
-docker run --env-file .env -v owaua-data:/app/data -p 3000:3000 ghcr.io/zeousky/kirmy-bot:side-a
-```
-
-`1.0.0` and `v1.0.0` are the same build. `side-a` stays on this release. `latest` moves when a newer release is published. Pulling needs access to this repository's packages.
+The release workflow publishes containers to `ghcr.io/<owner>/<repository>`, with version tags and `latest`. For `v1.0.0`, it also assigns `side-a`. Package visibility is separate from repository visibility, so a public source repository does not guarantee anonymous image pulls. Build from source above if a release image is unavailable.
 
 `/live` on port 3000 answers when the process is up, including when the bot has been stopped on purpose. `/health` answers only while Discord is connected.
 

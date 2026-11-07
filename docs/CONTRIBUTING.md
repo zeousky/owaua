@@ -10,6 +10,14 @@ Issues and pull requests are welcome.
 
 Tests are supposed to stay offline. They get temporary databases and mocked providers. A change that needs a real Discord login or a paid API call should say so in the pull request.
 
+Pull requests run checks and tests on Node 24.22.1 and 26.12.1. CI also runs `npm audit --omit=dev` and Gitleaks 8.30.1 over all fetched branches and tags. You can run the same secret scan locally after installing Gitleaks:
+
+```sh
+gitleaks git . --log-opts="--all --full-history" --redact --no-banner
+```
+
+The configuration exempts two exact synthetic test values. Keep those exceptions narrow; do not ignore an entire file or directory to silence a finding. Review staged files with `git diff --cached` before committing. Ignore rules do not remove a file from existing history.
+
 Be decent in issues and reviews. Do not post someone else's private messages, a token, or a database dump.
 
 The capability checklist in [Grok API coverage](GROK_API_AUDIT.md) is a developer note about what the xAI API surface already reaches. [Codex cloud](CODEX_CLOUD.md) is only for that development environment.

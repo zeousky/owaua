@@ -13,14 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the release
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Build and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/kirmy-bot"
+          image="ghcr.io/${GITHUB_REPOSITORY}"
           version="${GITHUB_REF_NAME#v}"
           echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           docker build \

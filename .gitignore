@@ -26,3 +26,13 @@ __pycache__/
 *.db-*
 /data/
 /backups/
+
+# Additional local snapshots and credentials.
+*.sql
+*.sql.gz
+backups/
+dumps/
+logs/
+*.p12
+*.pfx
+.npmrc.local

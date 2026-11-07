@@ -2,9 +2,9 @@
 
 Owaua is a Discord bot. Mention it, reply to it, or send it a DM and it talks back. Chat runs on Grok 4.7 through xAI. It can search the web and X, read pictures and documents you attach, remember things you tell it, make images and short videos, speak, and play music in a voice channel
 
-The GitHub repository is still called kirmy-bot. The bot this code runs is Owaua
+This repository used to be called kirmy-bot
 
-The first release is [1.0, Side A](https://github.com/zeousky/kirmy-bot/releases/tag/v1.0.0). That same build is the container tag `side-a`.
+The first release is [1.0, Side A](https://github.com/zeousky/owaua/releases/tag/v1.0.0).
 
 ## Try it
 
@@ -25,9 +25,12 @@ The longer tour is in [Using Owaua](docs/USAGE.md).
 You need Node.js 24, a Discord bot token, and an xAI API key. Music also needs FFmpeg and yt-dlp. Calls to xAI are billed to the key you provide
 
 ```sh
+git clone https://github.com/zeousky/owaua.git
+cd owaua
 nvm install && nvm use
 npm ci
 cp .env.example .env
+# Fill in DISCORD_TOKEN and XAI_API_KEY in .env before starting.
 npm start
 ```
 
@@ -40,4 +43,6 @@ npm test
 
 Tests do not need tokens. They use temporary databases and mocked providers. See [Contributing](docs/CONTRIBUTING.md) if you want to change something.
 
-[License](LICENSE) · [Security](docs/SECURITY.md) · [Changelog](CHANGELOG.md)
+GitHub Actions checks both supported Node versions, production dependencies, and Git history for secrets. Local databases, backups, credentials, and private extensions belong outside Git; the Docker build only includes the runtime source and scripts.
+
+[License](LICENSE) · [Security](docs/SECURITY.md) · [Changelog](CHANGELOG.md) · [Public release checklist](docs/PUBLIC_RELEASE.md)

@@ -2,6 +2,12 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-11-06
+
+### Changed
+
+- Self-hosting and contribution guides now use Owaua’s renamed repository, with clearer setup and privacy instructions.
+
 ## 2026-11-04
 
 ### Fixed

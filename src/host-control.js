@@ -21,7 +21,7 @@ export function readHostIdentity(path = new URL('../BOT_IDENTITY.json', import.m
   try { identity = JSON.parse(readFileSync(path, 'utf8')); }
   catch { throw new HostControlError('Owaua’s bot identity file could not be read.'); }
   if (identity.botName !== 'Owaua' || identity.runtime !== 'node' ||
-    identity.discordApplicationId !== expected.application || identity.githubRepository !== 'zeousky/kirmy-bot' ||
+    identity.discordApplicationId !== expected.application || identity.githubRepository !== 'zeousky/owaua' ||
     identity.railway?.projectId !== expected.project || identity.railway?.environmentId !== expected.environment ||
     identity.railway?.serviceId !== expected.service) {
     throw new HostControlError('The configured service does not match the Owaua bot. No action was performed.');

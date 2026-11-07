@@ -2,9 +2,9 @@
 
 This page is for Codex cloud setup. Running the bot starts in the README and [Self-hosting](SELF_HOSTING.md).
 
-**Bot identity:** This repository develops **Owaua (Node)**. Its historical checkout/repository labels are not the bot's current name. Read `../BOT_IDENTITY.json` and the root `AGENTS.md` first. Owaua = Node.js / `zeousky/kirmy-bot`; Kirmy = Python / `zeousky/owaua`. Cloud development does not authorize live deployment.
+**Bot identity:** This repository develops **Owaua (Node)**. Its historical checkout/repository labels are not the bot's current name. Read `../BOT_IDENTITY.json` and the root `AGENTS.md` first. Owaua = Node.js / `zeousky/owaua`; Kirmy = Python / `zeousky/owaua-n`. Cloud development does not authorize live deployment.
 
-Use a private Codex cloud environment connected to `zeousky/kirmy-bot`.
+Use a private Codex cloud environment connected to `zeousky/owaua`.
 Select Node.js 24.22.1 (also recorded in `.nvmrc`). The bot uses built-in
 `node:sqlite`, including FTS5, and native PNG rendering dependencies.
 

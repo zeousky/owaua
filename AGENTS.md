@@ -6,8 +6,8 @@ This checkout is **Owaua**, even though its historical folder/repository names s
 
 | User means | Codebase | GitHub repository | Railway project / service | Discord application ID |
 | --- | --- | --- | --- | --- |
-| **Owaua bot** | **Node.js**, local `kirmy/`, `src/bot.js` | `zeousky/kirmy-bot` | `bots` / `kirmy` | `1442127404607737999` |
-| **Kirmy bot** | **Python**, local `owaua-persona-testbot/`, `src/owaua/bot.py` | `zeousky/owaua` | `bots` / `owaua` | `1562279174222385212` |
+| **Owaua bot** | **Node.js**, local `kirmy/`, `src/bot.js` | `zeousky/owaua` | `bots` / `kirmy` | `1442127404607737999` |
+| **Kirmy bot** | **Python**, local `owaua-persona-testbot/`, `src/owaua/bot.py` | `zeousky/owaua-n` | `bots` / `owaua` | `1562279174222385212` |
 
 - The identity swap happened on 2026-10-23. Treat older chats, memories, project labels, repository names, source directory names, environment-variable prefixes, and service names as historical aliases. They do not reverse this mapping.
 - A request to change **Owaua** belongs here. A request to change **Kirmy** belongs in the other codebase; switch to that repository before editing. Do not implement a named bot's change in whichever checkout happens to be open.
