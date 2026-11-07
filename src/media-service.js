@@ -10,7 +10,7 @@ export class MediaService {
         authorize: async proposal => {
           // A clear current request authorizes this media type immediately.
           // Ambiguous/model-proposed actions still require actor-bound review.
-          if (!requestsMedia(kind, currentRequest, options) &&
+          if (!requestsMedia(kind, currentRequest, { ...options, proposal: proposal.body }) &&
             await this.confirm({ userId, send, proposal, signal }) !== true) return false;
           signal?.throwIfAborted();
           id = this.store.reserve({ userId, guildId, kind: kind.includes('image') ? 'image' : 'video',

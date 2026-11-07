@@ -63,6 +63,18 @@ test('streamed custom tools still continue once and preserve tool outputs', asyn
   assert.equal(JSON.parse(requests[1].input.at(-1).output).timezone, 'UTC');
 });
 
+test('an incomplete stream terminal event cannot dispatch a local tool', async () => {
+  let executions = 0;
+  const ai = new AICore({ tools: {
+    definitions: () => [{ type: 'function', name: 'current_time' }],
+    execute: async () => { executions++; return {}; },
+  }, fetchImpl: async () => stream([{ type: 'response.incomplete', response: { output: [
+    { type: 'function_call', name: 'current_time', call_id: 'clock', arguments: '{"timezone":"UTC"}' },
+  ] } }], { ending: false }) });
+  await assert.rejects(ai.respond({ input: 'Time?', onActivity() {} }), { code: 'incomplete_tool_response' });
+  assert.equal(executions, 0);
+});
+
 test('truncated and failed streams fail safely without retrying the paid request', async () => {
   for (const events of [[], [{ type: 'error', message: 'secret-provider-body' }],
     [{ type: 'response.failed', response: { error: { message: 'secret-provider-body' } } }]]) {

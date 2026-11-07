@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { MCPRegistry } from '../src/mcp.js';
 import { AICore } from '../src/ai.js';
 import { normalizeRequestOptions, RequestOptionsError } from '../src/request-options.js';
+import { SafetyError } from '../src/safety.js';
 
 test('built-in read-only public integrations require explicit selection for every request', async () => {
   const registry = new MCPRegistry();
@@ -36,6 +37,70 @@ test('deployment credentials are environment references, scoped, and excluded fr
   const missing = new MCPRegistry([{ label: 'private_docs', url: 'https://docs.example.com/mcp', readOnly: true,
     allowedTools: ['search'], authorizationEnv: 'DOCS_TOKEN', guildIds: [guildId] }], { environment: {} });
   assert.throws(() => missing.definitions(['private_docs'], { guildId }), /credential configured/);
+});
+
+test('authenticated integration credentials cannot reach replies, text exports or local tools', async () => {
+  const guildId = '123456789012345678';
+  const credential = 'opaque-private-integration-value';
+  const authorization = `Bearer ${credential}`;
+  const registry = new MCPRegistry([{ label: 'private_docs', url: 'https://docs.example.com/mcp',
+    readOnly: true, allowedTools: ['search'], authorizationEnv: 'PRIVATE_DOCS_ACCESS', guildIds: [guildId],
+  }], { environment: { PRIVATE_DOCS_ACCESS: authorization } });
+  const requestOptions = { integrations: 'private_docs' };
+  const context = { guildId, memory: { recall: () => assert.fail('A credential reached a local tool') } };
+  const envelope = JSON.stringify({ filename: 'document.txt', mime_type: 'text/plain',
+    base64: Buffer.from(credential).toString('base64') });
+  const binary = JSON.stringify({ filename: 'document.pdf', mime_type: 'application/pdf',
+    base64: Buffer.from(`%PDF-1.5\n%${credential}\n%%EOF`).toString('base64') });
+  const exportCall = { type: 'code_interpreter_call', status: 'completed', outputs: [{ type: 'logs',
+    logs: JSON.stringify({ exit_code: 0, stdout: `OWAUA_ARTIFACT:${envelope}\nOWAUA_ARTIFACT:${binary}` }) }] };
+  let requests = 0;
+  const ai = new AICore({ mcpRegistry: registry, fetchImpl: async (_, request) => {
+    const body = JSON.parse(request.body);
+    const first = ++requests === 1;
+    if (first) assert.equal(body.tools.find(tool => tool.type === 'mcp').authorization, authorization);
+    else {
+      assert.deepEqual(body.tools, []);
+      assert.equal(request.body.includes(credential), false);
+    }
+    const message = { type: 'message', content: [{ type: 'output_text', text: first ? credential : 'Here are the docs.' }] };
+    return { ok: true, json: async () => ({
+      output: first ? [exportCall, message] : [message], model: credential,
+      usage: { output_tokens: 8, unexpected: credential },
+    }) };
+  } });
+  const result = await ai.respond({ input: 'Find the docs', context, requestOptions });
+  assert.equal(requests, 2);
+  assert.equal(result.text, 'Here are the docs.');
+  assert.deepEqual(result.artifacts, []);
+  assert.equal(result.model, ai.model);
+  assert.deepEqual(result.usage, [{ output_tokens: 8 }, { output_tokens: 8 }]);
+  assert.match(result.artifactWarnings.join(' '), /Hosted binary exports are unavailable/);
+  await assert.rejects(ai.respond({ input: authorization, context, requestOptions }), SafetyError);
+  assert.equal(requests, 2);
+
+  const leakingTool = new AICore({ mcpRegistry: registry, fetchImpl: async () => ({ ok: true, json: async () => ({
+    output: [{ type: 'function_call', name: 'recall_memory', call_id: 'recall',
+      arguments: JSON.stringify({ query: credential }) }],
+  }) }) });
+  await assert.rejects(leakingTool.respond({ input: 'Find the docs', context, requestOptions }), SafetyError);
+});
+
+test('decoded and short Basic credentials receive the same reply protection', async () => {
+  const guildId = '123456789012345678';
+  const basic = Buffer.from('x:z').toString('base64');
+  const registry = new MCPRegistry([{ label: 'private_docs', url: 'https://docs.example.com/mcp',
+    readOnly: true, allowedTools: ['search'], authorizationEnv: 'PRIVATE_DOCS_ACCESS', guildIds: [guildId],
+  }], { environment: { PRIVATE_DOCS_ACCESS: `Basic ${basic}` } });
+  for (const leak of [basic, 'x:z', 'z']) {
+    let requests = 0;
+    const ai = new AICore({ mcpRegistry: registry, fetchImpl: async () => ({ ok: true, json: async () => ({
+      output: [{ type: 'message', content: [{ type: 'output_text', text: ++requests === 1 ? leak : 'Done.' }] }],
+    }) }) });
+    const reply = await ai.respond({ input: 'Find the docs', context: { guildId }, requestOptions: { integrations: 'private_docs' } });
+    assert.equal(requests, 2);
+    assert.equal(reply.text, 'Done.');
+  }
 });
 
 test('MCP rejects arbitrary request URLs and broad or malformed deployment configurations', () => {

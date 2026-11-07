@@ -45,9 +45,44 @@ test('tool loops stop at configured round limit', async () => {
   let requests = 0;
   const ai = new AICore({ apiKey: 'test', maxToolRounds: 1, fetchImpl: async () => {
     requests++;
-    return response({ output: [{ type: 'function_call', name: 'current_time', arguments: '{}', call_id: 'x' }] });
+    return response({ output: [{ type: 'function_call', name: 'current_time', arguments: '{"timezone":"UTC"}', call_id: `time-${requests}` }] });
   } });
   await assert.rejects(ai.respond({ input: 'loop' }), /limit/);
+  assert.equal(requests, 2);
+});
+test('a malformed tool batch is rejected before any local tool runs', async () => {
+  const call = { type: 'function_call', name: 'current_time', call_id: 'clock', arguments: '{"timezone":"UTC"}' };
+  const cases = [
+    [{ status: 'incomplete', output: [call] }, 'incomplete_tool_response'],
+    [{ status: 'in_progress', output: [call] }, 'incomplete_tool_response'],
+    [{ output: [call, { ...call, call_id: 'next', status: 'incomplete' }] }, 'invalid_tool_call'],
+    [{ output: [call, { ...call, call_id: 'next', arguments: '{"timezone":' }] }, 'invalid_tool_call'],
+    [{ output: [call, { ...call, call_id: 'next', arguments: '{"timezone":42}' }] }, 'invalid_tool_call'],
+    [{ output: [call, { ...call, call_id: '' }] }, 'invalid_tool_call'],
+    [{ output: [call, { ...call }] }, 'invalid_tool_call'],
+    [{ output: [call, { ...call, call_id: 'next', name: 'unoffered_tool' }] }, 'unauthorized_tool_call'],
+  ];
+  for (const [providerBody, code] of cases) {
+    let executions = 0, requests = 0;
+    const ai = new AICore({ tools: {
+      definitions: () => [{ type: 'function', name: 'current_time',
+        parameters: { type: 'object', properties: { timezone: { type: 'string' } }, required: ['timezone'] } }],
+      execute: async () => { executions++; return { local: 'noon' }; },
+    }, fetchImpl: async () => response(++requests === 1 ? providerBody : final()) });
+    await assert.rejects(ai.respond({ input: 'Time?' }), { code });
+    assert.equal(executions, 0);
+    assert.equal(requests, 1);
+  }
+});
+test('a replayed tool call ID is rejected in later rounds', async () => {
+  let executions = 0, requests = 0;
+  const call = { type: 'function_call', name: 'current_time', call_id: 'clock', arguments: '{"timezone":"UTC"}' };
+  const ai = new AICore({ tools: {
+    definitions: () => [{ type: 'function', name: 'current_time' }],
+    execute: async () => { executions++; return { local: 'noon' }; },
+  }, fetchImpl: async () => response(++requests <= 2 ? { output: [call] } : final()) });
+  await assert.rejects(ai.respond({ input: 'Time?' }), { code: 'invalid_tool_call' });
+  assert.equal(executions, 1);
   assert.equal(requests, 2);
 });
 test('citations are kept as usable source links', async () => {

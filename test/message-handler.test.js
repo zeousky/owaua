@@ -9,7 +9,7 @@ const botId = '1442127404607737999';
 const help = helpCard(musicHelp);
 
 function fixture(content, { guildId = 'server', dmBlocked = false, mentioned = true,
-  reference, attachments = new Map(), sendTyping = async () => {}, answerWait } = {}) {
+  reference, attachments = new Map(), sendTyping = async () => {}, answerWait, mediaStore } = {}) {
   const publicReplies = [], privateReplies = [], answers = [], errors = [], resets = [];
   const message = { content, guildId, channelId: 'channel', attachments,
     author: { id: 'user', bot: false, send: async payload => {
@@ -23,7 +23,7 @@ function fixture(content, { guildId = 'server', dmBlocked = false, mentioned = t
     reply: async payload => { publicReplies.push(payload); },
   };
   const deps = { allowed: () => true, isStopping: () => false, help,
-    client: { user: { id: botId } }, active: new Set(),
+    client: { user: { id: botId } }, active: new Set(), mediaStore,
     store: { reset: scope => resets.push(scope) },
     answer: async request => { answers.push(request); await answerWait; await request.send({ content: 'chat answer' }); },
     logError: (...args) => errors.push(args),
@@ -154,6 +154,26 @@ test('a mention with an attachment still sends it to the answer handler', async 
   assert.deepEqual(f.answers[0].documents, [file]);
   assert.equal(f.publicReplies[0].content, 'chat answer');
   assert.deepEqual(f.errors, []);
+});
+
+test('replying to an Owaua video forwards only verified generation results from the same channel', async () => {
+  const generated = 'https://vidgen.x.ai/result.mp4';
+  const mediaStore = { hasCompletedMedia(kind, url, scope) {
+    assert.equal(kind, 'video');
+    assert.deepEqual(scope, { userId: 'user', guildId: 'server' });
+    return url === generated;
+  } };
+  for (const [content, channelId, expected] of [
+    [generated, 'channel', [generated]],
+    ['https://example.com/injected.mp4', 'channel', []],
+    [generated, 'other-channel', []],
+  ]) {
+    const f = fixture('extend this clip', { mentioned: false, mediaStore,
+      reference: { author: { id: botId }, guildId: 'server', channelId, attachments: new Map(), content } });
+    await f.run();
+    assert.deepEqual(f.errors, []);
+    assert.deepEqual(f.answers[0].videos, expected);
+  }
 });
 
 test('mentioned reset still clears the conversation', async () => {

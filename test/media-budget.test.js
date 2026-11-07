@@ -98,6 +98,28 @@ test('clear media requests submit all five actions without a Discord confirmatio
   assert.equal(posts, 5);
 });
 
+test('unrequested media and model-selected upgrades require review before any reservation or POST', async t => {
+  const { store } = fixture(t);
+  const reviews = [];
+  const service = new MediaService({ store,
+    confirm: async ({ proposal }) => { reviews.push(proposal); return false; },
+    media: new MediaGenerator({ fetchImpl: async () => assert.fail('No provider calls') }) });
+  for (const [kind, currentRequest, options] of [
+    ['video', 'Make a list of videos', {}],
+    ['image', 'Make a video from this image', {}],
+    ['image', 'Make an image', { count: 2 }],
+    ['image', 'Make a picture', { resolution: '2k' }],
+    ['image', 'Make a picture of a dog at 2k', {}],
+    ['video', 'Make a video of a dog lasting 10 seconds', {}],
+    ['video', 'Make a video', { model: 'standard', duration: 15, resolution: '1080p' }],
+  ]) {
+    await assert.rejects(service.generate(kind, 'A cat', { userId: user, guildId: guild, currentRequest, options }),
+      /cancelled or not confirmed/);
+  }
+  assert.deepEqual(reviews.map(({ kind }) => kind), ['video', 'image', 'image', 'image', 'image', 'video', 'video']);
+  assert.deepEqual(store.usage().rows, []);
+});
+
 test('video ID is durable before first poll; restart resumes via GET only and retains failed/uncertain charges', async t => {
   const { directory, store } = fixture(t);
   const controller = new AbortController();

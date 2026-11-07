@@ -11,7 +11,7 @@ import { createJikiClient, directJikiReply, usesDirectJiki } from './jiki.js';
 import { MediaGenerator, MediaInputError } from './media.js';
 import { MediaStore } from './media-store.js';
 import { MediaService } from './media-service.js';
-import { confirmMedia } from './media-approval.js';
+import { confirmMedia, confirmSongDownload } from './media-approval.js';
 import { createCommandHandler } from './command-handler.js';
 import { commands } from './commands.js';
 import { createMessageHandler } from './message-handler.js';
@@ -162,7 +162,11 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
     const downloadSong = async (query, { signal } = {}) => {
       if (songStarted && !fullModeActive(userId)) throw new SongInputError('Please request one MP3 at a time.');
       songStarted = true;
-      return songs.download(query, { signal: signal ?? shutdownController.signal });
+      const approvalSignal = signal ?? shutdownController.signal;
+      const approved = await confirmSongDownload({ userId, send, query, signal: approvalSignal });
+      approvalSignal.throwIfAborted();
+      if (!approved) throw new SongInputError('The MP3 download was cancelled or the confirmation timed out.');
+      return songs.download(query, { signal: approvalSignal });
     };
     const result = await ai.respond({ input: prepared.input, history: store.history(scope), memory: store.context(scope, prepared.userText), persona, language: store.language(userId), fullMode: fullModeActive(userId),
       context: { userId, guildId, generateMedia, downloadSong, memory }, signal: shutdownController.signal,
@@ -273,7 +277,7 @@ client.on(Events.InteractionCreate, async interaction => {
   } catch (error) { logError('interaction_error', error); }
 });
 client.on(Events.MessageCreate, createMessageHandler({ allowed, localExtension, handleCommand, client, isStopping: () => stopping,
-  voiceManager, music, active, store, answer, logError }));
+  voiceManager, music, active, store, mediaStore, answer, logError }));
 client.on(Events.VoiceStateUpdate, (oldState, newState) => { music.voiceStateUpdate(oldState, newState); voiceManager.voiceStateUpdate(oldState, newState); });
 client.on(Events.Error, error => logError('discord_error', error));
 const server = createServer(async (request, response) => {

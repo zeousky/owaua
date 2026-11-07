@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { confirmMedia } from '../src/media-approval.js';
+import { confirmMedia, confirmSongDownload } from '../src/media-approval.js';
 import { MediaGenerator, MediaInputError } from '../src/media.js';
 import { AICore, ProviderError } from '../src/ai.js';
 
@@ -56,6 +56,29 @@ test('only the requester can approve this exact message and nonce; duplicate cli
   assert.deepEqual(ui.edits.at(-1).attachments, []);
   await ui.click();
   assert.equal(ui.acknowledgements, 1);
+});
+
+test('song proposals show the exact query and accept only the requester’s approval', async () => {
+  const query = 'Artist - Song';
+  for (const result of ['approve', 'cancel', 'abort']) {
+    const ui = discord();
+    const controller = new AbortController();
+    const waiting = confirmSongDownload({ userId: owner, send: ui.send, query, signal: controller.signal });
+    await ui.ready;
+    assert.match(ui.payload.content, /download an MP3/);
+    assert.equal(ui.payload.files[0].name, 'song-request.json');
+    assert.deepEqual(JSON.parse(ui.payload.files[0].attachment), { query });
+    assert.match(ui.payload.components[0].toJSON().components[0].custom_id, /^song:/);
+    await ui.click('yes', '222222222222222222');
+    await ui.click('yes', owner, 'other-message');
+    await ui.click('yes', owner, 'reply', 'song:stale:yes');
+    assert.equal(ui.acknowledgements, 0);
+    if (result === 'abort') controller.abort();
+    else await ui.click(result === 'approve' ? 'yes' : 'no');
+    assert.equal(await waiting, result === 'approve');
+    assert.deepEqual(ui.edits.at(-1).components, []);
+    assert.deepEqual(ui.edits.at(-1).attachments, []);
+  }
 });
 
 test('cancel, expiry, deletion and shutdown fail closed and remove controls', async () => {

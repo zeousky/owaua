@@ -76,6 +76,14 @@ export class MediaStore {
     return this.db.prepare(`SELECT * FROM media_requests WHERE user_id=? AND guild_id=?
       AND state NOT IN ('reserved','released') ORDER BY created_at DESC LIMIT 10`).all(userId, guildId ?? '');
   }
+  hasCompletedMedia(kind, url, { userId, guildId }) {
+    const guild = guildId ?? '';
+    return Boolean(this.db.prepare(`SELECT 1 FROM media_requests
+      WHERE guild_id=? AND (?<>'' OR user_id=?) AND state='completed' AND kind=?
+      AND CASE WHEN json_valid(result) THEN json_extract(result,'$.url')=?
+        OR EXISTS (SELECT 1 FROM json_each(result,'$.urls') WHERE value=?) ELSE 0 END
+      LIMIT 1`).get(guild, guild, userId, kind, url, url));
+  }
   usage({ userId, guildId } = {}) {
     const day = mediaDay(this.now());
     const rows = this.db.prepare(`SELECT kind, state, exempt, SUM(units) AS units FROM media_requests

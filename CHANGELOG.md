@@ -2,6 +2,15 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-11-07
+
+### Fixed
+
+- Owaua asks you to confirm ambiguous media requests and proposals with custom settings before starting a paid job.
+- AI-suggested MP3 downloads ask for your approval. Explicit MP3 commands still start directly.
+- Replies reuse verified Owaua-generated images and videos, and incomplete AI tool responses stop before running actions.
+- Private integrations have stronger credential protection in replies and exports.
+
 ## 2026-11-06
 
 ### Changed

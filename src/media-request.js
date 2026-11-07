@@ -1,29 +1,56 @@
-// Only the current Discord message can skip review. Never pass history,
-// transcripts, document text or model arguments to this recognizer.
-export function requestsMedia(kind, text, { images = [], videos = [] } = {}) {
+const image = '(?:images?|pictures?|pics?|photos?|portraits?|illustrations?|drawings?|logos?|wallpapers?|memes?|kepe?t?|kepet|fotot)';
+const video = '(?:videos?|clips?|animations?|videot?|animaciot)';
+const quantities = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const article = '(?:an?|the|this|that|my|our|egy)';
+const modifiers = '(?:(?:new|short|animated|realistic|photorealistic|simple|cartoon|attached|same)\\s+)*';
+const objectEnd = '(?=$|[,.!?;:]|\\s+(?:of|about|for|from|with|using|showing|featuring|that|in|at|as|and|egy|a|az)\\b)';
+const object = noun => new RegExp(`^(?:me\\s+)?(?:${article}\\s+)?(?:(\\d+|${quantities.join('|')})\\s+)?${modifiers}${noun}\\b${objectEnd}`);
+const imageObject = object(image);
+const videoObject = object(video);
+const create = /^(?:make|create|generate|draw|paint|render|design|produce|keszits|generalj|rajzolj|csinalj)\s+/;
+const want = /^(?:i want|i'd like|id like|i need|szeretnek)\b/;
+const edit = noun => new RegExp(`^(?:edit|change|crop|resize|recolor|modosits|valtoztasd)\\s+(?:${article}\\s+)?${modifiers}${noun}\\b(?=$|[,.!?;:]|\\s+(?:to|by|so|with|in|from|egy|a|az)\\b)`);
+const editImage = edit(image), editVideo = edit(video);
+const visualChange = /^(?:make|change|replace|remove|recolor|blur)\s+(?:(?:the|this|its)\s+)?(?:background|foreground|lighting|colors?|sky)\b/;
+const animateImage = new RegExp(`^animate\\s+(?:(?:this|that|it)(?=$|[,.!?;:]|\\s+(?:with|into|by|so|in)\\b)|(?:${article}\\s+)?${modifiers}${image}\\b${objectEnd})`);
+const extendVideo = new RegExp(`^(?:extend|continue|lengthen)\\s+(?:(?:this|that|it)(?=$|[,.!?;:]|\\s+(?:by|for|with|so)\\b)|(?:${article}\\s+)?${modifiers}${video}\\b(?=$|[,.!?;:]|\\s+(?:by|for|with|so)\\b))`);
+const customSettings = new RegExp(`\\b(?:2k|480p|1080p|\\d{1,2}:\\d{1,2}|(?:low|auto) quality|(?:lite|standard|classic) model|(?:\\d+|${quantities.join('|')})[-\\s]*(?:s|secs?|seconds?))\\b`);
+
+// Only the current Discord message can skip review. The final provider payload
+// must also stay within the settings authorized by that message.
+export function requestsMedia(kind, text, { images = [], videos = [], proposal } = {}) {
   if (typeof text !== 'string') return false;
   const request = text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
-    .replace(/```[\s\S]*?```|`[^`]*`|"[^"]*"|“[^”]*”/g, ' ')
+    .replace(/```[\s\S]*?```|`[^`]*`|"[^"]*"|“[^”]*”|‘[^’]*’|(?<!\w)'[^'\n]*'(?!\w)/g, ' ')
+    .replace(/’/g, "'")
     .replace(/^\s*(?:hey\s+)?(?:owaua[,!:]?\s+)?/, '').trim();
-  // Questions about generating media, negations and quoted examples are not
-  // themselves requests to submit a generation.
-  if (/\b(?:don't|dont|do not|never|not yet|ne|nem)\b/.test(request)) return false;
+  if (/\b(?:don't|dont|do not|never|not (?:yet|now)|unless|if|only after|(?:after|until|once) (?:i|my)|ask (?:me )?first|confirm(?:ation)? first|wait|hold off|just kidding|ne|nem)\b/.test(request)) return false;
   const direct = request.replace(/^(?:(?:please|pls|plz|just)\s+|(?:can|could|would|will)\s+(?:you|u)\s+|(?:i want|i'd like|id like|i need)\s+(?:you to\s+)?|(?:szeretnek|kerlek|tudnal)\s+)*/, '');
-  if (/^(?:how|explain|summarize|translate|example)\b/.test(direct) ||
-    /^(?:make|create|generate|write)\s+(?:(?:me|an?|some|the)\s+)*(?:code|script|prompt|example|instructions|tutorial)\b/.test(direct)) return false;
-  const image = /\b(?:images?|pictures?|pics?|photos?|portraits?|illustrations?|drawings?|logos?|wallpapers?|memes?|kepe?t?|kepet|fotot)\b/;
-  const video = /\b(?:videos?|clips?|animations?|videot?|videot|animaciot)\b/;
-  const create = /^(?:make|create|generate|draw|paint|render|design|animate|produce|keszits|generalj|rajzolj|csinalj)\b/;
   const isVideo = kind.includes('video');
+  let count = 1;
+  let authorized;
   if (kind === 'image' || kind === 'video') {
-    if (create.test(direct) && (isVideo ? video : image).test(direct)) return true;
-    if (!isVideo && /^(?:draw|paint|rajzolj)\b/.test(direct)) return true;
-    if (isVideo && images.length && /^animate\b/.test(direct)) return true;
-    return /^(?:i want|i'd like|id like|i need|szeretnek)\b/.test(request) &&
-      (isVideo ? video : image).test(direct);
+    const verb = direct.match(create);
+    const target = verb ? direct.slice(verb[0].length) : want.test(request) ? direct : '';
+    const match = target.match(isVideo ? videoObject : imageObject);
+    count = match?.[1] ? (/^\d+$/.test(match[1]) ? Number(match[1]) : quantities.indexOf(match[1]) + 1) : 1;
+    authorized = Boolean(match) || isVideo && images.length > 0 && animateImage.test(direct);
+  } else if (kind === 'extend_video') {
+    authorized = videos.length > 0 && extendVideo.test(direct);
+  } else {
+    authorized = (isVideo ? videos : images).length > 0 &&
+      ((isVideo ? editVideo : editImage).test(direct) || visualChange.test(direct));
   }
-  const sources = isVideo ? videos : images;
-  return sources.length > 0 && (kind === 'extend_video'
-    ? /^(?:extend|continue|lengthen)\b/.test(direct)
-    : /^(?:edit|change|make|replace|remove|add|turn|put|crop|resize|recolor|animate|modosits|valtoztasd)\b/.test(direct));
+  return authorized && (!proposal || !customSettings.test(direct) && defaultSettings(kind, proposal, count));
+}
+
+function defaultSettings(kind, body, count) {
+  if (!kind.includes('video')) {
+    return body.n === count && body.quality === 'medium' && body.resolution === '1k' && body.aspect_ratio === undefined;
+  }
+  if (kind === 'edit_video') return true;
+  if (kind === 'extend_video') return body.duration === 6;
+  const defaultModel = body.reference_images?.length > 1 ? 'grok-imagine-video-1.5' : 'grok-imagine-video-1.5-lite';
+  return body.model === defaultModel && body.duration === 6 && body.resolution === '720p' &&
+    (body.aspect_ratio === undefined || body.aspect_ratio === '16:9');
 }

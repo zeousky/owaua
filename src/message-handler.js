@@ -7,7 +7,7 @@ import { card } from './ui.js';
 import { withFullMode } from './full-mode.js';
 
 export function createMessageHandler({ allowed, localExtension, handleCommand, client, isStopping,
-  voiceManager, music, active, store, answer, logError }) {
+  voiceManager, music, active, store, mediaStore, answer, logError }) {
   return function handleMessage(message) {
     return withServerLanguage(message.guildId, () => withFullMode(message.author.id, store.fullMode?.(message.author.id), async () => {
     if (message.author.bot) return;
@@ -46,8 +46,13 @@ export function createMessageHandler({ allowed, localExtension, handleCommand, c
         return await handleCommand(createPrefixInteraction(message, { commandName: 'help', values: new Map() }));
       }
       let attachments;
-      try { attachments = requestAttachments(message, reference, client.user.id); }
-      catch (error) { return message.reply(card('Check your images', error.message, { tone: 'warning' })); }
+      try {
+        const isGeneratedMedia = (kind, url) => reference?.channelId === message.channelId &&
+          reference?.guildId === message.guildId && mediaStore?.hasCompletedMedia(kind, url, {
+            userId: message.author.id, guildId: message.guildId,
+          });
+        attachments = requestAttachments(message, reference, client.user.id, isGeneratedMedia);
+      } catch (error) { return message.reply(card('Check your images', error.message, { tone: 'warning' })); }
       if (!text && !attachments.images.length && !attachments.documents.length && !attachments.videos.length && !attachments.audio.length) return message.reply(card('', 'Hey, what’s up? Ask me something, or use `/help` for the guide.'));
       // Typing is only a hint: Discord latency or a failed hint must never
       // delay the answer, including when the channel throws synchronously.

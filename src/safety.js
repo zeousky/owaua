@@ -82,9 +82,10 @@ function normalized(text) {
       α: 'a', ε: 'e', ο: 'o', ρ: 'p', υ: 'u', χ: 'x', μ: 'm' })[ch]);
 }
 function secretsFor(options) {
-  return [...new Set([...(options.secrets ?? []), ...Object.entries(process.env)
-    .filter(([key]) => /(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY|AUTHORIZATION|WEBHOOK)/i.test(key)).map(([, value]) => value)])]
+  const inferred = [...(options.secrets ?? []), ...Object.entries(process.env)
+    .filter(([key]) => /(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY|AUTHORIZATION|WEBHOOK)/i.test(key)).map(([, value]) => value)]
     .filter(value => typeof value === 'string' && value.length >= 8);
+  return [...new Set([...inferred, ...(options.exactSecrets ?? []).filter(value => typeof value === 'string' && value.length)])];
 }
 function printable(bytes) {
   try {

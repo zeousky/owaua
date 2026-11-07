@@ -5,9 +5,9 @@ import { fullModeActive } from './full-mode.js';
 
 export class AttachmentInputError extends Error {}
 
-// Only Discord attachment metadata and explicitly replied-to bot media become
-// references. Model tool arguments never choose an input URL.
-export function requestAttachments(message, reference, botId) {
+// A bot-authored message can contain model-generated links. Reuse URLs only
+// from known generation results, in addition to actual Discord attachments.
+export function requestAttachments(message, reference, botId, isGeneratedMedia) {
   const current = [...message.attachments.values()];
   const selected = current.length ? current : [...(reference?.attachments.values() ?? [])];
   const pictures = [], documents = [], videos = [], audio = [];
@@ -32,15 +32,12 @@ export function requestAttachments(message, reference, botId) {
   }
   // New documents/videos suppress old image references just as new images do.
   const images = requestImages({ attachments: new Map(pictures.map((a, i) => [i, a])) },
-    selected.length || current.length ? undefined : reference, botId);
-  if (!selected.length && !current.length && reference?.author?.id === botId) {
-    const preview = (reference.embeds ?? []).map(e => e.video?.url).find(Boolean);
+    selected.length ? undefined : reference, botId, isGeneratedMedia);
+  if (!selected.length && reference?.author?.id === botId) {
     const direct = /^https:\/\/\S+\.mp4(?:\?\S*)?$/i.test(reference.content?.trim() ?? '') ? reference.content.trim() : null;
-    const source = preview ?? direct;
-    if (source) {
-      const url = new URL(source);
-      if (url.protocol === 'https:' && !url.username && !url.password) videos.push(url.href);
-    }
+    const source = [direct, ...(reference.embeds ?? []).map(e => e.video?.url)]
+      .find(url => typeof url === 'string' && isGeneratedMedia?.('video', url));
+    if (source) videos.push(source);
   }
   return { images, documents, videos, audio };
 }

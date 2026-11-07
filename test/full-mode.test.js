@@ -153,7 +153,7 @@ test('full mode removes AI token, context, local tool and round budgets; cancell
       assert.equal(signal, controller.signal, 'only the caller cancellation signal applies');
       await new Promise(resolve => setTimeout(resolve, 5));
       if (requests.length <= 4) return { ok: true, json: async () => ({ output: [{ type: 'function_call',
-        name: 'current_time', arguments: '{}', call_id: `time-${requests.length}` }] }) };
+        name: 'current_time', arguments: '{"timezone":"UTC"}', call_id: `time-${requests.length}` }] }) };
       return { ok: true, json: async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text }] }] }) };
     } });
   const history = [{ role: 'user', content: 'Old context '.repeat(20) }, { role: 'assistant', content: 'Previous answer '.repeat(20) }];

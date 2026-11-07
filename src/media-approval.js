@@ -12,8 +12,6 @@ export async function confirmMedia({ userId, send, proposal, signal, timeoutMs =
   signal?.throwIfAborted();
   assertSafeValue(proposal, { instructions: true });
   if (!/^\d{17,20}$/.test(userId) || !actions[proposal?.kind]) return false;
-  const nonce = randomUUID();
-  const yes = `media:${nonce}:yes`, no = `media:${nonce}:no`;
   const body = proposal.body;
   const labels = { model: 'Model', n: 'Images', quality: 'Quality', resolution: 'Resolution',
     duration: proposal.kind === 'extend_video' ? 'Added seconds' : 'Seconds', aspect_ratio: 'Aspect ratio' };
@@ -24,9 +22,26 @@ export async function confirmMedia({ userId, send, proposal, signal, timeoutMs =
   const note = body.video ? 'Video edits inherit source settings, capped at 720p. Extension seconds are added to the source.'
     : body.image ? 'The aspect ratio comes from the source image.' : 'An unspecified aspect ratio uses the provider default.';
   const review = { action: actions[proposal.kind], prompt: body.prompt, settings, sources, note };
-  const message = await send({ ...card('', `Ready to go? **${actions[proposal.kind]}**\n\n${Object.entries(settings).map(([label, value]) => `${label}: ${value}`).join(' · ')}\nUsing ${sources.length} reference ${sources.length === 1 ? 'file' : 'files'}. ${note}\n\nThe attached file has the full prompt, references, and settings. Take a look, then hit “Go ahead” to start this paid xAI request. Only you can approve it. You have ${Math.ceil(timeoutMs / 1000)} seconds to decide.`),
+  return confirmAction({ type: 'media', userId, send, signal, timeoutMs, preview: {
+    ...card('', `Ready to go? **${actions[proposal.kind]}**\n\n${Object.entries(settings).map(([label, value]) => `${label}: ${value}`).join(' · ')}\nUsing ${sources.length} reference ${sources.length === 1 ? 'file' : 'files'}. ${note}\n\nThe attached file has the full prompt, references, and settings. Take a look, then hit “Go ahead” to start this paid xAI request. Only you can approve it. You have ${Math.ceil(timeoutMs / 1000)} seconds to decide.`),
     attachments: [], files: [{ attachment: Buffer.from(JSON.stringify(review, null, 2)), name: 'media-request.json' }],
-    components: [new ActionRowBuilder().addComponents(
+  } });
+}
+
+export async function confirmSongDownload({ userId, send, query, signal, timeoutMs = 60000 }) {
+  signal?.throwIfAborted();
+  if (!/^\d{17,20}$/.test(userId) || typeof query !== 'string' || !query.trim() || query.length > 300) return false;
+  assertSafeValue({ query }, { instructions: true });
+  return confirmAction({ type: 'song', userId, send, signal, timeoutMs, preview: {
+    ...card('', `Ready to download an MP3? The attached file shows the exact SoundCloud search or track link. Only you can approve it. You have ${Math.ceil(timeoutMs / 1000)} seconds to decide.`),
+    attachments: [], files: [{ attachment: Buffer.from(JSON.stringify({ query }, null, 2)), name: 'song-request.json' }],
+  } });
+}
+
+async function confirmAction({ type, userId, send, preview, signal, timeoutMs }) {
+  const nonce = randomUUID();
+  const yes = `${type}:${nonce}:yes`, no = `${type}:${nonce}:no`;
+  const message = await send({ ...preview, components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(yes).setLabel('Go ahead').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(no).setLabel('Cancel').setStyle(ButtonStyle.Secondary),
     )],
@@ -60,7 +75,7 @@ export async function confirmMedia({ userId, send, proposal, signal, timeoutMs =
   } finally {
     signal?.removeEventListener('abort', abort);
     collector?.stop('finished');
-    // Failed acknowledgement or removal fails closed before any provider POST.
+    // Failed acknowledgement or removal fails closed before the action starts.
     await message.edit({ ...card('', approved ? 'Got it — starting your request.' : 'I didn’t start it — you cancelled, or the confirmation timed out.'),
       components: [], attachments: [] });
   }

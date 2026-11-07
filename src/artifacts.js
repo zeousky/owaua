@@ -115,18 +115,25 @@ export function exportChart({ title, x_label = '', y_label = '', series, chart_t
 
 export class ArtifactCollector {
   #safety;
-  constructor({ safety = {} } = {}) { this.#safety = safety; }
+  #allowBinary;
+  constructor({ safety = {}, allowBinary = true } = {}) {
+    this.#safety = safety;
+    this.#allowBinary = allowBinary;
+  }
   #files = [];
   #hashes = new Set();
   #total = 0;
   #warnings = new Set();
   #pythonExports = new Map();
-  add(artifact, safety = this.#safety) {
+  add(artifact, safety = this.#safety, { renderedLocally = false } = {}) {
     if (!artifact || !Buffer.isBuffer(artifact.attachment)) throw invalid();
     const verified = validatedArtifact(artifact.name, artifact.attachment, 'base64');
     assertSafeText(verified.name, safety);
     if (verified.contentType.startsWith('text/') || verified.contentType === 'application/json') {
       assertSafeText(new TextDecoder('utf-8', { fatal: true }).decode(verified.attachment), safety);
+    } else if (!this.#allowBinary && !renderedLocally) {
+      this.#warnings.add('Hosted binary exports are unavailable when a private integration is active. Use a text export instead.');
+      return { error: 'Hosted binary exports are unavailable with a private integration.' };
     }
     const hash = createHash('sha256').update(verified.attachment).digest('hex');
     if (this.#hashes.has(hash)) return { filename: this.#files.find(file => file.hash === hash).name, bytes: verified.attachment.length, duplicate: true };
@@ -160,7 +167,7 @@ export class ArtifactCollector {
             const artifact = exportFile({ filename: envelope.filename, content: envelope.base64, encoding: 'base64' });
             if (artifact.contentType !== envelope.mime_type) throw invalid();
             const metadata = this.add(artifact, safety);
-            this.#pythonExports.set(key, metadata.error ? { attached: false, error: 'Export limit reached.' } :
+            this.#pythonExports.set(key, metadata.error ? { attached: false, error: metadata.error } :
               { filename: metadata.filename, bytes: metadata.bytes, attached: true });
           } catch {
             this.#pythonExports.set(key, { attached: false, error: 'Invalid or unsupported export.' });

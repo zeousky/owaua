@@ -14,10 +14,14 @@ test('replying to an image attachment supplies it when no new image is attached'
   assert.deepEqual(requestImages(msg(), ref, 'bot'), ['https://cdn.discordapp.com/cat.png']);
 });
 test('bot image embeds support iterative edits but other users embeds are ignored', () => {
-  const ref = msg([], { author: { id: 'bot' }, embeds: [{ image: { url: 'https://imgen.x.ai/cat.png' } }] });
-  assert.deepEqual(requestImages(msg(), ref, 'bot'), ['https://imgen.x.ai/cat.png']);
+  const generated = 'https://imgen.x.ai/cat.png';
+  const ref = msg([], { author: { id: 'bot' }, embeds: [
+    { image: { url: generated } }, { image: { url: 'https://imgen.x.ai/different.png' } },
+  ] });
+  const isGeneratedMedia = (kind, url) => kind === 'image' && url === generated;
+  assert.deepEqual(requestImages(msg(), ref, 'bot', isGeneratedMedia), [generated]);
   ref.author.id = 'other';
-  assert.deepEqual(requestImages(msg(), ref, 'bot'), []);
+  assert.deepEqual(requestImages(msg(), ref, 'bot', isGeneratedMedia), []);
   assert.deepEqual(requestImages(msg(), undefined, 'bot'), []);
 });
 test('oversize, unsupported, and too many attachments are rejected', () => {

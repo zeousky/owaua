@@ -72,9 +72,9 @@ test('recovery is bounded and its final draft must pass the same output checks',
 
 test('recovery never replays completed tools or executes new tool calls', async () => {
   for (const repairOutput of [final('Already on the clock.'), { output: [
-    { type: 'function_call', name: 'current_time', call_id: 'new', arguments: '{}' },
+    { type: 'function_call', name: 'current_time', call_id: 'new', arguments: '{"timezone":"UTC"}' },
   ] }]) {
-    const f = fixture([{ output: [{ type: 'function_call', name: 'current_time', call_id: 'first', arguments: '{}' }] },
+    const f = fixture([{ output: [{ type: 'function_call', name: 'current_time', call_id: 'first', arguments: '{"timezone":"UTC"}' }] },
       final("You're an idiot"), repairOutput]);
     let executed = 0;
     f.ai.tools.execute = async () => { executed++; return { time: '12:00' }; };
