@@ -20,29 +20,6 @@ Slash commands and the same commands with a dot both work. A dot command does no
 
 The longer tour is in [Using Owaua](docs/USAGE.md).
 
-## Run a copy
-
-You need Node.js 24, a Discord bot token, and an xAI API key. Music also needs FFmpeg and yt-dlp. Calls to xAI are billed to the key you provide
-
-```sh
-git clone https://github.com/zeousky/owaua.git
-cd owaua
-nvm install && nvm use
-npm ci
-cp .env.example .env
-# Fill in DISCORD_TOKEN and XAI_API_KEY in .env before starting.
-npm start
-```
-
-Put `DISCORD_TOKEN` and `XAI_API_KEY` in `.env`. In the Discord developer portal, turn on the Message Content Intent. Invite permissions, Docker, and what the bot stores are in [Self-hosting](docs/SELF_HOSTING.md).
-
-```sh
-npm run check
-npm test
-```
-
-Tests do not need tokens. They use temporary databases and mocked providers. See [Contributing](docs/CONTRIBUTING.md) if you want to change something.
-
 GitHub Actions checks both supported Node versions, production dependencies, and Git history for secrets. Local databases, backups, credentials, and private extensions belong outside Git; the Docker build only includes the runtime source and scripts.
 
 [License](LICENSE) · [Security](docs/SECURITY.md) · [Changelog](CHANGELOG.md) · [Public release checklist](docs/PUBLIC_RELEASE.md)
