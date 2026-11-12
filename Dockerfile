@@ -10,11 +10,11 @@ COPY package*.json ./
 RUN npm ci --omit=dev \
     && groupadd --gid 10001 owaua \
     && useradd --uid 10001 --gid owaua --home-dir /app owaua \
-    && mkdir /app/data && chown owaua:owaua /app/data
+    && mkdir -m 0700 /app/data /app/.owaua && chown owaua:owaua /app/data /app/.owaua
 COPY --chown=owaua:owaua src ./src
 COPY --chown=owaua:owaua scripts ./scripts
 COPY --chown=owaua:owaua BOT_IDENTITY.json ./BOT_IDENTITY.json
 RUN bash scripts/install-terminal-commands.sh --directory /usr/local/bin
 USER owaua
-ENV NODE_ENV=production DATA_DIR=/app/data
+ENV NODE_ENV=production DATA_DIR=/app/data HOME=/app
 CMD ["node", "scripts/owaua-host.js"]

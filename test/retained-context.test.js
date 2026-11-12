@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,7 +40,7 @@ test('reported custom persona and equivalent answer controls cannot be saved or 
     assert.deepEqual(safeContext([{ text: attack }], { retained: true }), []);
   }
   // A community-content exemption cannot waive the retained-context boundary.
-  await withRequestUser('1172433512364769342', async () => {
+  await withRequestUser(OWNER_ID, async () => {
     assert.throws(() => validateCustomPersona(reported), CustomPersonaError);
     assert.throws(() => memoryText(control), SafetyError);
   });

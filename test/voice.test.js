@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -8,7 +9,7 @@ import prism from 'prism-media';
 import { VoiceAPI, VoiceManager, RealtimeVoice, MonoToStereo, VoiceInputError, isAudioAttachment, audioAttachmentUrl } from '../src/voice.js';
 import { voiceErrorMessage, handleSpeakCommand, handleTranscribeCommand } from '../src/voice-command.js';
 import { ProviderError } from '../src/ai.js';
-import { withFullMode, FULL_MODE_OWNER } from '../src/full-mode.js';
+import { withFullMode } from '../src/full-mode.js';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const attachment = { name: 'voice-message.ogg', contentType: 'audio/ogg', size: 5,
@@ -261,9 +262,9 @@ test('voice sessions exclusively receive consenting creator and commit completed
 
 test('owner full mode bypasses shared voice capacity, session and idle caps while preserving creator consent', async () => {
   const f = fixture({ maxSessions: 0, maxSessionMs: 1, idleMs: 1 });
-  f.message.author.id = FULL_MODE_OWNER;
+  f.message.author.id = OWNER_ID;
   try {
-    await withFullMode(FULL_MODE_OWNER, true, () => f.manager.handle(f.message, { action: 'join' }));
+    await withFullMode(OWNER_ID, true, () => f.manager.handle(f.message, { action: 'join' }));
     const session = f.manager.sessions.get('guild');
     assert.equal(session.fullMode, true);
     assert.equal(session.timeout, undefined);

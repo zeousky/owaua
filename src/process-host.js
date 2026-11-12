@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process';
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { createServer as createControlServer, createConnection } from 'node:net';
 import { chmodSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { checkControlDirectory, controlSocketLocation } from './control-socket.js';
 
 const actions = new Set(['start', 'stop', 'restart', 'status']);
 const integer = (value, min, max, label) => {
@@ -41,7 +42,8 @@ export function createProcessHost({ root = process.cwd(), directory, socketPath,
   onEvent = event => console.log(JSON.stringify(event)) } = {}) {
   root = resolve(root);
   directory = resolve(directory ?? env.DATA_DIR ?? join(root, 'data'));
-  socketPath = resolve(socketPath ?? env.OWAUA_CONTROL_SOCKET ?? '/tmp/owaua-control.sock');
+  const socketLocation = controlSocketLocation(env, socketPath);
+  socketPath = socketLocation.path;
   port = integer(port ?? env.PORT ?? 3000, 0, 65535, 'host port');
   childPort = integer(childPort ?? env.OWAUA_BOT_PORT ?? (port === 3001 ? 3002 : 3001), 1, 65535, 'internal bot port');
   if (port === childPort) throw safeError('The host and internal bot ports must differ.');
@@ -237,7 +239,7 @@ export function createProcessHost({ root = process.cwd(), directory, socketPath,
   });
   async function listen() {
     if (listening || closing) throw safeError('The Owaua supervisor cannot be started twice.');
-    mkdirSync(dirname(socketPath), { recursive: true, mode: 0o700 });
+    checkControlDirectory(socketLocation, { create: true });
     await reclaimSocket(socketPath);
     await new Promise((resolveListen, reject) => {
       controlServer.once('error', reject);

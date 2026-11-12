@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,17 +8,35 @@ import { ConversationStore, conversationScope } from '../src/store.js';
 import { handleFullCommand } from '../src/full-command.js';
 import { createCommandHandler } from '../src/command-handler.js';
 import { createPrefixInteraction, parsePrefixCommand, PrefixCommandError } from '../src/prefix-command.js';
-import { FULL_MODE_OWNER, fullModeActive, withFullMode } from '../src/full-mode.js';
+import { fullModeActive, withFullMode } from '../src/full-mode.js';
 import { UsageStore, RequestLimiter, DEFAULT_USAGE_LIMITS } from '../src/usage.js';
 import { AICore } from '../src/ai.js';
+import { configuredOwnerId, isOwner } from '../src/owner.js';
 
-const alice = '1172433512364769342', bob = '222222222222222222';
+const alice = OWNER_ID, bob = '222222222222222222';
 function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'owaua-full-mode-'));
   let store = new ConversationStore(directory);
   t.after(() => { store.close(); rmSync(directory, { recursive: true, force: true }); });
   return { get store() { return store; }, reopen() { store.close(); store = new ConversationStore(directory); } };
 }
+
+test('owner privilege requires a valid deployment-configured Discord identity', t => {
+  assert.equal(configuredOwnerId({}), undefined);
+  assert.equal(configuredOwnerId({ OWAUA_OWNER_ID: '' }), undefined);
+  assert.equal(configuredOwnerId({ OWAUA_OWNER_ID: OWNER_ID }), OWNER_ID);
+  assert.throws(() => configuredOwnerId({ OWAUA_OWNER_ID: 'not-a-user-id' }), /Discord user ID/);
+  assert.equal(isOwner(OWNER_ID), true);
+  assert.equal(isOwner(bob), false);
+  const prior = process.env.OWAUA_OWNER_ID;
+  t.after(() => { process.env.OWAUA_OWNER_ID = prior; });
+  delete process.env.OWAUA_OWNER_ID;
+  const { store } = fixture(t);
+  store.db.prepare('INSERT INTO reply_settings(user_id,full_mode) VALUES(?,1)').run(OWNER_ID);
+  assert.equal(store.fullMode(OWNER_ID), false);
+  assert.equal(isOwner(undefined), false);
+  withFullMode(OWNER_ID, true, () => assert.equal(fullModeActive(), false));
+});
 
 test('full mode defaults off, persists per user and preserves persona, language and conversation', t => {
   const f = fixture(t);
@@ -98,7 +117,7 @@ test('non-owners cannot trigger full mode through commands or stale saved settin
 });
 
 test('full mode is an actor-bound asynchronous capability isolated from other users', async () => {
-  await Promise.all([withFullMode(FULL_MODE_OWNER, true, async () => {
+  await Promise.all([withFullMode(OWNER_ID, true, async () => {
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(fullModeActive(), true);
     assert.equal(fullModeActive(bob), false);
@@ -109,7 +128,7 @@ test('full mode is an actor-bound asynchronous capability isolated from other us
     assert.equal(fullModeActive(), false);
   })]);
   assert.equal(fullModeActive(), false);
-  withFullMode(FULL_MODE_OWNER, false, () => assert.equal(fullModeActive(), false));
+  withFullMode(OWNER_ID, false, () => assert.equal(fullModeActive(), false));
 });
 
 test('owner full mode bypasses every request/voice quota, burst, cooldown and shared capacity without consuming others allowances', t => {

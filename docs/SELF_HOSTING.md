@@ -14,11 +14,13 @@ A copy of Owaua needs your own Discord application and your own xAI account. Thi
 ```sh
 nvm install && nvm use
 npm ci
-cp .env.example .env
-npm start
+if [ ! -e .env ]; then
+  (umask 077 && set -C && cat .env.example > .env)
+fi
+chmod 600 .env
 ```
 
-Fill in `DISCORD_TOKEN` and `XAI_API_KEY`. Leave everything else until you want to change a limit. `XAI_MODEL` defaults to `grok-4.7`. `XAI_REASONING_EFFORT` defaults to `low`.
+Fill in `DISCORD_TOKEN` and `XAI_API_KEY`, then run `npm start`. Set `OWAUA_OWNER_ID` if you want owner-only controls. `XAI_MODEL` defaults to `grok-4.7` and `XAI_REASONING_EFFORT` defaults to `low`.
 
 Invite the bot with the `bot` and `applications.commands` scopes. It needs permission to view channels, send messages, read message history, attach files, embed links, connect, and speak. Music also needs to see the voice channel.
 
@@ -37,7 +39,7 @@ docker build -t owaua .
 docker run --env-file .env -v owaua-data:/app/data -p 127.0.0.1:3000:3000 owaua
 ```
 
-The data directory inside the container is `/app/data`. Keep that volume. It holds the conversation database and the document-library index.
+The data directory inside the container is `/app/data`. Keep that volume. It holds the conversation database and the document-library index. Use a data directory the bot account can write without granting write access to other local accounts.
 
 The release workflow publishes containers to `ghcr.io/<owner>/<repository>`, with version tags and `latest`. For `v1.0.0`, it also assigns `side-a`. Package visibility is separate from repository visibility, so a public source repository does not guarantee anonymous image pulls. Build from source above if a release image is unavailable.
 
@@ -52,6 +54,7 @@ The release workflow publishes containers to `ghcr.io/<owner>/<repository>`, wit
 | `MCP_SERVERS_JSON` | Extra read-only MCP integrations, chosen by label. Put any token in its own environment variable, not in this JSON and not in a Discord message. |
 | `DATA_DIR` | Where SQLite files live. Defaults to `./data`. |
 | `PORT` | Health port for `npm start`. Defaults to 3000. |
+| `OWAUA_CONTROL_SOCKET` | Overrides the managed host's Unix socket. Choose a path in a directory owned by the bot account with mode `0700`. The default is `.owaua/control.sock` under the bot account's home. |
 
 The rest of `.env.example` is limits: output length, how many requests can run at once, daily and per-minute allowances, and voice caps. Set a real spending limit on the xAI account as well. These numbers only count requests.
 
@@ -67,7 +70,7 @@ People's prompts and attachments are sent to xAI. Saved documents stay there unt
 
 ## Owner commands
 
-A few controls, including `.full` and looking up another person's usage, are limited to one Discord account written in the source. On a fork, that account is not you. Search for the owner id and replace it with your own before you depend on those commands. Do not publish your token or your users' databases while you do that.
+Set `OWAUA_OWNER_ID` to the Discord user ID you want to grant access to `.full`, quota exemptions, and usage filters for other users and servers. Leave it empty to disable owner privileges on your installation.
 
 ## A local backup process on a Mac
 

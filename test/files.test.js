@@ -1,7 +1,8 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { DocumentInputs, DocumentInputError, isDocumentAttachment } from '../src/files.js';
-import { FULL_MODE_OWNER, withFullMode } from '../src/full-mode.js';
+import { withFullMode } from '../src/full-mode.js';
 
 const document = (name = 'notes.txt', extras = {}) => ({
   name, url: `https://cdn.discordapp.com/attachments/1/2/${name}?ex=signature`, size: 4,
@@ -157,7 +158,7 @@ for (const fullMode of [false, true]) test(`uploads concurrently with bounded wo
     active--;
     return json({ id: `file_${name.split('.')[0]}` });
   } });
-  const pending = withFullMode(FULL_MODE_OWNER, fullMode, () => client.upload(names.map(name => document(name))));
+  const pending = withFullMode(OWNER_ID, fullMode, () => client.upload(names.map(name => document(name))));
   try {
     await initialUploads.promise;
     assert.deepEqual(started, names.slice(0, 3));

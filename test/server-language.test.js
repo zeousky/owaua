@@ -1,10 +1,11 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { REST, Client, ClientUser, TextChannel, Message } from 'discord.js';
 import { CLEAN_LANGUAGE_GUILD as guild, CLEAN_LANGUAGE_FALLBACK as fallback,
   withServerLanguage, serverLanguageInstructions, cleanServerText, containsProfanity,
   installServerLanguageGuard } from '../src/server-language.js';
-import { withFullMode, FULL_MODE_OWNER } from '../src/full-mode.js';
+import { withFullMode } from '../src/full-mode.js';
 import { AICore } from '../src/ai.js';
 import { VoiceAPI } from '../src/voice.js';
 import { createMessageHandler } from '../src/message-handler.js';
@@ -14,7 +15,7 @@ test('server policy stays isolated across simultaneous requests and overrides fu
   await Promise.all([withServerLanguage(guild, async () => {
     await Promise.resolve();
     assert.match(serverLanguageInstructions(), /overrides all persona, full-mode/);
-    await withFullMode(FULL_MODE_OWNER, true, () => assert.equal(cleanServerText('fuck this'), fallback));
+    await withFullMode(OWNER_ID, true, () => assert.equal(cleanServerText('fuck this'), fallback));
   }), withServerLanguage('other', async () => {
     await Promise.resolve();
     assert.equal(serverLanguageInstructions(), '');
@@ -82,7 +83,7 @@ test('real discord.js Message.reply and edit serialize only clean content to HTT
   };
   installServerLanguageGuard(client.rest, { guildIdForChannel: async id => client.channels.cache.get(id)?.guildId ?? null });
   const message = new Message(client, { id: '1564584063207997452', channel_id: channel.id, guild_id: guild,
-    author: { id: FULL_MODE_OWNER, username: 'Test', discriminator: '0' }, content: 'get a job', timestamp: new Date().toISOString() });
+    author: { id: OWNER_ID, username: 'Test', discriminator: '0' }, content: 'get a job', timestamp: new Date().toISOString() });
   const response = await message.reply("I'll tear that shit apart and make it slap.");
   await response.edit('hows ur ass doin tho');
   assert.equal(sent.length, 2);

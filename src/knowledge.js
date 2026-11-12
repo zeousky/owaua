@@ -1,15 +1,25 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, chmodSync } from 'node:fs';
-import { join } from 'node:path';
-import { createHash } from 'node:crypto';
+import { extname } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { isDocumentAttachment } from './files.js';
 import { ProviderError } from './ai.js';
 import { fullModeActive } from './full-mode.js';
+import { openPrivateDatabase } from './private-storage.js';
 
 const MiB = 1024 * 1024;
 const FILE_ID = /^file[-_][A-Za-z0-9_-]{1,200}$/;
 const COLLECTION_ID = /^collection[-_][A-Za-z0-9_-]{1,200}$/;
 const HOSTS = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
+const DURABLE_LIMITS = {
+  user: { documents: 80, bytes: 160 * MiB },
+  guild: { documents: 400, bytes: 800 * MiB },
+  bot: { documents: 2000, bytes: 4000 * MiB },
+};
+const REJECTED_UPLOAD_STATUSES = new Set([400, 401, 403, 404, 413, 415, 422, 429]);
+const UPLOAD_RECOVERY_GRACE_MS = 60000;
+const UPLOAD_RECOVERY_RETRY_MS = 600000;
+const UPLOAD_RECOVERY_BATCH = 4;
+const UPLOAD_RECOVERY_PAGE_SIZE = 20;
+const UPLOAD_RECOVERY_EMPTY_CONFIRMATIONS = 3;
 export class KnowledgeError extends Error {}
 
 export function knowledgeFilename(value) {
@@ -20,6 +30,12 @@ export function knowledgeFilename(value) {
 function validScope(scope) {
   if (typeof scope !== 'string' || !scope.length || scope.length > 200 || /[\x00-\x1f]/.test(scope)) throw new KnowledgeError('Invalid knowledge library scope.');
   return scope;
+}
+
+function uploadFilename(filename) {
+  const extension = extname(filename);
+  const stem = filename.slice(0, filename.length - extension.length).slice(0, 60).toWellFormed();
+  return `owaua-${randomUUID().replaceAll('-', '')}-${stem}${extension.slice(0, 16).toWellFormed()}`;
 }
 
 function attachmentUrl(attachment) {
@@ -70,17 +86,21 @@ async function downloadBody(response, limit, signal) {
 export class KnowledgeLibrary {
   constructor({ directory, apiKey, managementApiKey, fetchImpl = fetch, timeoutMs = 60000,
     maxDocuments = 20, maxFileBytes = 20 * MiB, maxLibraryBytes = 40 * MiB,
-    maxInputFiles = 20, maxInputBytes = 40 * MiB,
+    maxInputFiles = 20, maxInputBytes = 40 * MiB, durableLimits = DURABLE_LIMITS, now = Date.now,
     onCleanupFailure = () => {} } = {}) {
+    for (const key of ['user', 'guild', 'bot']) {
+      const { documents, bytes } = durableLimits[key] ?? {};
+      if (!Number.isSafeInteger(documents) || documents < 1 || !Number.isSafeInteger(bytes) || bytes < 1) {
+        throw new TypeError('Invalid durable knowledge limit');
+      }
+    }
     Object.assign(this, { apiKey, managementApiKey, fetchImpl, timeoutMs, maxDocuments,
-      maxFileBytes, maxLibraryBytes, maxInputFiles, maxInputBytes, onCleanupFailure });
+      maxFileBytes, maxLibraryBytes, maxInputFiles, maxInputBytes, now, onCleanupFailure });
+    this.durableLimits = structuredClone(durableLimits);
     this.pending = new Map();
     this.closed = false;
-    mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const filename = join(directory, 'knowledge.sqlite');
-    this.db = new DatabaseSync(filename);
-    chmodSync(filename, 0o600);
-    this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
+    this.db = openPrivateDatabase(directory, 'knowledge.sqlite');
+    this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS knowledge_files (
         id INTEGER PRIMARY KEY AUTOINCREMENT, scope TEXT NOT NULL,
         file_id TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, bytes INTEGER NOT NULL,
@@ -89,7 +109,13 @@ export class KnowledgeLibrary {
       CREATE INDEX IF NOT EXISTS knowledge_scope ON knowledge_files(scope, id);
       CREATE TABLE IF NOT EXISTS knowledge_collections (
         scope TEXT PRIMARY KEY, collection_id TEXT NOT NULL UNIQUE
-      );`);
+      );
+      CREATE TABLE IF NOT EXISTS knowledge_uploads (
+        provider_name TEXT PRIMARY KEY, scope TEXT NOT NULL, bytes INTEGER NOT NULL,
+        file_id TEXT, retry_at INTEGER NOT NULL, cleanup INTEGER NOT NULL DEFAULT 0,
+        empty_checks INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS knowledge_upload_retry ON knowledge_uploads(retry_at);`);
   }
 
   isActive(scope) { return this.pending.has(scope); }
@@ -120,12 +146,97 @@ export class KnowledgeLibrary {
     return this.db.prepare('SELECT * FROM knowledge_files WHERE scope = ? ORDER BY id DESC').all(scope);
   }
 
+  #checkUploadQuota(scope, bytes) {
+    const [guild, , user] = scope.split(':');
+    const guildPrefix = user && guild !== 'dm' ? guild + ':' : null;
+    const usage = this.db.prepare(`WITH
+      target(scope, actor_suffix, guild_prefix) AS (VALUES (?, ?, ?)),
+      durable(scope, bytes) AS (
+        SELECT scope, bytes FROM knowledge_files
+        UNION ALL
+        SELECT scope, bytes FROM knowledge_uploads
+      ),
+      usage AS (
+        SELECT bytes,
+          durable.scope = target.scope AS same_scope,
+          durable.scope = target.scope OR substr(durable.scope, -length(actor_suffix)) = actor_suffix AS same_user,
+          substr(durable.scope, 1, length(guild_prefix)) = guild_prefix AS same_guild
+        FROM durable, target
+      )
+      SELECT
+        count(*) FILTER (WHERE same_scope) AS scope_documents,
+        coalesce(sum(bytes) FILTER (WHERE same_scope), 0) AS scope_bytes,
+        count(*) FILTER (WHERE same_user) AS user_documents,
+        coalesce(sum(bytes) FILTER (WHERE same_user), 0) AS user_bytes,
+        count(*) FILTER (WHERE same_guild) AS guild_documents,
+        coalesce(sum(bytes) FILTER (WHERE same_guild), 0) AS guild_bytes,
+        count(*) AS bot_documents,
+        coalesce(sum(bytes), 0) AS bot_bytes
+      FROM usage`).get(scope, `:${user ?? scope}`, guildPrefix);
+    const fullMode = fullModeActive();
+    if (!fullMode && usage.scope_documents >= this.maxDocuments) {
+      throw new KnowledgeError(`Your library here is full (${this.maxDocuments} documents). Use /knowledge forget or clear first.`);
+    }
+    if (!fullMode && usage.scope_bytes + bytes > this.maxLibraryBytes) {
+      throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
+    }
+    for (const [key, label] of [['user', 'Your'], ['guild', 'This server’s'], ['bot', 'The bot’s']]) {
+      if (key === 'guild' && !guildPrefix) continue;
+      const limit = this.durableLimits[key];
+      if (usage[`${key}_documents`] >= limit.documents || usage[`${key}_bytes`] + bytes > limit.bytes) {
+        throw new KnowledgeError(`${label} saved-document storage limit is reached. Remove saved documents before uploading more.`);
+      }
+    }
+  }
+
+  #transaction(operation) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = operation();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      try { this.db.exec('ROLLBACK'); } catch {}
+      throw error;
+    }
+  }
+
+  #reserveUpload(scope, providerName, bytes) {
+    this.#transaction(() => {
+      this.#checkUploadQuota(scope, bytes);
+      const retryAt = this.now() + this.timeoutMs + UPLOAD_RECOVERY_GRACE_MS;
+      this.db.prepare('INSERT INTO knowledge_uploads(provider_name, scope, bytes, retry_at) VALUES (?, ?, ?, ?)')
+        .run(providerName, scope, bytes, retryAt);
+    });
+  }
+
+  #releaseUpload(providerName) {
+    this.db.prepare('DELETE FROM knowledge_uploads WHERE provider_name = ?').run(providerName);
+  }
+
+  #rememberUploadId(providerName, fileId) {
+    this.db.prepare('UPDATE knowledge_uploads SET file_id = ? WHERE provider_name = ?').run(fileId, providerName);
+  }
+
+  #saveUpload(providerName, fileId, filename) {
+    return this.#transaction(() => {
+      const upload = this.db.prepare('SELECT scope, bytes FROM knowledge_uploads WHERE provider_name = ? AND cleanup = 0')
+        .get(providerName);
+      if (!upload) throw new KnowledgeError('That document upload was interrupted. Please try again.');
+      const { scope, bytes } = upload;
+      const result = this.db.prepare('INSERT INTO knowledge_files(scope,file_id,filename,bytes,created_at) VALUES(?,?,?,?,?)')
+        .run(scope, fileId, filename, bytes, this.now());
+      this.#releaseUpload(providerName);
+      return { id: Number(result.lastInsertRowid), file_id: fileId, filename, bytes, index_status: 'unindexed' };
+    });
+  }
+
   list(scope) {
     this.#assertOpen();
     return this.#rows(validScope(scope)).map(({ id, filename, bytes, created_at, index_status }) => ({ id, filename, bytes, created_at, index_status }));
   }
 
-  async #request(path, { method = 'GET', body, management = false, signal, allowMissing = false } = {}) {
+  async #request(path, { method = 'GET', body, management = false, signal, allowMissing = false, confirmDelete = false } = {}) {
     signal.throwIfAborted();
     const response = await this.fetchImpl(`${management ? 'https://management-api.x.ai/v1' : 'https://api.x.ai/v1'}${path}`, {
       method, redirect: 'error', signal,
@@ -139,7 +250,7 @@ export class KnowledgeLibrary {
       throw new ProviderError(response.status, 'knowledge_request_failed');
     }
     // DELETE endpoints can return an empty response.
-    if (method === 'DELETE') { await response.body?.cancel().catch(() => {}); return true; }
+    if (method === 'DELETE' && !confirmDelete) { await response.body?.cancel().catch(() => {}); return true; }
     return response.json();
   }
 
@@ -162,6 +273,82 @@ export class KnowledgeLibrary {
 
   #cleanupFailed() {
     try { Promise.resolve(this.onCleanupFailure(1)).catch(() => {}); } catch {}
+  }
+
+  async #deleteUncommittedFile(fileId, signal) {
+    // A duplicate or stale provider ID must never remove a committed document.
+    if (!FILE_ID.test(fileId)) throw new ProviderError(502, 'knowledge_cleanup_unconfirmed');
+    if (this.db.prepare('SELECT 1 FROM knowledge_files WHERE file_id = ?').get(fileId)) return;
+    const result = await this.#request(`/files/${fileId}`, {
+      method: 'DELETE', signal, allowMissing: true, confirmDelete: true,
+    });
+    if (result !== null && (result?.deleted !== true || (result.id != null && result.id !== fileId))) {
+      throw new ProviderError(502, 'knowledge_cleanup_unconfirmed');
+    }
+  }
+
+  async #findUncommittedFiles(upload, signal) {
+    // xAI's name filter is fuzzy. Use only exact matches of the generated
+    // upload name and recorded byte count as cleanup candidates.
+    const query = new URLSearchParams({
+      limit: String(UPLOAD_RECOVERY_PAGE_SIZE),
+      filter: `name:${JSON.stringify(upload.provider_name)}`,
+    });
+    const ids = new Set();
+    for (let page = 0; page < 2; page++) {
+      const { data, pagination_token: cursor } = await this.#request(`/files?${query}`, { signal });
+      if (!Array.isArray(data) || data.length > UPLOAD_RECOVERY_PAGE_SIZE) break;
+      for (const file of data) {
+        if (file?.filename !== upload.provider_name) continue;
+        if (file.bytes !== upload.bytes || typeof file.id !== 'string' || !FILE_ID.test(file.id)) {
+          throw new ProviderError(502, 'knowledge_cleanup_unconfirmed');
+        }
+        ids.add(file.id);
+      }
+      // The Files API returns a token even on the last page. A short page marks the end.
+      if (data.length < UPLOAD_RECOVERY_PAGE_SIZE) return ids;
+      if (typeof cursor !== 'string' || !cursor.length || cursor.length > 1024 || cursor === query.get('pagination_token')) break;
+      query.set('pagination_token', cursor);
+    }
+    throw new ProviderError(502, 'knowledge_cleanup_unconfirmed');
+  }
+
+  recoverUploads({ signal: callerSignal } = {}) {
+    if (this.closed) return Promise.resolve();
+    if (this.recovery) return this.recovery;
+    const signal = callerSignal
+      ? AbortSignal.any([callerSignal, AbortSignal.timeout(10000)])
+      : AbortSignal.timeout(10000);
+    this.recovery = this.#recoverUploads(signal).finally(() => { this.recovery = undefined; });
+    return this.recovery;
+  }
+
+  async #recoverUploads(signal) {
+    const now = this.now();
+    const due = this.db.prepare('SELECT * FROM knowledge_uploads WHERE retry_at <= ? ORDER BY retry_at LIMIT ?')
+      .all(now, UPLOAD_RECOVERY_BATCH);
+    const claim = this.db.prepare('UPDATE knowledge_uploads SET cleanup = 1, retry_at = ? WHERE provider_name = ? AND retry_at <= ?');
+    for (const upload of due) {
+      if (signal.aborted) return;
+      if (!claim.run(now + UPLOAD_RECOVERY_RETRY_MS, upload.provider_name, now).changes) continue;
+      try {
+        const ids = upload.file_id ? [upload.file_id] : [...await this.#findUncommittedFiles(upload, signal)];
+        if (!ids.length) {
+          // Confirm absence across complete list responses spaced apart by the
+          // retry interval. A failed or incomplete lookup never counts.
+          if (upload.empty_checks + 1 >= UPLOAD_RECOVERY_EMPTY_CONFIRMATIONS) {
+            this.#releaseUpload(upload.provider_name);
+          } else {
+            this.db.prepare('UPDATE knowledge_uploads SET empty_checks=empty_checks+1 WHERE provider_name=?')
+              .run(upload.provider_name);
+          }
+          continue;
+        }
+        if (!upload.file_id && ids.length === 1) this.#rememberUploadId(upload.provider_name, ids[0]);
+        for (const id of ids) await this.#deleteUncommittedFile(id, signal);
+        this.#releaseUpload(upload.provider_name);
+      } catch { this.#cleanupFailed(); }
+    }
   }
 
   async #index(scope, row, signal) {
@@ -200,11 +387,8 @@ export class KnowledgeLibrary {
     return this.#serialized(scope, async () => {
       if (!isDocumentAttachment(attachment)) throw new KnowledgeError('Attach a PDF, text, or code document directly to Discord.');
       const url = attachmentUrl(attachment);
-      const existing = this.#rows(scope);
-      if (!fullModeActive() && existing.length >= this.maxDocuments) throw new KnowledgeError(`Your library here is full (${this.maxDocuments} documents). Use /knowledge forget or clear first.`);
-      const storedBytes = existing.reduce((sum, row) => sum + row.bytes, 0);
       if (Number.isFinite(attachment.size) && attachment.size > this.maxFileBytes) throw new KnowledgeError('Each library document must be no larger than 20 MiB.');
-      if (!fullModeActive() && Number.isFinite(attachment.size) && storedBytes + attachment.size > this.maxLibraryBytes) throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
+      this.#checkUploadQuota(scope, Number.isSafeInteger(attachment.size) ? Math.max(0, attachment.size) : 0);
       const signal = this.#signal(callerSignal);
       const response = await this.fetchImpl(url, { redirect: 'error', signal });
       if (!response.ok) {
@@ -212,24 +396,45 @@ export class KnowledgeLibrary {
         throw new KnowledgeError('I could not download that document. Please attach it again.');
       }
       const { blob, bytes } = await downloadBody(response, this.maxFileBytes, signal);
-      if (!fullModeActive() && storedBytes + bytes > this.maxLibraryBytes) throw new KnowledgeError('Your library here can hold up to 40 MiB in total. Remove a document with /knowledge forget first.');
       const filename = knowledgeFilename(attachment.name ?? attachment.filename);
       const mime = filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain';
+      const providerName = uploadFilename(filename);
       const body = new FormData();
       body.append('purpose', 'assistants');
-      body.append('file', new Blob([blob], { type: mime }), filename);
-      const uploaded = await this.#request('/files', { method: 'POST', body, signal });
-      if (typeof uploaded.id !== 'string' || !FILE_ID.test(uploaded.id)) throw new ProviderError(502, 'invalid_knowledge_upload');
-      let row;
+      body.append('file', new Blob([blob], { type: mime }), providerName);
+      const uploadSignal = fullModeActive() ? AbortSignal.any([signal, AbortSignal.timeout(this.timeoutMs)]) : signal;
+      uploadSignal.throwIfAborted();
+      this.#reserveUpload(scope, providerName, bytes);
+      let row, fileId;
+      if (uploadSignal.aborted) {
+        this.#releaseUpload(providerName);
+        uploadSignal.throwIfAborted();
+      }
       try {
+        const uploaded = await this.#request('/files', { method: 'POST', body, signal: uploadSignal });
+        if (typeof uploaded?.id !== 'string' || !FILE_ID.test(uploaded.id) ||
+            (uploaded.filename != null && uploaded.filename !== providerName) ||
+            (uploaded.bytes != null && uploaded.bytes !== bytes)) {
+          throw new ProviderError(502, 'invalid_knowledge_upload');
+        }
+        // Only a response that identifies our exact upload may authorize a
+        // rollback by ID. Otherwise recovery will correlate the stored name.
+        if (uploaded.filename === providerName && uploaded.bytes === bytes) fileId = uploaded.id;
         if (uploaded.expires_at != null) throw new KnowledgeError('The provider returned an expiring file. It was not saved to your permanent library.');
-        signal.throwIfAborted();
-        const result = this.db.prepare('INSERT INTO knowledge_files(scope,file_id,filename,bytes,created_at) VALUES(?,?,?,?,?)')
-          .run(scope, uploaded.id, filename, bytes, Date.now());
-        row = { id: Number(result.lastInsertRowid), file_id: uploaded.id, filename, bytes, index_status: 'unindexed' };
+        uploadSignal.throwIfAborted();
+        row = this.#saveUpload(providerName, uploaded.id, filename);
       } catch (error) {
-        try { await this.#request(`/files/${uploaded.id}`, { method: 'DELETE', signal: AbortSignal.timeout(10000), allowMissing: true }); }
-        catch { this.#cleanupFailed(); }
+        if (fileId) {
+          try {
+            this.#rememberUploadId(providerName, fileId);
+            await this.#deleteUncommittedFile(fileId, AbortSignal.timeout(10000));
+            this.#releaseUpload(providerName);
+          } catch { this.#cleanupFailed(); }
+        } else if (error instanceof ProviderError && REJECTED_UPLOAD_STATUSES.has(error.status)) {
+          this.#releaseUpload(providerName);
+        } else {
+          this.#cleanupFailed();
+        }
         throw error;
       }
       // The durable save is already complete. An indexing timeout must not make
@@ -321,7 +526,7 @@ export class KnowledgeLibrary {
   close() {
     if (this.closePromise) return this.closePromise;
     this.closed = true;
-    return this.closePromise = Promise.allSettled([...this.pending.values()]).then(() => {
+    return this.closePromise = Promise.allSettled([...this.pending.values(), this.recovery]).then(() => {
       try { this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } finally { this.db.close(); }
     });
   }

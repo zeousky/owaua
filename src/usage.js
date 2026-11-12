@@ -1,8 +1,6 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { mediaDay } from './media-store.js';
 import { fullModeActive } from './full-mode.js';
+import { openPrivateDatabase } from './private-storage.js';
 
 export const DEFAULT_USAGE_LIMITS = {
   daily: { user: 60, server: 300, bot: 1000 },
@@ -29,10 +27,9 @@ export class UsageStore {
     for (const window of ['daily', 'minute', 'voice']) for (const scope of ['user', 'server', 'bot']) {
       if (!Number.isSafeInteger(limits[window]?.[scope]) || limits[window][scope] < 1) throw new Error('Invalid usage limits');
     }
-    mkdirSync(directory, { recursive: true });
     this.now = now;
     this.limits = structuredClone(limits);
-    this.db = new DatabaseSync(join(directory, 'kirmy.sqlite'));
+    this.db = openPrivateDatabase(directory, 'kirmy.sqlite');
     this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS usage_admissions (
         id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, guild_id TEXT NOT NULL,

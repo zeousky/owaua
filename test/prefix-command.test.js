@@ -1,11 +1,11 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { commands } from '../src/commands.js';
 import { parsePrefixCommand, createPrefixInteraction, PrefixCommandError, PrefixPrivateReplyError } from '../src/prefix-command.js';
 import { createCommandHandler } from '../src/command-handler.js';
 import { conversationScope } from '../src/store.js';
 import { DEFAULT_PERSONA } from '../src/persona.js';
-import { MEDIA_OWNER } from '../src/media-store.js';
 
 const actor = '111111111111111111';
 const file = (id, name, contentType) => ({ id, name, contentType, size: 12, url: `https://cdn.discordapp.com/attachments/1/2/${name}` });
@@ -192,6 +192,8 @@ for (const route of routes) {
     }
     if (/^\.(speak|transcribe|knowledge (add|forget|clear)|voice join)/.test(route)) assert.ok(calls.some(call => call[0] === 'standalone'));
     if (route === '.voice join') assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { voice: true });
+    if (route === '.voice voices') assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { voice: false });
+    if (route === '.voice leave' || route === '.voice status') assert.ok(!calls.some(call => call[0] === 'standalone'));
     if (route.startsWith('.knowledge ') && !route.endsWith('list')) assert.deepEqual(calls.find(call => call[0] === 'standalone')[2], { charge: route === '.knowledge add' });
     if (route === '.usage') assert.deepEqual(calls.at(-1), ['usage', { userId: actor, guildId: undefined }]);
   });
@@ -223,7 +225,7 @@ test('original channel scope, owner authorization and busy guards survive DM del
   assert.deepEqual(calls.at(-1), ['remember', scope, actor]);
   await handler(event('.knowledge add'));
   assert.ok(calls.some(call => call[0] === 'add' && call[1] === scope && call[2] === files[1]));
-  await handler(event(`.usage user:<@${actor}> server:123456789012345678`, { userId: MEDIA_OWNER }));
+  await handler(event(`.usage user:<@${actor}> server:123456789012345678`, { userId: OWNER_ID }));
   assert.deepEqual(calls.at(-1), ['usage', { userId: actor, guildId: '123456789012345678' }]);
   deps.active.add(scope);
   const before = calls.length;

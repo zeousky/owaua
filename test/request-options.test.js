@@ -1,8 +1,8 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { AICore } from '../src/ai.js';
 import { hostedTools, normalizeRequestOptions, RequestOptionsError } from '../src/request-options.js';
-import { FULL_MODE_OWNER } from '../src/full-mode.js';
 
 const final = () => ({ ok: true, json: async () => ({ status: 'completed', output: [
   { type: 'message', content: [{ type: 'output_text', text: 'Answer' }] },
@@ -27,7 +27,7 @@ test('fast reasoning defaults honor configured effort and explicit overrides wit
     const requests = [];
     const ai = new AICore({ model, fetchImpl: async (_, request) => { requests.push(JSON.parse(request.body)); return final(); } });
     await ai.respond({ input: 'Hi' });
-    await ai.respond({ input: 'Hi', fullMode: true, context: { userId: FULL_MODE_OWNER } });
+    await ai.respond({ input: 'Hi', fullMode: true, context: { userId: OWNER_ID } });
     for (const body of requests) {
       assert.deepEqual(body.reasoning, model === 'custom-model' ? undefined : { effort: 'low' });
     }
@@ -39,7 +39,7 @@ test('fast reasoning defaults honor configured effort and explicit overrides wit
   const requests = [];
   const ai = new AICore({ defaultReasoningEffort: 'medium', fetchImpl: async (_, request) => { requests.push(JSON.parse(request.body)); return final(); } });
   await ai.respond({ input: 'Hi' });
-  await ai.respond({ input: 'Solve this carefully', requestOptions: { reasoningEffort: 'xhigh' }, fullMode: true, context: { userId: FULL_MODE_OWNER } });
+  await ai.respond({ input: 'Solve this carefully', requestOptions: { reasoningEffort: 'xhigh' }, fullMode: true, context: { userId: OWNER_ID } });
   assert.deepEqual(requests.map(body => body.reasoning), [{ effort: 'medium' }, { effort: 'xhigh' }]);
   assert.throws(() => new AICore({ defaultReasoningEffort: 'none' }), RequestOptionsError);
   assert.throws(() => new AICore({ model: 'grok-4.5', defaultReasoningEffort: 'xhigh' }), RequestOptionsError);

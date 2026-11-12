@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { LANGUAGE_NAMES } from './language.js';
+import { isOwner } from './owner.js';
 
 // Only the Discord request boundary supplies identity. Prompts, persona data,
 // model arguments and other users cannot grant a content-filter exemption.
@@ -7,7 +8,7 @@ const requestUser = new AsyncLocalStorage();
 export function withRequestUser(userId, callback) {
   return requestUser.run(userId, callback);
 }
-function contentExempt() { return requestUser.getStore() === '1172433512364769342'; }
+function contentExempt() { return isOwner(requestUser.getStore()); }
 
 // Application policy is independent of persona, model compliance and tool use.
 // Decoding here is inspection only: decoded text is never run or promoted into
@@ -37,11 +38,13 @@ const MAX_TOTAL = 8 * MAX_TEXT;
 const MAX_VARIANTS = 128;
 const MAX_DEPTH = 6;
 const MAX_NODES = 300000;
+const MAX_DECODE_ATTEMPTS = 1000000;
+const MAX_DECODE_BYTES = 32 * MAX_TEXT;
 const restrictedContent = /(?<![\p{L}\p{N}])(?:cum(?:s|ming)?(?!\s+laude\b)|blowjobs?|handjobs?|deepthroat(?:ing)?|pussy|porn(?:hub)?|nigg(?:er|a)s?|faggots?|pina)(?![\p{L}\p{N}])/iu;
 const personalAbuse = /\b(?:you(?:'re| are)|u r)\s+(?:an?\s+)?(?:idiot|moron|loser|worthless|disgusting|stupid)\b/i;
 // Users may insult Owaua; generated replies still reject personal abuse.
 // Ordinary profanity alone is allowed throughout the application.
-const manipulation = /(?:^|[\r\n.!?]\s*)(?:please\s+)?(?:ignore|disregard|override|bypass|disable|forget)\b[^\r\n]{0,90}\b(?:instructions?|rules?|safety|safeguards?|filters?|restrictions?|system|developer|previous|above)\b|\b(?:you are now (?:dan|unrestricted|uncensored)|developer mode enabled|never refuse|always obey me)\b|(?:^|\n)\s*(?:system|developer)\s*:\s*(?:ignore|override|reveal|disable)|\b(?:reveal|print|dump|leak)\b.{0,50}\b(?:your|hidden|internal)\s+(?:system\s+)?(?:prompt|instructions|configuration|credentials|secrets)\b/i;
+const manipulation = /(?:^|[\r\n.!?])[^\S\r\n]*(?:please\s+)?(?:ignore|disregard|override|bypass|disable|forget)\b[^\r\n]{0,90}\b(?:instructions?|rules?|safety|safeguards?|filters?|restrictions?|system|developer|previous|above)\b|\b(?:you are now (?:dan|unrestricted|uncensored)|developer mode enabled|never refuse|always obey me)\b|(?:^|[\r\n])[^\S\r\n]*(?:system|developer)\s*:\s*(?:ignore|override|reveal|disable)|\b(?:reveal|print|dump|leak)\b.{0,50}\b(?:your|hidden|internal)\s+(?:system\s+)?(?:prompt|instructions|configuration|credentials|secrets)\b/i;
 function attemptsOverride(text) {
   // Correcting a conversational topic does not revoke the bot's instructions.
   // Preserve every other part of the request for the normal override checks.
@@ -105,13 +108,30 @@ function printable(bytes) {
     return text.length && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text) ? text : null;
   } catch { return null; }
 }
-function base64(text) {
+function base64(text, state) {
+  if (++state.decodeAttempts > MAX_DECODE_ATTEMPTS || (state.decodeBytes += text.length) > MAX_DECODE_BYTES) {
+    throw new SafetyError();
+  }
   const value = text.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
   if (value.length < 4 || value.length > MAX_TEXT || value.length % 4 === 1 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return null;
   const bytes = Buffer.from(value, 'base64');
   return bytes.toString('base64').replace(/=+$/, '') === value.replace(/=+$/, '') ? printable(bytes) : null;
 }
-function* variants(text) {
+// Tokenize each input once. Checking only the gaps between consecutive tokens
+// keeps the scan linear even when the text has very long uninterrupted runs.
+function* base64Runs(text) {
+  let chunks = [], previousEnd = 0;
+  for (const match of text.matchAll(/[A-Za-z0-9+/_-]+={0,2}/g)) {
+    if (chunks.length && !/^\s+$/.test(text.slice(previousEnd, match.index))) {
+      yield chunks;
+      chunks = [];
+    }
+    chunks.push(match[0]);
+    previousEnd = match.index + match[0].length;
+  }
+  if (chunks.length) yield chunks;
+}
+function* variants(text, state) {
   const escaped = text.replace(/\\u\{([a-f0-9]{1,6})\}|\\u([a-f0-9]{4})|\\x([a-f0-9]{2})/gi, (all, wide, unicode, hex) => {
     const point = Number.parseInt(wide ?? unicode ?? hex, 16);
     return point <= 0x10ffff ? String.fromCodePoint(point) : all;
@@ -128,23 +148,24 @@ function* variants(text) {
   if (folded !== text) yield folded;
   // Check text encodings without treating binary files, arbitrary hashes, or
   // every ordinary decode request as prohibited content.
-  for (const match of text.matchAll(/[A-Za-z0-9+/_-]{4,}={0,2}/g)) {
-    const decoded = base64(match[0]);
-    if (decoded) yield decoded;
-  }
-  // Replies may wrap encoded bytes without a quote or an encoding label. Try
-  // bounded adjacent chunk windows as well as the entire run, including when
-  // ordinary surrounding prose shares its alphabet. This is inspection only.
-  let candidates = 0;
-  for (const match of text.matchAll(/[A-Za-z0-9+/_-]+={0,2}(?:\s+[A-Za-z0-9+/_-]+={0,2})+/g)) {
-    const chunks = match[0].split(/\s+/);
-    const whole = base64(match[0]); if (whole) yield whole;
+  // A wrapped value can share a run with surrounding prose. Check single
+  // tokens, the complete run and bounded adjacent windows.
+  for (const chunks of base64Runs(text)) {
+    for (const chunk of chunks) {
+      if (chunk.length < 4) continue;
+      const decoded = base64(chunk, state);
+      if (decoded) yield decoded;
+    }
+    if (chunks.length < 2) continue;
+    const whole = base64(chunks.join(''), state);
+    if (whole) yield whole;
     for (let start = 0; start < chunks.length - 1; start++) {
       let joined = chunks[start];
-      for (let end = start + 1; end < Math.min(chunks.length, start + 16); end++) {
-        if (++candidates > 1000000) throw new SafetyError();
+      const endOfWindow = Math.min(chunks.length, start + 16);
+      for (let end = start + 1; end < endOfWindow && !joined.endsWith('='); end++) {
         joined += chunks[end];
-        const decoded = base64(joined); if (decoded) yield decoded;
+        const decoded = base64(joined, state);
+        if (decoded) yield decoded;
       }
     }
   }
@@ -165,10 +186,10 @@ function* variants(text) {
   }
   // Quoted or line-wrapped base64, including spaces between chunks.
   for (const match of text.matchAll(/[`"']([A-Za-z0-9+/_=\s-]{4,})[`"']|\b(?:base64|b64)\s*[:=]\s*([A-Za-z0-9+/_=\s-]+)/gi)) {
-    const decoded = base64(match[1] ?? match[2]); if (decoded) yield decoded;
+    const decoded = base64(match[1] ?? match[2], state); if (decoded) yield decoded;
   }
   for (const match of text.matchAll(/\bdecode\b\s*(?:(?:this|the|following|text|string|payload|as|from|base64|please)\b[\s:=-]*){0,6}([A-Za-z0-9+/_=-]+(?:\s+[A-Za-z0-9+/_=-]+)*)/gi)) {
-    const decoded = base64(match[1]); if (decoded) yield decoded;
+    const decoded = base64(match[1], state); if (decoded) yield decoded;
   }
   if (/\brot[- ]?13\b/i.test(text)) yield text.replace(/[a-z]/gi, ch => String.fromCharCode(ch.charCodeAt(0) + (ch.toLowerCase() <= 'm' ? 13 : -13)));
   if (/\b(?:reverse|backwards)\b/i.test(text)) yield [...text].reverse().join('');
@@ -220,7 +241,7 @@ function inspect(text, options, state, depth = 0, chain = { count: 0 }) {
   for (const privateText of options.privateText ?? []) {
     for (const line of privateText.split('\n')) if (line.length >= 100 && text.includes(line)) throw new SafetyError();
   }
-  for (const variant of variants(text)) {
+  for (const variant of variants(text, state)) {
     const value = typeof variant === 'string' ? variant : variant.text;
     // A JSON field is a separately bounded piece of data, rather than another
     // recursive decoding of every sibling. Large ordinary lists remain usable.
@@ -229,11 +250,11 @@ function inspect(text, options, state, depth = 0, chain = { count: 0 }) {
   }
 }
 export function assertSafeText(text, options = {}) {
-  inspect(text, options, { seen: new Set(), count: 0, total: 0, secrets: secretsFor(options) });
+  inspect(text, options, { seen: new Set(), total: 0, decodeAttempts: 0, decodeBytes: 0, secrets: secretsFor(options) });
   return text;
 }
 export function assertSafeValue(value, options = {}) {
-  const state = { seen: new Set(), count: 0, total: 0, secrets: secretsFor(options) };
+  const state = { seen: new Set(), total: 0, decodeAttempts: 0, decodeBytes: 0, secrets: secretsFor(options) };
   const visited = new Set(); let nodes = 0;
   const visit = item => {
     if (++nodes > MAX_NODES) throw new SafetyError();

@@ -1,4 +1,5 @@
 import { registerArtifactTools } from './artifacts.js';
+import { MEMORY_REVISION_LIMIT } from './memory.js';
 
 // Add explicitly permitted functions here; model calls never execute local code.
 export class ToolRegistry {
@@ -55,7 +56,7 @@ export function createTools() {
     try { return context.memory.remember({ key, text }); }
     catch (error) {
       const safe = ['Memory is paused', 'Memory must quote the current user message', 'Memory update limit reached',
-        'Memory is full; forget a note first', 'Invalid memory key', 'Invalid memory text', 'Do not save credentials in memory'];
+        'Memory is full; forget a note first', MEMORY_REVISION_LIMIT, 'Invalid memory key', 'Invalid memory text', 'Do not save credentials in memory'];
       if (!safe.includes(error.message)) throw error;
       return { saved: false, error: error.message };
     }

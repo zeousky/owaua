@@ -1,5 +1,5 @@
 import './runtime.js';
-import 'dotenv/config';
+import './secure-environment.js';
 import { installServerLanguageGuard, cleanServerText, serverLanguageInstructions, cleanLanguageRequired } from './server-language.js';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
@@ -30,7 +30,7 @@ import { resultReply, deliverResultReply } from './reply.js';
 import { assertSafeValue, assertSafeText, assertSafeChatInput, requestSafetyInstructions, SafetyError, withRequestUser } from './safety.js';
 import { limitReplyLength, stripEmojis, REPLY_STYLE_INSTRUCTIONS } from './reply-style.js';
 import { loadLocalExtension } from './local-extension.js';
-import { MEDIA_OWNER } from './media-store.js';
+import { configuredOwnerId } from './owner.js';
 import { UsageStore, RequestLimiter, UsageLimitError, usageLimitsFromEnv } from './usage.js';
 import { withFullMode, fullModeActive } from './full-mode.js';
 
@@ -42,6 +42,7 @@ function integer(name, fallback, min, max) {
 for (const name of ['DISCORD_TOKEN', 'XAI_API_KEY']) {
   if (!process.env[name]) throw new Error(`Missing required environment variable: ${name}`);
 }
+const ownerId = configuredOwnerId();
 const dataDirectory = process.env.DATA_DIR ?? './data';
 const store = new ConversationStore(dataDirectory, integer('MAX_CONTEXT_TURNS', 16, 1, 50), {
   archiveTurns: integer('MAX_ARCHIVE_TURNS', 1000, 50, 10000),
@@ -67,8 +68,11 @@ const mediaStore = new MediaStore(dataDirectory);
 mediaStore.recover();
 const mediaService = new MediaService({ media, store: mediaStore, confirm: confirmMedia });
 let recoveryTimer, recoveryTask;
-function recoverMedia() {
-  if (stopping || recoveryTask) return;
+function recoverJobs() {
+  if (stopping) return;
+  void knowledge.recoverUploads({ signal: shutdownController.signal })
+    .catch(error => logError('knowledge_recovery_error', error));
+  if (recoveryTask) return;
   recoveryTask = mediaService.resume({ signal: shutdownController.signal })
     .catch(error => logError('media_recovery_error', error)).finally(() => { recoveryTask = undefined; });
 }
@@ -120,7 +124,7 @@ function logError(event, error) {
   console.error(JSON.stringify({ event, type: error?.name ?? 'Error', status: error?.status ?? null, code: error?.code ?? null }));
 }
 const localExtension = await loadLocalExtension({ card, assertSafeChatInput, assertSafeValue,
-  ownerId: MEDIA_OWNER, signal: shutdownController.signal, isStopping: () => stopping, logError });
+  ownerId, signal: shutdownController.signal, isStopping: () => stopping, logError });
 function answer(request) {
   return withFullMode(request.userId, store.fullMode(request.userId),
     () => withRequestUser(request.userId, () => answerForUser(request)));
@@ -134,11 +138,11 @@ async function answerForUser({ scope, userId, guildId, text, images = [], docume
   }
   let prepared, release;
   try {
-    assertSafeChatInput(text);
     const options = normalizeRequestOptions(requestOptions, { model: ai.model });
     mcp.definitions(options.integrations ?? [], { userId, guildId });
     if (spoken && options.outputFormat === 'json') throw new RequestOptionsError('Choose text output for a spoken answer. JSON output is delivered as a file.');
     release = limiter.acquire({ scope, userId, guildId });
+    assertSafeChatInput(text);
     const persona = store.persona(userId);
     const songRequest = parseSongRequest(text);
     if (songRequest && options.outputFormat !== 'json') {
@@ -214,9 +218,9 @@ function answerJiki({ scope, userId, guildId, text, send }) {
     try {
       const safety = { secrets: [process.env.QWEN_API_KEY, process.env.QWEN_API_URL] };
       const direct = usesDirectJiki(userId, guildId);
+      release = limiter.acquire({ scope, userId, guildId });
       if (direct) assertSafeText(text, safety);
       else assertSafeChatInput(text, safety);
-      release = limiter.acquire({ scope, userId, guildId });
       const fullMode = fullModeActive(userId);
       const instructions = direct ? undefined : [
         'You are Jiki, a text assistant available through Owaua on Discord. Answer the current prompt directly. You have no tools or previous chat context. Never claim to have performed an external action.',
@@ -261,8 +265,8 @@ async function standalone(interaction, handler, { charge = true, voice = false }
 }
 client.once(Events.ClientReady, async ready => {
   console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, model: ai.model }));
-  recoverMedia();
-  recoveryTimer = setInterval(recoverMedia, 30000);
+  recoverJobs();
+  recoveryTimer = setInterval(recoverJobs, 30000);
   recoveryTimer.unref();
   try {
     await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN).put(Routes.applicationCommands(ready.user.id), { body: commands });

@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { KnowledgeLibrary, KnowledgeError, knowledgeFilename } from '../src/knowledge.js';
-import { withFullMode, FULL_MODE_OWNER } from '../src/full-mode.js';
+import { withFullMode } from '../src/full-mode.js';
+import { OWNER_ID } from '../test-support/owner.js';
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 const attachment = (name = 'guide.txt', extras = {}) => ({ name, contentType: 'text/plain', size: 5,
@@ -28,10 +29,10 @@ function setup(t, settings = {}) {
 
 test('owner full mode bypasses library counts and combined budgets without relaxing file validation', async t => {
   const { library } = setup(t, { maxDocuments: 1, maxLibraryBytes: 5, maxInputFiles: 1, maxInputBytes: 5 });
-  const scope = `g:c:${FULL_MODE_OWNER}`;
+  const scope = `g:c:${OWNER_ID}`;
   await library.add(scope, attachment('first.txt'));
   await assert.rejects(library.add(scope, attachment('second.txt')), /full/);
-  await withFullMode(FULL_MODE_OWNER, true, async () => {
+  await withFullMode(OWNER_ID, true, async () => {
     await library.add(scope, attachment('second.txt'));
     await library.add(scope, attachment('third.txt'));
     assert.equal((await library.context(scope)).selected, 3);
@@ -270,4 +271,91 @@ test('filename sanitization bounds hostile and bidirectional names', () => {
   assert.equal(knowledgeFilename('../../@everyone\u202e*private*.txt'), '_everyone_private_.txt');
   assert.ok(knowledgeFilename('a'.repeat(1000)).length <= 120);
   assert.equal(knowledgeFilename(''), 'document.txt');
+});
+
+test('durable library limits count saved and pending bytes across channel scopes', async t => {
+  const shared = { documents: 8, bytes: 100 };
+  const durableLimits = { user: { documents: 2, bytes: 5 }, guild: shared, bot: shared };
+  let releaseFirst, startedFirst;
+  const started = new Promise(resolve => { startedFirst = resolve; });
+  const finish = new Promise(resolve => { releaseFirst = resolve; });
+  let uploads = 0;
+  const { library } = setup(t, { durableLimits, fetchImpl: async (url, request = {}) => {
+    if (url.startsWith('https://cdn.discordapp.com/')) return new Response('hello');
+    if (request.method === 'DELETE') return json({ deleted: true });
+    assert.equal(request.method, 'POST');
+    const file = request.body.get('file');
+    const id = 'file_' + ++uploads;
+    if (uploads === 1) { startedFirst(); await finish; }
+    return json({ id, filename: file.name, bytes: file.size });
+  } });
+  const first = library.add('g:one:alice', attachment());
+  await started;
+  try {
+    await assert.rejects(library.add('g:two:alice', attachment('second.txt', { size: 0 })), /saved-document storage limit/);
+    assert.equal(uploads, 1);
+  } finally { releaseFirst(); }
+  const saved = await first;
+  await assert.rejects(library.add('dm:three:alice', attachment()), /saved-document storage limit/);
+  assert.equal(await library.forget('g:one:alice', saved.id), true);
+  assert.equal((await library.add('g:two:alice', attachment())).bytes, 5);
+});
+
+test('recovery after restart reconciles an interrupted upload by exact provider identity', async t => {
+  let now = 1000, uploadedName;
+  const calls = [];
+  const { library, directory } = setup(t, { now: () => now, fetchImpl: async (url, request = {}) => {
+    assert.equal(request.method === 'POST' || url.startsWith('https://cdn.discordapp.com/'), true);
+    if (url.startsWith('https://cdn.discordapp.com/')) return new Response('hello');
+    uploadedName = request.body.get('file').name;
+    throw new TypeError('Connection closed');
+  } });
+  await assert.rejects(library.add('g:c:alice', attachment()), /Connection closed/);
+  assert.deepEqual(library.list('g:c:alice'), []);
+  await library.close();
+  now += 130000;
+  const reopened = new KnowledgeLibrary({ directory, now: () => now, apiKey: 'mock-key', fetchImpl: async (url, request = {}) => {
+    const parsed = new URL(url);
+    calls.push([request.method, parsed.pathname]);
+    if (request.method === 'DELETE') return json({ deleted: true, id: 'file_orphan' });
+    assert.equal(parsed.searchParams.get('filter'), 'name:' + JSON.stringify(uploadedName));
+    return json({ data: [
+      { id: 'file_unrelated', filename: uploadedName + '.other', bytes: 5 },
+      { id: 'file_orphan', filename: uploadedName, bytes: 5 },
+    ], pagination_token: 'finished' });
+  } });
+  try {
+    await reopened.recoverUploads();
+    await reopened.recoverUploads();
+    assert.deepEqual(calls, [['GET', '/v1/files'], ['DELETE', '/v1/files/file_orphan']]);
+    assert.equal(reopened.db.prepare('SELECT COUNT(*) AS n FROM knowledge_uploads').get().n, 0);
+  } finally { await reopened.close(); }
+});
+
+test('successful repeated absence checks release the reservation for a failed upload', async t => {
+  let now = 1000;
+  const durableLimits = { user: { documents: 1, bytes: 5 }, guild: { documents: 2, bytes: 10 },
+    bot: { documents: 2, bytes: 10 } };
+  let firstPost = true, lookupCount = 0;
+  const { library } = setup(t, { now: () => now, durableLimits, fetchImpl: async (url, request = {}) => {
+    if (url.startsWith('https://cdn.discordapp.com/')) return new Response('hello');
+    if (request.method === 'POST') {
+      if (firstPost) { firstPost = false; throw new TypeError('Connection closed'); }
+      const file = request.body.get('file');
+      return json({ id: 'file_saved', bytes: file.size, filename: file.name });
+    }
+    assert.equal(request.method, 'GET');
+    if (++lookupCount === 2) return json({}, 500);
+    return json({ data: [], pagination_token: 'complete' });
+  } });
+  await assert.rejects(library.add('g:one:alice', attachment()), /Connection closed/);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    now += 660000;
+    await library.recoverUploads();
+    if (attempt < 3) {
+      await assert.rejects(library.add('g:two:alice', attachment()), /saved-document storage limit/);
+    }
+  }
+  assert.equal(lookupCount, 4);
+  assert.equal((await library.add('g:two:alice', attachment())).bytes, 5);
 });

@@ -9,7 +9,7 @@ import { AudioPlayerStatus, VoiceConnectionStatus } from '@discordjs/voice';
 import { MusicManager, parseMusicCommand, searchTarget, resolveTrack, streamTrack, audioDiagnostic } from '../src/music.js';
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function fixture(resolve = async query => ({ title: query, url: 'https://soundcloud.com/artist/song', duration: 60 })) {
+function fixture(resolve = async query => ({ title: query, url: 'https://soundcloud.com/artist/song', duration: 60 }), options = {}) {
   const sent = [];
   let closed = 0;
   const player = new EventEmitter();
@@ -23,7 +23,7 @@ function fixture(resolve = async query => ({ title: query, url: 'https://soundcl
   connection.subscribe = () => {};
   connection.destroy = () => { connection.state.status = VoiceConnectionStatus.Destroyed; connection.emit(VoiceConnectionStatus.Destroyed); };
   const manager = new MusicManager({ resolve, player: () => player, join: () => connection,
-    wait: async () => {}, stream: () => ({ resource: {}, close: () => closed++ }), idleMs: 15 });
+    wait: async () => {}, stream: () => ({ resource: {}, close: () => closed++ }), idleMs: 15, ...options });
   const voice = { id: 'voice', type: ChannelType.GuildVoice, permissionsFor: () => ({ has: () => true }) };
   const member = { voice: { channel: voice, channelId: voice.id } };
   const message = { guildId: 'guild', author: { id: 'user' }, guild: { voiceAdapterCreator: {},
@@ -89,6 +89,71 @@ test('stop during a search aborts it and prevents late playback', async () => {
   finish({ title: 'late' }); await search;
   assert.equal(f.manager.sessions.size, 0);
   assert.equal(f.player.resource, undefined);
+});
+test('stopping music retains the shared slot until its outstanding lookup ends', async () => {
+  let finish, lookupSignal;
+  let calls = 0;
+  const f = fixture((query, signal) => {
+    if (++calls > 1) return { title: query, url: 'https://soundcloud.com/artist/song', duration: 60 };
+    lookupSignal = signal;
+    return new Promise(resolve => { finish = resolve; });
+  }, { maxSessions: 1 });
+  const otherGuild = { ...f.message, guildId: 'other-guild', author: { id: 'another-user' } };
+  const lookup = f.manager.handle(f.message, { action: 'play', query: 'first' });
+  await tick();
+  await f.manager.handle(otherGuild, { action: 'play', query: 'second' });
+  assert.match(f.sent.at(-1), /Music is busy in other servers/);
+  await f.manager.handle(f.message, { action: 'queue' });
+  assert.match(f.sent.at(-1), /Nothing playing yet/);
+  await f.manager.handle(f.message, { action: 'stop' });
+  assert.ok(lookupSignal.aborted);
+  await f.manager.handle(otherGuild, { action: 'play', query: 'second' });
+  assert.equal(calls, 1);
+  assert.match(f.sent.at(-1), /Music is busy in other servers/);
+  finish({ title: 'first' }); await lookup;
+  await f.manager.handle(otherGuild, { action: 'play', query: 'second' });
+  assert.equal(calls, 2);
+  f.manager.close();
+});
+test('lookup admission follows the requester across guilds', async () => {
+  let finish;
+  let calls = 0;
+  const f = fixture(() => {
+    calls++;
+    return new Promise(resolve => { finish = resolve; });
+  });
+  const lookup = f.manager.handle(f.message, { action: 'play', query: 'first' });
+  await tick();
+  await f.manager.handle({ ...f.message, guildId: 'other-guild' }, { action: 'play', query: 'second' });
+  assert.equal(calls, 1);
+  assert.match(f.sent.at(-1), /still finding another song for you/);
+  f.manager.close();
+  finish({ title: 'first' }); await lookup;
+});
+test('skip and stop hold stream capacity until the player workers close', async () => {
+  let finish;
+  let calls = 0;
+  const closed = new Promise(resolve => { finish = resolve; });
+  const f = fixture(undefined, { maxSessions: 1, stream: () => {
+    calls++;
+    return { resource: {}, close: () => closed };
+  } });
+  const otherGuild = { ...f.message, guildId: 'other-guild', author: { id: 'another-user' } };
+  await f.manager.handle(f.message, { action: 'play', query: 'first' });
+  await f.manager.handle(f.message, { action: 'play', query: 'second' });
+  await f.manager.handle(f.message, { action: 'skip' });
+  await tick();
+  assert.equal(calls, 1);
+  assert.equal(f.manager.sessions.get('guild').queue[0].title, 'second');
+  await f.manager.handle(f.message, { action: 'stop' });
+  await f.manager.handle(otherGuild, { action: 'play', query: 'third' });
+  assert.equal(calls, 1);
+  assert.match(f.sent.at(-1), /Music is busy in other servers/);
+  finish(); await tick();
+  await f.manager.handle(otherGuild, { action: 'play', query: 'third' });
+  assert.equal(calls, 2);
+  assert.equal(f.manager.sessions.get('other-guild').current.title, 'third');
+  f.manager.close();
 });
 test('permissions are checked before joining and DMs are rejected', async () => {
   const f = fixture();
@@ -218,7 +283,7 @@ test('resolver rejects live streams, long tracks, and unexpected sources', async
     await assert.rejects(resolveTrack('go away', undefined, async () => ({ stdout: JSON.stringify(info) })));
   }
 });
-test('extractor failure reports bounded diagnostics and kills both child processes', async () => {
+test('extractor failure reports bounded diagnostics and kills the remaining child', async () => {
   const children = [];
   const launch = () => {
     const child = new EventEmitter();
@@ -234,10 +299,9 @@ test('extractor failure reports bounded diagnostics and kills both child process
   assert.equal(reported.code, 1);
   assert.match(reported.detail, /429/);
   assert.ok(!reported.detail.includes('secret'));
-  assert.ok(children.every(child => child.killed));
+  assert.ok(children[1].killed);
   assert.ok(audioDiagnostic('x'.repeat(10000)).length <= 800);
-  audio.close();
-  await tick();
+  await audio.close();
 });
 
 test('HLS fragment files are writable, isolated between streams, and removed after child exit', async () => {
@@ -273,18 +337,27 @@ test('HLS fragment files are writable, isolated between streams, and removed aft
   second.close();
 });
 
-test('encoder startup failure terminates the downloader and cleans its fragments', () => {
+test('encoder startup failure waits for the downloader before releasing its work', async () => {
   let directory, child;
   const launch = (file, args, options) => {
     if (child) throw new Error('spawn failed');
     directory = options.cwd;
     writeFileSync(join(directory, '--Frag1.part'), 'partial');
     child = new EventEmitter();
-    child.kill = () => { child.killed = true; setImmediate(() => child.emit('close', null)); };
+    child.kill = () => { child.killed = true; };
     return child;
   };
-  assert.throws(() => streamTrack({ duration: 60 }, assert.fail, launch), /spawn failed/);
+  let workersClosed;
+  assert.throws(() => streamTrack({ duration: 60 }, assert.fail, launch), error => {
+    workersClosed = error.workersClosed;
+    return /spawn failed/.test(error.message);
+  });
   assert.equal(child.killed, true);
+  let complete = false;
+  workersClosed.then(() => { complete = true; });
+  await tick();
+  assert.equal(complete, false);
   child.emit('close', null);
+  await workersClosed;
   assert.equal(existsSync(directory), false);
 });

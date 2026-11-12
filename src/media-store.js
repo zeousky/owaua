@@ -1,10 +1,8 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { MediaInputError } from './media.js';
+import { isOwner } from './owner.js';
+import { openPrivateDatabase } from './private-storage.js';
 
-export const MEDIA_OWNER = '1172433512364769342';
 export const MEDIA_LIMITS = { user: { image: 2, video: 1 }, server: { image: 5, video: 3 } };
 export const mediaDay = (now = Date.now()) => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Budapest', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -13,10 +11,9 @@ export const mediaDay = (now = Date.now()) => new Intl.DateTimeFormat('en-CA', {
 // Synchronous transactions serialize admission across channels and DB connections.
 export class MediaStore {
   constructor(directory, { now = Date.now } = {}) {
-    mkdirSync(directory, { recursive: true });
     this.now = now;
     // Share the historical conversation database, including existing media jobs.
-    this.db = new DatabaseSync(join(directory, 'kirmy.sqlite'));
+    this.db = openPrivateDatabase(directory, 'kirmy.sqlite');
     this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS media_requests (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL, guild_id TEXT NOT NULL,
@@ -38,7 +35,7 @@ export class MediaStore {
       !['image', 'video'].includes(kind) || !Number.isInteger(units) || units < 1 || units > 10) {
       throw new Error('Invalid media reservation');
     }
-    const day = mediaDay(this.now()), exempt = userId === MEDIA_OWNER;
+    const day = mediaDay(this.now()), exempt = isOwner(userId);
     this.db.exec('BEGIN IMMEDIATE');
     try {
       if (!exempt) {

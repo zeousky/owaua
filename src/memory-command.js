@@ -1,6 +1,7 @@
 import { conversationScope } from './store.js';
 import { card } from './ui.js';
 import { assertSafeValue, SafetyError } from './safety.js';
+import { MEMORY_REVISION_LIMIT, MEMORY_SOURCE_HISTORY_INCOMPLETE } from './memory.js';
 
 const MAX_VIEW_LENGTH = 30000;
 const MAX_VISIBLE_NOTES = 20;
@@ -96,6 +97,7 @@ export async function handleMemoryCommand(interaction, store, { isActive = () =>
       note = store.remember(scope, userId, { key: key.trim(), text: text.trim(), source: 'command', explicit: true });
     } catch (error) {
       if (error.message === 'Memory is paused') return reply('Memory is paused here. Use /memory resume before saving a fact.');
+      if (error.message === MEMORY_REVISION_LIMIT) return reply(MEMORY_REVISION_LIMIT);
       // Do not reflect rejected input, which may contain the secret that was refused.
       return reply('I couldn’t save that memory. Use a short fact without secrets and a key containing letters, numbers, spaces, dots, underscores, or hyphens.');
     }
@@ -104,9 +106,14 @@ export async function handleMemoryCommand(interaction, store, { isActive = () =>
   if (action === 'forget') {
     const id = interaction.options.getInteger('id', true);
     if (!Number.isSafeInteger(id) || id < 1) return reply('Choose a valid positive memory ID from /memory view. Your memory was not changed.');
-    return reply(store.forgetMemory(scope, id)
-      ? `I’ve deleted memory #${id} here. It might still come up in our old conversations; /memory clear removes those too.`
-      : 'I couldn’t find a saved note with that ID here. Check /memory view for the right number.');
+    try {
+      return reply(store.forgetMemory(scope, id)
+        ? `I’ve deleted memory #${id} here. It might still come up in our old conversations. Use /memory clear to remove those too.`
+        : 'I couldn’t find a saved note with that ID here. Check /memory view for the right number.');
+    } catch (error) {
+      if (error.message === MEMORY_SOURCE_HISTORY_INCOMPLETE) return reply(MEMORY_SOURCE_HISTORY_INCOMPLETE);
+      throw error;
+    }
   }
   if (action === 'clear') {
     store.clearMemory(scope);

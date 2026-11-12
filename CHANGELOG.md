@@ -2,6 +2,15 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-11-12
+
+### Fixed
+
+- Music and voice lookups now share capacity limits so activity in one server is less likely to slow down others.
+- Saved documents count toward shared storage limits. Interrupted uploads are checked for leftover files.
+- Large text checks and saved note revisions have work limits. Unclear media requests still ask for confirmation.
+- Self-hosted copies use their own owner setting and protect local settings and conversation files.
+
 ## 2026-11-07
 
 ### Fixed

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { ConversationStore, conversationScope } from '../src/store.js';
-import { boundedHistory, createMemorySession, memoryKey, memoryText, searchTerms } from '../src/memory.js';
+import { boundedHistory, createMemorySession, memoryKey, memoryText, searchTerms, MAX_MEMORY_REVISIONS } from '../src/memory.js';
 import { createTools } from '../src/tools.js';
 import { AICore } from '../src/ai.js';
 import { DEFAULT_PERSONA } from '../src/persona.js';
@@ -488,4 +488,35 @@ test('memory tools report safe failed-save results for capacity and grounding er
   assert.ok(!JSON.stringify(grounding).includes('private payload marker'));
   assert.equal(session.pending.size, 0);
   assert.equal(store.memoryStatus(scopeA).notes, 200);
+});
+
+test('memory source capacity keeps existing revisions and allows idempotent saves', t => {
+  const { store } = fixture(t);
+  const saved = note(store, scopeA, alice, 'color', 'I prefer blue.');
+  const insert = store.db.prepare('INSERT INTO memory_sources(memory_id,scope,text) VALUES (?,?,?)');
+  for (let index = 1; index < MAX_MEMORY_REVISIONS; index++) insert.run(saved.id, scopeA, 'Old preference ' + index);
+  assert.equal(note(store, scopeA, alice, 'color', 'I prefer blue.').id, saved.id);
+  const input = 'I prefer green.';
+  const session = createMemorySession(store, { scope: scopeA, userId: alice, input });
+  assert.throws(() => session.remember({ key: 'color', text: input }), /revision limit/);
+  assert.throws(() => note(store, scopeA, alice, 'color', input), /revision limit/);
+  assert.equal(store.listMemories(scopeA)[0].text, 'I prefer blue.');
+  assert.equal(store.forgetMemory(scopeA, saved.id), true);
+});
+
+test('oversized legacy provenance is bounded without silently clearing chat history', t => {
+  const state = fixture(t);
+  const saved = note(state.store, scopeA, alice, 'color', 'I prefer blue.');
+  state.store.append(scopeA, 'A previous chat', 'A previous answer');
+  state.store.db.exec('ALTER TABLE memories DROP COLUMN source_history_incomplete');
+  const insert = state.store.db.prepare('INSERT INTO memory_sources(memory_id,scope,text) VALUES (?,?,?)');
+  for (let index = 0; index < MAX_MEMORY_REVISIONS; index++) insert.run(saved.id, scopeA, 'Legacy preference ' + index);
+  const store = state.reopen();
+  assert.equal(store.listMemories(scopeA)[0].text, 'I prefer blue.');
+  assert.equal(store.db.prepare('SELECT count(*) AS n FROM memory_sources').get().n, 0);
+  assert.throws(() => store.forgetMemory(scopeA, saved.id), /Use \/memory clear/);
+  assert.equal(store.history(scopeA).length, 2);
+  store.clearMemory(scopeA);
+  assert.deepEqual(store.listMemories(scopeA), []);
+  assert.deepEqual(store.history(scopeA), []);
 });

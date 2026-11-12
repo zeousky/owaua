@@ -1,10 +1,11 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { UsageStore, RequestLimiter, UsageLimitError, DEFAULT_USAGE_LIMITS, usageLimitsFromEnv } from '../src/usage.js';
-import { MediaStore, MEDIA_OWNER } from '../src/media-store.js';
+import { MediaStore } from '../src/media-store.js';
 import { handleMediaCommand } from '../src/media-command.js';
 import { ConversationStore } from '../src/store.js';
 
@@ -46,7 +47,7 @@ test('server and bot limits include all users, the owner and DMs; rejected attem
   assert.equal(serverFixture.store.snapshot({ userId: other }).scopes.user.requests, 0);
   reserve(serverFixture.store, { userId: other, guildId: otherGuild });
   const botFixture = fixture(t, small('daily', 'bot', 2));
-  reserve(botFixture.store, { userId: MEDIA_OWNER });
+  reserve(botFixture.store, { userId: OWNER_ID });
   reserve(botFixture.store, { userId: other, guildId: null });
   assert.throws(() => reserve(botFixture.store), /bot’s daily request limit/);
   assert.equal(botFixture.store.snapshot().scopes.bot.requests, 2);
@@ -158,7 +159,7 @@ test('private usage is actor-scoped; only owner may select other actors', async 
   assert.match(await run(other), /1\/60 requests; 0\/3 voice sessions/);
   assert.match(await run(user, other), /Only the bot owner/);
   assert.match(await run(user, null, otherGuild), /Only the bot owner/);
-  assert.match(await run(MEDIA_OWNER, other), /Selected user: 1\/60/);
+  assert.match(await run(OWNER_ID, other), /Selected user: 1\/60/);
   assert.doesNotMatch(await run(user, null, null, null), /Server \(shared\)/);
 });
 

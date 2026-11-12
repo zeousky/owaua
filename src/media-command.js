@@ -1,6 +1,7 @@
 import { card } from './ui.js';
-import { MEDIA_OWNER, MEDIA_LIMITS } from './media-store.js';
+import { MEDIA_LIMITS } from './media-store.js';
 import { fullModeActive } from './full-mode.js';
+import { isOwner } from './owner.js';
 
 export const jobsCommand = { name: 'jobs', description: 'Find your recent images and videos here (only you can see them)' };
 export const usageCommand = { name: 'usage', description: 'Privately check your daily requests, voice and media allowances', options: [
@@ -17,7 +18,7 @@ const dateLabel = value => new Intl.DateTimeFormat('en-GB', {
 
 export async function handleMediaCommand(interaction, store, usageStore) {
   if (interaction.commandName === 'usage') {
-    const owner = interaction.user.id === MEDIA_OWNER;
+    const owner = isOwner(interaction.user.id);
     const selectedUser = interaction.options.getUser('user')?.id;
     const selectedGuild = interaction.options.getString('server') ?? undefined;
     if (!owner && (selectedUser || selectedGuild)) return interaction.reply({ ...card('', 'Only the bot owner can filter usage for other users or servers.'), flags: 64 });

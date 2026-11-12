@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, readlinkSync, existsS
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { HostControlError, readHostIdentity, requestHostControl, main } from '../src/host-control.js';
+import { checkControlDirectory, controlSocketLocation } from '../src/control-socket.js';
 
 const identity = readHostIdentity();
 const localEnv = { RAILWAY_PROJECT_ID: identity.railway.projectId, RAILWAY_ENVIRONMENT_ID: identity.railway.environmentId,
@@ -85,6 +86,14 @@ test('Railway local mode requires all three production selectors and never falls
     requestImpl: async (value, options) => { action = value; assert.equal(options.socketPath, localEnv.OWAUA_CONTROL_SOCKET); return state; },
     spawnImpl: () => { throw new Error('No SSH inside the container'); } }), 0);
   assert.equal(action, 'start'); assert.equal(stdout.read(), 'Owaua is running.\n');
+});
+
+test('native managed hosts use a private home directory socket by default', t => {
+  const home = directory(t);
+  const location = controlSocketLocation({ HOME: home });
+  assert.equal(location.path, join(home, '.owaua', 'control.sock'));
+  checkControlDirectory(location, { create: true });
+  assert.equal(lstatSync(join(home, '.owaua')).mode & 0o777, 0o700);
 });
 
 test('invalid CLI arguments and wrong owning identity fail before any process or socket action', async t => {

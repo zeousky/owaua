@@ -1,9 +1,10 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MediaStore, MEDIA_OWNER, mediaDay } from '../src/media-store.js';
+import { MediaStore, mediaDay } from '../src/media-store.js';
 import { MediaService } from '../src/media-service.js';
 import { MediaGenerator } from '../src/media.js';
 import { handleMediaCommand } from '../src/media-command.js';
@@ -29,7 +30,7 @@ test('separate DB connections enforce user/server limits, image batch size, and 
   assert.throws(() => reserve(second, '555555555555555555'), /server image limit/);
   for (let n = 0; n < 3; n++) reserve(store, String(600000000000000000n + BigInt(n)), 'video');
   assert.throws(() => reserve(second, '555555555555555555', 'video'), /server video limit/);
-  reserve(store, MEDIA_OWNER, 'image', 10); reserve(store, MEDIA_OWNER, 'video');
+  reserve(store, OWNER_ID, 'image', 10); reserve(store, OWNER_ID, 'video');
   assert.equal(store.count('guild_id', guild, 'image', mediaDay()), 5);
   assert.equal(store.count('guild_id', guild, 'video', mediaDay()), 3);
 });
@@ -89,7 +90,7 @@ test('clear media requests submit all five actions without a Discord confirmatio
     ['edit_image', 'make the background blue'], ['edit_video', 'remove the background'],
     ['extend_video', 'continue this clip']]) {
     const result = await service.generate(kind, 'A cat in a sunny garden', {
-      userId: MEDIA_OWNER, guildId: guild, currentRequest,
+      userId: OWNER_ID, guildId: guild, currentRequest,
       images: kind === 'edit_image' ? ['https://example.com/cat.png'] : [],
       videos: kind.includes('_video') ? ['https://example.com/cat.mp4'] : [],
     });
@@ -201,7 +202,7 @@ test('personal usage and private job retrieval enforce actor and guild scope', a
   };
   assert.match(await run('usage'), /1 image — ready/);
   assert.doesNotMatch(await run('usage', other), /1 image — ready/);
-  assert.match(await run('usage', MEDIA_OWNER), /1 image — ready/);
+  assert.match(await run('usage', OWNER_ID), /1 image — ready/);
   assert.match(await run('jobs'), /private.png/);
   assert.doesNotMatch(await run('jobs', other), /private.png/);
   assert.doesNotMatch(await run('jobs', user, null), /private.png/);

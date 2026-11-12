@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { AICore, ProviderError } from '../src/ai.js';
 import { MediaGenerator, MediaInputError } from '../src/media.js';
@@ -8,7 +9,7 @@ import { resultReply } from '../src/reply.js';
 import { exportFile } from '../src/artifacts.js';
 import { withRequestUser, assertSafeText, assertSafeChatInput, requestSafetyInstructions, SafetyError } from '../src/safety.js';
 
-const exempt = '1172433512364769342';
+const exempt = OWNER_ID;
 const other = '111111111111111111';
 const text = 'Explain the word pussy.';
 const response = body => ({ ok: true, json: async () => body });

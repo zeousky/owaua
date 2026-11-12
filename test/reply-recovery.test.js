@@ -1,9 +1,9 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { AICore, ReplySafetyError, ProviderError } from '../src/ai.js';
 import { SAFETY_REFUSAL, withRequestUser } from '../src/safety.js';
 import { CLEAN_LANGUAGE_GUILD, withServerLanguage } from '../src/server-language.js';
-import { FULL_MODE_OWNER } from '../src/full-mode.js';
 
 const final = text => ({ output: [{ type: 'message', content: [{ type: 'output_text', text }] }] });
 function fixture(outputs) {
@@ -49,9 +49,9 @@ test('the generic policy recital is rewritten for ordinary questions and sensiti
 test('the screenshot replies are rewritten in the protected server even for the exempt owner', async () => {
   for (const text of ["hows ur ass doin tho", "I'll tear that shit apart and make it slap."]) {
     const f = fixture([final(text), final('Send it over and I can help improve it.')]);
-    const result = await withServerLanguage(CLEAN_LANGUAGE_GUILD, () => withRequestUser(FULL_MODE_OWNER,
+    const result = await withServerLanguage(CLEAN_LANGUAGE_GUILD, () => withRequestUser(OWNER_ID,
       () => f.ai.respond({ input: "I'm going to send you a job application in a moment boi.",
-        context: { userId: FULL_MODE_OWNER }, fullMode: true })));
+        context: { userId: OWNER_ID }, fullMode: true })));
     assert.equal(result.text, 'Send it over and I can help improve it.');
     assert.doesNotMatch(f.requests[0].instructions, /act gen z ish, swear alot/);
     assert.match(f.requests[0].instructions, /Server rule:/);

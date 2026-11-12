@@ -1,8 +1,8 @@
 import test from 'node:test';
+import { OWNER_ID } from '../test-support/owner.js';
 import assert from 'node:assert/strict';
 import { createJikiClient, JIKI_MODEL, JIKI_MAX_PROMPT_LENGTH, JikiProviderError,
   directJikiReply, usesDirectJiki } from '../src/jiki.js';
-import { FULL_MODE_OWNER } from '../src/full-mode.js';
 import { CLEAN_LANGUAGE_GUILD } from '../src/server-language.js';
 
 const url = 'https://jiki.example';
@@ -51,9 +51,9 @@ test('Jiki uses a single-turn text payload and returns only the final answer and
 });
 
 test('only the owner can use direct Jiki outside the clean-language server', () => {
-  assert.equal(usesDirectJiki(FULL_MODE_OWNER, null), true);
-  assert.equal(usesDirectJiki(FULL_MODE_OWNER, 'other-guild'), true);
-  assert.equal(usesDirectJiki(FULL_MODE_OWNER, CLEAN_LANGUAGE_GUILD), false);
+  assert.equal(usesDirectJiki(OWNER_ID, null), true);
+  assert.equal(usesDirectJiki(OWNER_ID, 'other-guild'), true);
+  assert.equal(usesDirectJiki(OWNER_ID, CLEAN_LANGUAGE_GUILD), false);
   assert.equal(usesDirectJiki('other-user', null), false);
 });
 

@@ -11,7 +11,7 @@ const create = /^(?:make|create|generate|draw|paint|render|design|produce|keszit
 const want = /^(?:i want|i'd like|id like|i need|szeretnek)\b/;
 const edit = noun => new RegExp(`^(?:edit|change|crop|resize|recolor|modosits|valtoztasd)\\s+(?:${article}\\s+)?${modifiers}${noun}\\b(?=$|[,.!?;:]|\\s+(?:to|by|so|with|in|from|egy|a|az)\\b)`);
 const editImage = edit(image), editVideo = edit(video);
-const visualChange = /^(?:make|change|replace|remove|recolor|blur)\s+(?:(?:the|this|its)\s+)?(?:background|foreground|lighting|colors?|sky)\b/;
+const visualChange = /^(?:(?:remove|blur)\s+(?:(?:the|this|its)\s+)?(?:background|foreground|sky)|(?:make|change|recolor)\s+(?:(?:the|this|its)\s+)?(?:background|foreground|lighting|colors?|sky)\s+(?:to\s+)?(?:black|white|gray|grey|red|orange|yellow|green|blue|purple|pink|brown|transparent|grayscale))(?:\s+please)?[.!?]?$/;
 const animateImage = new RegExp(`^animate\\s+(?:(?:this|that|it)(?=$|[,.!?;:]|\\s+(?:with|into|by|so|in)\\b)|(?:${article}\\s+)?${modifiers}${image}\\b${objectEnd})`);
 const extendVideo = new RegExp(`^(?:extend|continue|lengthen)\\s+(?:(?:this|that|it)(?=$|[,.!?;:]|\\s+(?:by|for|with|so)\\b)|(?:${article}\\s+)?${modifiers}${video}\\b(?=$|[,.!?;:]|\\s+(?:by|for|with|so)\\b))`);
 const customSettings = new RegExp(`\\b(?:2k|480p|1080p|\\d{1,2}:\\d{1,2}|(?:low|auto) quality|(?:lite|standard|classic) model|(?:\\d+|${quantities.join('|')})[-\\s]*(?:s|secs?|seconds?))\\b`);
@@ -24,7 +24,7 @@ export function requestsMedia(kind, text, { images = [], videos = [], proposal }
     .replace(/```[\s\S]*?```|`[^`]*`|"[^"]*"|“[^”]*”|‘[^’]*’|(?<!\w)'[^'\n]*'(?!\w)/g, ' ')
     .replace(/’/g, "'")
     .replace(/^\s*(?:hey\s+)?(?:owaua[,!:]?\s+)?/, '').trim();
-  if (/\b(?:don't|dont|do not|never|not (?:yet|now)|unless|if|only after|(?:after|until|once) (?:i|my)|ask (?:me )?first|confirm(?:ation)? first|wait|hold off|just kidding|ne|nem)\b/.test(request)) return false;
+  if (/\b(?:don't|dont|do not|never|not (?:yet|now)|unless|if|maybe|perhaps|instead of|rather than|only after|(?:after|before|until|once|when) (?:i|my|we|you)|ask (?:me )?first|confirm(?:ation)? first|wait|hold off|just kidding|ne|nem)\b/.test(request)) return false;
   const direct = request.replace(/^(?:(?:please|pls|plz|just)\s+|(?:can|could|would|will)\s+(?:you|u)\s+|(?:i want|i'd like|id like|i need)\s+(?:you to\s+)?|(?:szeretnek|kerlek|tudnal)\s+)*/, '');
   const isVideo = kind.includes('video');
   let count = 1;

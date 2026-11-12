@@ -1,5 +1,5 @@
 import { MessageFlags } from 'discord.js';
-import { FULL_MODE_OWNER } from './full-mode.js';
+import { isOwner } from './owner.js';
 import { cleanLanguageRequired } from './server-language.js';
 
 export const JIKI_MODEL = 'qwen3.5-9b-abliterated';
@@ -9,7 +9,7 @@ const MAX_OUTPUT_TOKENS = 768;
 const TIMEOUT_MS = 140_000;
 
 export function usesDirectJiki(userId, guildId) {
-  return userId === FULL_MODE_OWNER && !cleanLanguageRequired(guildId);
+  return isOwner(userId) && !cleanLanguageRequired(guildId);
 }
 
 export function directJikiReply(text) {

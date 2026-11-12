@@ -36,7 +36,10 @@ export function createCommandHandler({ allowed, isStopping, store, mediaStore, u
         onUsage: data => console.log(JSON.stringify({ event: 'voice_usage', ...data })) }));
       if (interaction.commandName === 'voice') {
         const run = () => handleVoiceCommand(interaction, voiceManager, voiceAPI, { signal });
-        return await (interaction.options.getSubcommand() === 'join' ? standalone(interaction, run, { voice: true }) : run());
+        const action = interaction.options.getSubcommand();
+        return await (action === 'join' || action === 'voices'
+          ? standalone(interaction, run, { voice: action === 'join' })
+          : run());
       }
       if (interaction.commandName === 'memory') return await handleMemoryCommand(interaction, store, { isActive: scope => active.has(scope), stopping });
       if (interaction.commandName === 'persona') {

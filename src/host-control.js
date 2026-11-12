@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { checkControlDirectory, controlSocketLocation } from './control-socket.js';
 
 const actions = new Set(['start', 'stop', 'restart', 'status']);
 const states = new Set(['running', 'starting', 'stopped', 'stopping']);
@@ -38,11 +39,19 @@ function validateLocalIdentity(env, identity) {
 }
 
 // There is deliberately no fallback that starts a local Discord client.
-export function requestHostControl(action, { socketPath = process.env.OWAUA_CONTROL_SOCKET ?? '/tmp/owaua-control.sock',
+export function requestHostControl(action, { socketPath,
   timeoutMs = 200000, connectImpl = createConnection } = {}) {
   if (!actions.has(action)) return Promise.reject(new HostControlError('Use start, stop, restart, or status.'));
-  if (typeof socketPath !== 'string' || !socketPath || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+  if ((socketPath !== undefined && (typeof socketPath !== 'string' || !socketPath)) ||
+    !Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
     return Promise.reject(new HostControlError('Invalid host controller configuration.'));
+  }
+  try {
+    const location = controlSocketLocation(process.env, socketPath);
+    checkControlDirectory(location);
+    socketPath = location.path;
+  } catch {
+    return Promise.reject(new HostControlError('Owaua’s host controller is unavailable.'));
   }
   return new Promise((resolveRequest, reject) => {
     let socket, settled = false, buffer = '';
@@ -105,7 +114,10 @@ export async function main(args = process.argv.slice(2), { env = process.env, id
       .some(key => Boolean(env[key]));
     if (args[1] === '--local' || railwayRuntime) {
       validateLocalIdentity(env, identity);
-      const result = await requestImpl(args[0], { socketPath: env.OWAUA_CONTROL_SOCKET ?? '/tmp/owaua-control.sock' });
+      const location = controlSocketLocation(env);
+      try { checkControlDirectory(location); }
+      catch { throw new HostControlError('Owaua’s host controller is unavailable.'); }
+      const result = await requestImpl(args[0], { socketPath: location.path });
       stdout.write(`Owaua is ${result.state}.${result.state === 'running' && !result.ready ? ' Discord is still connecting.' : ''}\n`);
       return 0;
     }

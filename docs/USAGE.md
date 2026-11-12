@@ -81,11 +81,11 @@ Memory stays with you, in one server and channel. A DM is its own place. The rec
 
 - `/memory view` shows your notes in private.
 - `/memory remember key:hobby text:"I like hiking"` saves a fact. The same key updates it.
-- `/memory forget id:3` removes one note.
+- `/memory forget id:3` removes one note and its tracked copies in chat history. A note can track up to 64 revisions. If an older note exceeds that limit, use `/memory clear` to erase it and the conversation history in that channel.
 - `/memory pause` and `/memory resume` turn memory off and on here. Pausing keeps the old notes in storage and stops new ones.
 - `/memory clear` or `/reset` erases your history and notes in this channel. Your persona stays.
 
-`/knowledge add` saves a document for later questions in this channel. The library is yours: this server, this channel, this user. `/knowledge list`, `/knowledge forget`, and `/knowledge clear` manage it. Nothing is included in an answer until you ask with `library:true`. Deleting a document does not rewrite answers that were already sent.
+`/knowledge add` saves a document for later questions in this channel. The library is private to your account in that server and channel. Saved documents also count toward shared storage limits across channels. `/knowledge list`, `/knowledge forget`, and `/knowledge clear` manage it. Nothing is included in an answer until you ask with `library:true`. Deleting a document does not rewrite answers that were already sent.
 
 `/language Hungarian` or `.language Hungarian` makes later AI replies to you use that language, including a new voice session. Command replies stay in English. `.language` shows the current choice, `.language list` shows names it accepts, and `.language auto` goes back to matching your message.
 

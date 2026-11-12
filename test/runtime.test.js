@@ -31,7 +31,7 @@ test('guard rejects a vulnerable runtime during import before subsequent startup
 
 test('production entry points run the guard first and version selectors agree', () => {
   const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-  assert.match(read('src/bot.js'), /^import '\.\/runtime\.js';\nimport 'dotenv\/config';/);
+  assert.match(read('src/bot.js'), /^import '\.\/runtime\.js';\nimport '\.\/secure-environment\.js';/);
   assert.match(read('scripts/backup-memory.js'), /^import '\.\.\/src\/runtime\.js';/);
   assert.equal(JSON.parse(read('package.json')).engines.node, SUPPORTED_NODE);
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].engines.node, SUPPORTED_NODE);

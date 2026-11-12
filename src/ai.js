@@ -9,7 +9,7 @@ import { hostedTools, normalizeRequestOptions, opaqueRequestHash, matchesOutputS
 import { MCPRegistry } from './mcp.js';
 import { ArtifactCollector, ARTIFACT_INSTRUCTIONS } from './artifacts.js';
 import { assertSafeText, assertSafeValue, assertSafeChatInput, safeContext, requestSafetyInstructions, SafetyError, SAFETY_REFUSAL } from './safety.js';
-import { FULL_MODE_OWNER } from './full-mode.js';
+import { isOwner } from './owner.js';
 
 export class ProviderError extends Error {
   constructor(status, code) {
@@ -47,7 +47,7 @@ export class AICore {
   async respond({ input, history = [], memory, context = {}, persona, language = 'auto', fullMode = false, onActivity, signal: callerSignal,
     requestOptions = {}, cacheKey, safetyIdentifier, knowledgeTools = [] }) {
     if (typeof fullMode !== 'boolean') throw new TypeError('Invalid full mode setting');
-    fullMode = fullMode && context.userId === FULL_MODE_OWNER;
+    fullMode = fullMode && isOwner(context.userId);
     const options = normalizeRequestOptions(requestOptions, { model: this.model });
     const reasoningEffort = options.reasoningEffort ?? this.defaultReasoningEffort;
     const fileSearchTools = normalizeKnowledgeTools(knowledgeTools);

@@ -11,7 +11,13 @@ import {
 
 import { card, trackCard } from './ui.js';
 
-const exec = promisify(execFile);
+const execFileAsync = promisify(execFile);
+async function exec(file, args, options) {
+  const result = execFileAsync(file, args, { ...options, killSignal: 'SIGKILL' });
+  // An aborted execFile promise can reject before the child's close event.
+  const closed = result.child && new Promise(resolve => result.child.once('close', resolve));
+  try { return await result; } finally { await closed; }
+}
 const ytdlp = process.env.YTDLP_PATH || 'yt-dlp';
 export const commonArgs = ['--ignore-config', '--no-plugin-dirs', '--no-playlist', '--no-warnings', '--no-cache-dir',
   '--socket-timeout', '15', '--retries', '2'];
@@ -66,68 +72,95 @@ export function streamTrack(track, onError, launch = spawn) {
   // /app is read-only to the runtime user; isolate fragments for every playback.
   const workDir = mkdtempSync(joinPath(tmpdir(), 'owaua-music-'));
   const children = new Set();
-  const cleanup = () => { if (!children.size) rmSync(workDir, { recursive: true, force: true }); };
-  const start = (file, args, stdio) => {
-    const child = launch(file, args, { cwd: workDir, stdio });
-    children.add(child);
-    child.once('close', () => { children.delete(child); cleanup(); });
-    return child;
-  };
-  let source, encoder;
-  try {
-    source = start(ytdlp, [...commonArgs, '--abort-on-unavailable-fragments', '-f', 'bestaudio/best', '-o', '-', '--', track.url], ['ignore', 'pipe', 'pipe']);
-    encoder = start(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-hide_banner', '-loglevel', 'error',
-    '-i', 'pipe:0', '-vn', '-t', '3600', '-c:a', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2', '-f', 'ogg', 'pipe:1'],
-    ['pipe', 'pipe', 'pipe']);
-  } catch (error) {
-    for (const child of children) child.kill('SIGKILL');
-    cleanup();
-    throw error;
-  }
-  let closed = false;
+  let resolveStopped;
+  const stopped = new Promise(resolve => { resolveStopped = resolve; });
+  let source, encoder, timer, closing = false;
   let sourceDiagnostic = '', encoderDiagnostic = '';
-  const timer = setTimeout(() => fail('timeout'), (track.duration + 120) * 1000);
-  timer.unref();
-  const close = () => {
-    if (closed) return;
-    closed = true;
+  const cleanup = () => {
+    if (children.size) return;
     clearTimeout(timer);
-    source.stdout.unpipe(encoder.stdin);
-    source.kill('SIGKILL'); encoder.kill('SIGKILL');
-    source.stdout.destroy(); encoder.stdin.destroy(); encoder.stdout.destroy();
+    try { rmSync(workDir, { recursive: true, force: true }); }
+    catch (error) { console.error(JSON.stringify({ event: 'music_cleanup_error', code: error.code ?? null })); }
+    finally { resolveStopped(); }
+  };
+  const close = () => {
+    if (!closing) {
+      closing = true;
+      clearTimeout(timer);
+      source?.stdout?.unpipe(encoder?.stdin);
+      for (const child of children) {
+        try { child.kill('SIGKILL'); }
+        catch (error) { console.error(JSON.stringify({ event: 'music_stop_error', code: error.code ?? null })); }
+      }
+      source?.stdout?.destroy(); encoder?.stdin?.destroy(); encoder?.stdout?.destroy();
+    }
+    return stopped;
   };
   const fail = (stage, code = null, detail = '') => {
-    if (closed) return;
+    if (closing) return;
     const error = new Error('Audio source or encoder failed');
     error.stage = stage; error.code = code;
     error.detail = audioDiagnostic(sourceDiagnostic || detail || encoderDiagnostic);
     close(); onError(error);
   };
-  source.stderr.on('data', chunk => { sourceDiagnostic = (sourceDiagnostic + chunk).slice(-8000); });
-  encoder.stderr.on('data', chunk => { encoderDiagnostic = (encoderDiagnostic + chunk).slice(-8000); });
-  source.on('error', error => fail('extractor', error.code, error.message));
-  encoder.on('error', error => fail('encoder', error.code, error.message));
-  source.on('close', code => { if (code !== 0) fail('extractor', code); });
-  encoder.on('close', code => { if (code !== 0) fail('encoder', code); });
-  source.stdout.on('error', error => fail('extractor_pipe', error.code, error.message));
-  encoder.stdin.on('error', error => fail('encoder_pipe', error.code, error.message));
-  encoder.stdout.on('error', error => fail('encoder_output', error.code, error.message));
-  source.stdout.pipe(encoder.stdin);
-  return { resource: createAudioResource(encoder.stdout, { inputType: StreamType.OggOpus }), close };
+  const start = (file, args, stdio, stage) => {
+    const child = launch(file, args, { cwd: workDir, stdio });
+    children.add(child);
+    child.on('error', error => fail(stage, error.code, error.message));
+    child.once('close', code => {
+      children.delete(child);
+      cleanup();
+      if (code !== 0) fail(stage, code);
+    });
+    return child;
+  };
+  try {
+    source = start(ytdlp, [...commonArgs, '--abort-on-unavailable-fragments', '-f', 'bestaudio/best', '-o', '-', '--', track.url],
+      ['ignore', 'pipe', 'pipe'], 'extractor');
+    encoder = start(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-hide_banner', '-loglevel', 'error',
+      '-i', 'pipe:0', '-vn', '-t', '3600', '-c:a', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2', '-f', 'ogg', 'pipe:1'],
+    ['pipe', 'pipe', 'pipe'], 'encoder');
+    source.stderr.on('data', chunk => { sourceDiagnostic = (sourceDiagnostic + chunk).slice(-8000); });
+    encoder.stderr.on('data', chunk => { encoderDiagnostic = (encoderDiagnostic + chunk).slice(-8000); });
+    source.stdout.on('error', error => fail('extractor_pipe', error.code, error.message));
+    encoder.stdin.on('error', error => fail('encoder_pipe', error.code, error.message));
+    encoder.stdout.on('error', error => fail('encoder_output', error.code, error.message));
+    source.stdout.pipe(encoder.stdin);
+    const resource = createAudioResource(encoder.stdout, { inputType: StreamType.OggOpus });
+    timer = setTimeout(() => fail('timeout'), (track.duration + 120) * 1000);
+    timer.unref();
+    return { resource, close };
+  } catch (error) {
+    close();
+    cleanup();
+    throw Object.assign(new Error(error.message, { cause: error }), { workersClosed: stopped });
+  }
 }
 
 export class MusicManager {
   constructor({ resolve = resolveTrack, stream = streamTrack, join = joinVoiceChannel,
-    player = createAudioPlayer, wait = entersState, idleMs = 60000, isVoiceBusy = () => false } = {}) {
+    player = createAudioPlayer, wait = entersState, idleMs = 60000, maxSessions = 3, isVoiceBusy = () => false } = {}) {
+    if (!Number.isSafeInteger(maxSessions) || maxSessions < 1) throw new Error('Invalid music session limit');
     this.sessions = new Map();
+    this.draining = new Set();
+    this.searchActors = new Set();
     this.closed = false;
-    Object.assign(this, { resolve, stream, join, player, wait, idleMs, isVoiceBusy });
+    Object.assign(this, { resolve, stream, join, player, wait, idleMs, maxSessions, isVoiceBusy });
+  }
+  stopAudio(session) {
+    if (session.audio) {
+      session.audioStopping = session.audio.close();
+      session.audio = null;
+    }
+    return session.audioStopping;
   }
   dispose(session) {
     if (this.sessions.get(session.guildId) !== session) return;
     this.sessions.delete(session.guildId);
+    // A stopped guild keeps its slot until its lookup and playback workers exit.
+    this.draining.add(session.guildId);
     session.abort.abort(); clearTimeout(session.idle);
-    session.audio?.close(); session.audio = null;
+    void Promise.allSettled([session.lookup, this.stopAudio(session)]).then(() => this.draining.delete(session.guildId));
     session.player.stop(true);
     if (session.connection.state.status !== VoiceConnectionStatus.Destroyed) session.connection.destroy();
   }
@@ -142,15 +175,21 @@ export class MusicManager {
     track.failed = true;
     console.error(JSON.stringify({ event: 'music_stream_error', source: track.source ?? null,
       stage: error?.stage ?? 'player', code: error?.code ?? null, detail: audioDiagnostic(error?.detail || error?.message || '') }));
-    session.current = null; session.audio?.close(); session.audio = null;
+    session.current = null;
+    this.stopAudio(session);
     session.player.stop(true);
     this.notify(session, 'I couldn’t stream that song. Try searching by song name or using another SoundCloud track link.');
     this.next(session);
   }
   async next(session) {
-    if (this.sessions.get(session.guildId) !== session) return;
+    if (this.sessions.get(session.guildId) !== session || session.advancing) return;
     clearTimeout(session.idle);
-    session.audio?.close(); session.audio = null; session.current = null;
+    session.current = null;
+    session.advancing = true;
+    await this.stopAudio(session);
+    session.advancing = false;
+    if (this.sessions.get(session.guildId) !== session) return;
+    session.audioStopping = null;
     const track = session.queue.shift();
     if (!track) {
       session.idle = setTimeout(() => { if (!session.pending) this.dispose(session); else this.next(session); }, this.idleMs);
@@ -166,6 +205,7 @@ export class MusicManager {
         await this.showPlayback(session, track);
       }
     } catch (error) {
+      if (session.current === track && error?.workersClosed) session.audioStopping = error.workersClosed;
       await this.playbackFailed(session, track, error);
     }
   }
@@ -197,7 +237,8 @@ export class MusicManager {
       }
       if (command.action === 'skip') {
         if (!session.current) return reply('Nothing is playing to skip.');
-        session.current = null; session.audio?.close(); session.audio = null;
+        session.current = null;
+        this.stopAudio(session);
         session.player.stop(true); this.next(session); return reply('Skipped.');
       }
       return;
@@ -219,32 +260,47 @@ export class MusicManager {
     if (session && session.channelId !== channel.id) return reply('I’m playing in another voice channel. Join that channel to control the music.');
     if (session?.pending) return reply('I’m still finding the last song. Try again in a moment.');
     if (session?.queue.length >= 20) return reply('The queue is full (20 songs). Wait or skip a song first.');
+    const actor = message.author.id;
+    if (this.searchActors.has(actor)) return reply('I’m still finding another song for you. Try again in a moment.');
     if (!session) {
+      if (this.draining.has(message.guildId)) return reply('I’m still closing this server’s previous music session. Try again in a moment.');
+      if (this.sessions.size + this.draining.size >= this.maxSessions) return reply('Music is busy in other servers. Try again when a session ends.');
+      const player = this.player({ behaviors: { noSubscriber: NoSubscriberBehavior.Pause } });
       const connection = this.join({ guildId: message.guildId, channelId: channel.id,
         adapterCreator: message.guild.voiceAdapterCreator, selfDeaf: true });
-      session = { guildId: message.guildId, channelId: channel.id, connection,
-        player: this.player({ behaviors: { noSubscriber: NoSubscriberBehavior.Pause } }),
+      session = { guildId: message.guildId, channelId: channel.id, connection, player,
         queue: [], current: null, audio: null, abort: new AbortController(), text: message.channel };
       this.sessions.set(message.guildId, session);
-      connection.subscribe(session.player);
-      session.player.on(AudioPlayerStatus.Idle, () => { if (session.current) this.next(session); });
-      session.player.on('error', error => {
-        if (session.current) this.playbackFailed(session, session.current, error);
-      });
-      connection.on('error', () => { this.notify(session, 'Voice connection failed. Please try again.'); this.dispose(session); });
-      connection.on(VoiceConnectionStatus.Disconnected, async () => {
-        try { await Promise.race([
-          this.wait(connection, VoiceConnectionStatus.Signalling, 5000),
-          this.wait(connection, VoiceConnectionStatus.Connecting, 5000),
-        ]); } catch { this.dispose(session); }
-      });
-      connection.on(VoiceConnectionStatus.Destroyed, () => this.dispose(session));
+      try {
+        connection.subscribe(player);
+        player.on(AudioPlayerStatus.Idle, () => { if (session.current) this.next(session); });
+        player.on('error', error => {
+          if (session.current) this.playbackFailed(session, session.current, error);
+        });
+        connection.on('error', () => { this.notify(session, 'Voice connection failed. Please try again.'); this.dispose(session); });
+        connection.on(VoiceConnectionStatus.Disconnected, async () => {
+          try { await Promise.race([
+            this.wait(connection, VoiceConnectionStatus.Signalling, 5000),
+            this.wait(connection, VoiceConnectionStatus.Connecting, 5000),
+          ]); } catch { this.dispose(session); }
+        });
+        connection.on(VoiceConnectionStatus.Destroyed, () => this.dispose(session));
+      } catch (error) {
+        this.dispose(session);
+        throw error;
+      }
     }
     session.pending = true; clearTimeout(session.idle);
+    this.searchActors.add(actor);
+    const lookupAbort = new AbortController();
+    const lookupSignal = AbortSignal.any([session.abort.signal, lookupAbort.signal]);
+    const lookup = Promise.resolve().then(() => this.resolve(command.query, lookupSignal))
+      .finally(() => this.searchActors.delete(actor));
+    session.lookup = lookup;
     try {
       const [track] = await Promise.all([
-        this.resolve(command.query, session.abort.signal),
-        this.wait(session.connection, VoiceConnectionStatus.Ready, 20000),
+        lookup,
+        Promise.resolve().then(() => this.wait(session.connection, VoiceConnectionStatus.Ready, 20000)),
       ]);
       if (this.sessions.get(message.guildId) !== session) {
         await reply(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
@@ -258,6 +314,7 @@ export class MusicManager {
       }));
       if (!session.current) this.next(session);
     } catch (error) {
+      lookupAbort.abort();
       if (this.sessions.get(message.guildId) !== session) {
         await reply(card('Search cancelled', 'Stopped playing.', { tone: 'music' })); return;
       }
@@ -267,6 +324,8 @@ export class MusicManager {
       const payload = card('Couldn’t load your song', safe.includes(error.message) ? error.message : 'I couldn’t load that song. The source may have blocked it, or voice connection failed. Try a song name or SoundCloud link.', { tone: 'error', section: 'Owaua / Music' });
       await reply(payload);
     } finally {
+      await lookup.catch(() => {});
+      session.lookup = null;
       session.pending = false;
       if (!session.current && this.sessions.get(message.guildId) === session) this.next(session);
     }
