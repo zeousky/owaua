@@ -16,7 +16,7 @@ Chat commands also work with a dot, without mentioning Owaua. Use slash commands
 - `/voice join` — talk with it in your voice channel.
 - `.music song name` — play a song in the voice channel you are in. `.mp3 song name` sends the file in chat.
 - `/persona`, `/memory`, `/knowledge`, `/language` — your voice, your notes, saved documents, and which language it answers in.
-- `/remind`, `/poll`, `/afk` — personal reminders and tools for your server.
+- `/remind`, `/poll`, `/afk` — personal reminders and tools for your server
 - `/help` — a quick guide. `/usage` — what you have left today
 
 The longer tour is in [Using Owaua](docs/USAGE.md).
