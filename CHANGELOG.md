@@ -2,6 +2,17 @@
 
 Add each user-facing update as a new dated section at the top. The first dated section is posted to the Discord changelog channel when this file changes on `main`.
 
+## 2026-11-14
+
+### Added
+
+- Set personal and recurring reminders by DM, schedule channel messages, and use `/afk` to show when you’re away.
+- Run Discord or button polls and look up members, avatars, roles, and server stats.
+- Moderate with purge, warnings, timeouts, bans, and case history.
+- Set up self-assign roles, welcome and goodbye messages, autoroles, a starboard, and private support tickets.
+- Format Discord timestamps and JSON, convert colors, generate QR codes, and hash text.
+- Follow public GitHub activity and RSS feeds, and get downtime and recovery alerts for public websites.
+
 ## 2026-11-12
 
 ### Fixed

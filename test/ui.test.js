@@ -37,11 +37,11 @@ test('help keeps the quick start in chat and preserves advanced settings and pri
   assert.equal(payload.files.length, 1);
   assert.equal(payload.files[0].name, 'owaua-guide.md');
   const guide = payload.files[0].attachment.toString();
-  for (const detail of ['180 days', '1,000 exchanges', 'xAI', '/integrations', 'output:json', '/knowledge forget', '/memory forget']) {
+  for (const detail of ['180 days', '1,000 exchanges', 'xAI', '/integrations', 'output:json', '/knowledge forget', '/memory forget', '/remind', '/starboard setup', '/monitor add']) {
     assert.ok(guide.includes(detail), `Detailed guide should retain ${detail}`);
   }
   assert.ok(guide.includes(musicHelp));
-  for (const detail of ['Every slash command also works with', '.ask', '.speak', '.knowledge add', '.transcribe', 'Private results go to your DMs', 'use slash commands for private input']) {
+  for (const detail of ['Chat commands also work with a dot', '.ask', '.speak', '.knowledge add', '.transcribe', 'Private results go to your DMs', 'use slash commands for private input']) {
     assert.ok(guide.includes(detail), `Detailed guide should explain dot commands: ${detail}`);
   }
   assert.deepEqual(payload.allowedMentions.parse, []);

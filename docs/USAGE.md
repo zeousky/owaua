@@ -1,6 +1,6 @@
 # Using Owaua
 
-You can talk to Owaua with a slash command, a dot command, a mention, a reply, or a DM. Slash commands and dot commands take the same names. For `.ask` and `.speak`, write the free text first and put named options after it.
+You can talk to Owaua with a slash command, a dot command, a mention, a reply, or a DM. Chat commands use the same names in slash and dot form. Use slash commands for the personal and server tools below. For `.ask` and `.speak`, write the free text first and put named options after it.
 
 ```
 .ask What time is it?
@@ -10,6 +10,18 @@ You can talk to Owaua with a slash command, a dot command, a mention, a reply, o
 Quote a value when it contains words like `voice:` or `output:`, so those stay part of the sentence. Attach files to the same message. `audio:1` means the first attachment. Pasted URLs are not treated as uploads.
 
 Some replies are private and arrive by DM, still tied to the server and channel you were in. If DMs are closed, use the slash command instead. A dot command's text stays visible in the channel.
+
+## Personal and server tools
+
+- Use `/remind when:30m message:Check the oven` for a personal DM. Times can also be ISO dates with a time zone offset. Add `repeat:1d` for a fixed 24-hour interval. Use `/reminders list` and `/reminders remove` to manage reminders. Moderators can use `/reminders schedule` to post one-time or repeating messages in a channel. If the bot was offline, it delivers one overdue occurrence and resumes the regular interval.
+- Use `/poll` with answers separated by `|`. Discord polls count votes directly and support multiple selections. Button polls allow one answer per member. Use the buttons or `/vote cast` with the poll message link, and `/vote results` to see the button tally.
+- Use `/afk set` to show an optional away reason when someone tags you. Your next message in that server clears it. `/afk clear` clears it manually.
+- Use `/userinfo`, `/serverinfo`, `/roleinfo` and `/avatar` for Discord details. `/timestamp`, `/color`, `/qr`, `/json` and `/hash` are local developer tools.
+- Moderators can use `/purge`, `/warn`, `/timeout`, `/ban` and `/modhistory`. Discord permissions and role hierarchy apply.
+- Set up self-assign roles with `/roles create`, greetings and an optional autorole with `/welcome setup`, popular message links with `/starboard setup`, and private support channels with `/ticket setup`.
+- Use `/github watch` for public repository updates, `/feed add` for public RSS or Atom feeds, and `/monitor add` for outage and recovery notices from public HTTP(S) endpoints. Each command also has list and remove controls. These commands require Manage Server and permission to post in the destination. GitHub normally checks every 15 minutes and may be delayed by GitHub’s public activity feed. RSS checks every five minutes. Uptime monitors default to five minutes and alert after two consecutive failures, then again on recovery. Feed and monitor URLs use standard HTTP(S) ports and exclude query strings and credentials.
+
+These tools use SQLite in the bot's data directory to remember settings and activity between restarts. They run without an AI call.
 
 ## Asking
 

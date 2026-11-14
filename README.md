@@ -8,7 +8,7 @@ The first release is [1.0, Side A](https://github.com/zeousky/owaua/releases/tag
 
 ## Try it
 
-Slash commands and the same commands with a dot both work. A dot command does not need a mention.
+Chat commands also work with a dot, without mentioning Owaua. Use slash commands for personal and server tools.
 
 - `/ask` or `.ask What time is it?` — ask a question. Attach a picture, a PDF, or a recording if you want.
 - `/jiki` or `.jiki` — ask Jiki, when the host has that model set up.
@@ -16,7 +16,8 @@ Slash commands and the same commands with a dot both work. A dot command does no
 - `/voice join` — talk with it in your voice channel.
 - `.music song name` — play a song in the voice channel you are in. `.mp3 song name` sends the file in chat.
 - `/persona`, `/memory`, `/knowledge`, `/language` — your voice, your notes, saved documents, and which language it answers in.
-- `/help` — a short reminder. `/usage` — what you have left today
+- `/remind`, `/poll`, `/afk` — personal reminders and tools for your server.
+- `/help` — a quick guide. `/usage` — what you have left today
 
 The longer tour is in [Using Owaua](docs/USAGE.md).
 

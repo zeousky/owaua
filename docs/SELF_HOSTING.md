@@ -24,6 +24,8 @@ Fill in `DISCORD_TOKEN` and `XAI_API_KEY`, then run `npm start`. Set `OWAUA_OWNE
 
 Invite the bot with the `bot` and `applications.commands` scopes. It needs permission to view channels, send messages, read message history, attach files, embed links, connect, and speak. Music also needs to see the voice channel.
 
+Grant feature permissions in the channels where you use them. Native polls need Create Polls. Moderation needs the relevant Manage Messages, Moderate Members, or Ban Members permission. Role panels and autoroles need Manage Roles and a bot role above the assigned roles. Private tickets need Manage Channels and permission to manage channel overrides. Join/leave messages and autoroles need Server Members Intent enabled in the Discord Developer Portal and `OWAUA_GUILD_MEMBERS_INTENT=true` in the service environment.
+
 Slash commands are registered when the bot logs in. Discord can take a while to show them in every server.
 
 `ALLOWED_GUILD_IDS` can be a comma-separated list of server IDs. Leave it empty and every server the bot joins is allowed. Direct messages stay open either way.
@@ -39,7 +41,7 @@ docker build -t owaua .
 docker run --env-file .env -v owaua-data:/app/data -p 127.0.0.1:3000:3000 owaua
 ```
 
-The data directory inside the container is `/app/data`. Keep that volume. It holds the conversation database and the document-library index. Use a data directory the bot account can write without granting write access to other local accounts.
+The data directory inside the container is `/app/data`. Keep that volume. It holds conversations, the document-library index, and the SQLite databases for reminders, polls, moderation, community settings, and subscriptions. Use a data directory the bot account can write without granting write access to other local accounts.
 
 The release workflow publishes containers to `ghcr.io/<owner>/<repository>`, with version tags and `latest`. For `v1.0.0`, it also assigns `side-a`. Package visibility is separate from repository visibility, so a public source repository does not guarantee anonymous image pulls. Build from source above if a release image is unavailable.
 

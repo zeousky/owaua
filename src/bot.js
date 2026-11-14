@@ -1,9 +1,9 @@
 import './runtime.js';
 import './secure-environment.js';
-import { installServerLanguageGuard, cleanServerText, serverLanguageInstructions, cleanLanguageRequired } from './server-language.js';
+import { installServerLanguageGuard, cleanServerText, serverLanguageInstructions, cleanLanguageRequired, withServerLanguage } from './server-language.js';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
-import { Client, Events, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials, REST, Routes } from 'discord.js';
 import { MusicManager, musicHelp } from './music.js';
 import { SongDownloads, SongInputError, parseSongRequest, songResult } from './song-download.js';
 import { AICore, ProviderError } from './ai.js';
@@ -14,6 +14,11 @@ import { MediaService } from './media-service.js';
 import { confirmMedia, confirmSongDownload } from './media-approval.js';
 import { createCommandHandler } from './command-handler.js';
 import { commands } from './commands.js';
+import { personalCommands } from './personal-commands.js';
+import { createPersonalFeatures } from './personal-features.js';
+import { communityCommands, createCommunityFeatures } from './community-features.js';
+import { utilityCommands, createUtilityFeatures } from './utility-features.js';
+import { subscriptionCommands, createSubscriptionFeatures } from './subscription-features.js';
 import { createMessageHandler } from './message-handler.js';
 import { DocumentInputs, DocumentInputError } from './files.js';
 import { RequestOptionsError, normalizeRequestOptions } from './request-options.js';
@@ -91,8 +96,13 @@ const limiter = new RequestLimiter({ store: usageStore, active, cooldownMs: cool
   isActive: scope => knowledge.isActive(scope), isStopping: () => stopping });
 const shutdownController = new AbortController();
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
-  partials: [Partials.Channel], allowedMentions: { parse: [], repliedUser: false },
+  intents: [
+    GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions,
+    ...(process.env.OWAUA_GUILD_MEMBERS_INTENT === 'true' ? [GatewayIntentBits.GuildMembers] : []),
+  ],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User, Partials.GuildMember],
+  allowedMentions: { parse: [], repliedUser: false },
 });
 installServerLanguageGuard(client.rest, { guildIdForChannel: async channelId => {
   const channel = client.channels.cache.get(channelId) ?? await client.channels.fetch(channelId);
@@ -115,7 +125,8 @@ let jiki;
 try {
   jiki = createJikiClient({ url: process.env.QWEN_API_URL, apiKey: process.env.QWEN_API_KEY });
 } catch (error) { logError('jiki_config_error', error); }
-const capabilities = ['voice', 'knowledge', 'mcp', 'artifacts', 'structured_outputs', ...(jiki ? ['jiki'] : [])];
+const capabilities = ['voice', 'knowledge', 'mcp', 'artifacts', 'structured_outputs',
+  'reminders', 'polls', 'afk', 'server_tools', 'community_tools', 'subscriptions', ...(jiki ? ['jiki'] : [])];
 let stopping = false;
 const help = helpCard(musicHelp);
 
@@ -263,23 +274,88 @@ async function standalone(interaction, handler, { charge = true, voice = false }
   }
   try { return await withRequestUser(interaction.user.id, handler); } finally { release(); }
 }
+const featureOptions = { directory: dataDirectory, client, allowed, signal: shutdownController.signal, logError };
+const personal = createPersonalFeatures(featureOptions);
+const community = createCommunityFeatures(featureOptions);
+const utilities = createUtilityFeatures(featureOptions);
+const subscriptions = createSubscriptionFeatures(featureOptions);
+const featureGroups = [
+  [personalCommands, personal], [communityCommands, community],
+  [utilityCommands, utilities], [subscriptionCommands, subscriptions],
+];
+const featureHandlers = new Map(featureGroups.flatMap(([group, feature]) =>
+  group.map(({ name }) => [name, interaction => feature.handleCommand(interaction)])));
+const slashCommands = [...commands, ...featureGroups.flatMap(([group]) => group)];
+const activeFeatures = new Set();
+
+async function runFeature(work) {
+  if (stopping) return;
+  const task = Promise.resolve().then(work);
+  activeFeatures.add(task);
+  try { await task; } finally { activeFeatures.delete(task); }
+}
+
+async function runFeatureInteraction(interaction, handler) {
+  const respond = content => {
+    const reply = { content, allowedMentions: { parse: [], repliedUser: false } };
+    return interaction.deferred ? interaction.editReply(reply) : interaction.reply({ ...reply, flags: MessageFlags.Ephemeral });
+  };
+  if (!allowed(interaction.guildId)) return respond('Owaua is not enabled in this server.');
+  if (stopping) return respond('Owaua is restarting. Try again in a moment.');
+  await runFeature(() => withServerLanguage(interaction.guildId, () => withRequestUser(interaction.user.id, async () => {
+    try { await handler(interaction); }
+    catch (error) {
+      logError('feature_interaction_error', error);
+      if (!interaction.replied) await respond('Owaua couldn’t complete this action. Check the channel permissions and try again.');
+    }
+  })));
+}
+
 client.once(Events.ClientReady, async ready => {
   console.log(JSON.stringify({ event: 'discord_ready', user: ready.user.tag, id: ready.user.id, model: ai.model }));
   recoverJobs();
   recoveryTimer = setInterval(recoverJobs, 30000);
   recoveryTimer.unref();
+  personal.start();
+  subscriptions.start();
   try {
-    await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN).put(Routes.applicationCommands(ready.user.id), { body: commands });
-    console.log(JSON.stringify({ event: 'commands_registered', capabilities }));
+    await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN)
+      .put(Routes.applicationCommands(ready.user.id), { body: slashCommands });
+    console.log(JSON.stringify({ event: 'commands_registered', count: slashCommands.length, capabilities }));
   } catch (error) { logError('command_registration_error', error); }
 });
 const handleCommand = createCommandHandler({ allowed, isStopping: () => stopping, store, mediaStore, usageStore, knowledge, mcp, voiceAPI, voiceManager,
   standalone, active, help, client, answer, answerJiki: jiki ? answerJiki : undefined, signal: shutdownController.signal, logError });
 client.on(Events.InteractionCreate, async interaction => {
   try {
-    if (interaction.isChatInputCommand()) await handleCommand(interaction);
+    if (interaction.isChatInputCommand()) {
+      const feature = featureHandlers.get(interaction.commandName);
+      if (feature) await runFeatureInteraction(interaction, feature);
+      else await handleCommand(interaction);
+    } else if (interaction.isMessageComponent()) {
+      if (interaction.customId.startsWith('owaua:poll:')) await runFeatureInteraction(interaction, personal.handleComponent);
+      else if (interaction.customId.startsWith('community:')) await runFeatureInteraction(interaction, community.handleComponent);
+    }
   } catch (error) { logError('interaction_error', error); }
 });
+
+function onFeatureEvent(event, handler) {
+  client.on(event, (...args) => {
+    void runFeature(() => handler(...args)).catch(error => logError(`feature_${event}_error`, error));
+  });
+}
+onFeatureEvent(Events.MessageCreate, personal.onMessage);
+onFeatureEvent(Events.GuildMemberAdd, community.onMemberAdd);
+onFeatureEvent(Events.GuildMemberRemove, community.onMemberRemove);
+onFeatureEvent(Events.GuildMemberUpdate, community.onMemberUpdate);
+onFeatureEvent(Events.ChannelDelete, community.onChannelDelete);
+onFeatureEvent(Events.MessageDelete, community.onMessageDelete);
+onFeatureEvent(Events.MessageBulkDelete, community.onMessagesDelete);
+onFeatureEvent(Events.MessageReactionAdd, community.onReactionAdd);
+onFeatureEvent(Events.MessageReactionRemove, community.onReactionRemove);
+onFeatureEvent(Events.MessageReactionRemoveAll, community.onReactionClear);
+onFeatureEvent(Events.MessageReactionRemoveEmoji, community.onReactionClear);
+
 client.on(Events.MessageCreate, createMessageHandler({ allowed, localExtension, handleCommand, client, isStopping: () => stopping,
   voiceManager, music, active, store, mediaStore, answer, logError }));
 client.on(Events.VoiceStateUpdate, (oldState, newState) => { music.voiceStateUpdate(oldState, newState); voiceManager.voiceStateUpdate(oldState, newState); });
@@ -310,8 +386,12 @@ async function shutdown(exitCode = 0) {
   shutdownController.abort(new DOMException('Bot is restarting', 'AbortError'));
   try { await localExtension?.close?.(); } catch (error) { logError('local_close_error', error); exitCode = 1; }
   const deadline = Date.now() + 20000;
-  while (active.size && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+  while ((active.size || activeFeatures.size) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
   await recoveryTask;
+  const featureClosures = await Promise.allSettled([personal, subscriptions, utilities, community].map(async feature => feature.close()));
+  for (const result of featureClosures) {
+    if (result.status === 'rejected') { logError('feature_close_error', result.reason); exitCode = 1; }
+  }
   client.destroy();
   try { await knowledge.close(); } catch (error) { logError('knowledge_close_error', error); exitCode = 1; }
   try { store.close(); } catch (error) { logError('memory_close_error', error); exitCode = 1; }

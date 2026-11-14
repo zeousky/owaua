@@ -7,7 +7,7 @@ import { knowledgeCommand } from './knowledge-command.js';
 import { speakCommand, transcribeCommand, voiceCommand } from './voice-command.js';
 import { JIKI_MAX_PROMPT_LENGTH } from './jiki.js';
 
-// One registry for Discord registration and dot-prefix parsing.
+// Chat commands shared by Discord registration and dot-prefix parsing.
 export const commands = [
   { name: 'ask', description: 'Ask Owaua anything', options: [
     { type: 3, name: 'prompt', description: 'Your question', required: true, max_length: 6000 },
